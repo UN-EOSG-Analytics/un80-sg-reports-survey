@@ -12,7 +12,7 @@ export default async function Home() {
 
         <section className="mt-10">
           <h2 className="mb-6 text-2xl font-bold text-foreground">Secretary-General&apos;s Reports</h2>
-          <SGReportsList />
+          <SGReportsList userEntity={user?.entity} />
         </section>
       </div>
     </main>

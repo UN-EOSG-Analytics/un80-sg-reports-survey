@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Loader2, ChevronUp, ChevronDown, Filter, X, FileText, Search } from "lucide-react";
+import { Loader2, ChevronUp, ChevronDown, Filter, X, FileText, Search, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
   Popover,
   PopoverContent,
@@ -23,16 +24,26 @@ interface ReportGroup {
   symbol: string;
   body: string | null;
   year: number | null;
+  entity: string | null;
+  entityManual: string | null;
+  entityDri: string | null;
   versions: Version[];
   count: number;
   latestYear: number | null;
   frequency: string | null;
+  subjectTerms: string[];
+}
+
+interface SubjectCount {
+  subject: string;
+  count: number;
 }
 
 interface FilterOptions {
   bodies: string[];
   years: number[];
   frequencies: string[];
+  entities: string[];
 }
 
 interface APIResponse {
@@ -41,14 +52,18 @@ interface APIResponse {
   page: number;
   limit: number;
   filterOptions: FilterOptions;
+  subjectCounts: SubjectCount[];
 }
 
 interface Filters {
+  search: string; // Unified search for symbol OR title
   symbol: string;
   title: string;
   bodies: string[];
   years: number[];
   frequencies: string[];
+  subjects: string[];
+  entities: string[]; // Filter by reporting entities
 }
 
 // Abbreviations for common UN issuing bodies
@@ -76,10 +91,19 @@ function abbreviateBody(body: string | null): string | null {
     .join("");
 }
 
-type SortColumn = "symbol" | "title" | "body" | "year" | "frequency";
+type SortColumn = "symbol" | "title" | "subjects" | "entity" | "body" | "year" | "frequency";
 type SortDirection = "asc" | "desc";
 
-const GRID_COLS = "grid-cols-[160px_1fr_100px_70px_100px]";
+const GRID_COLS = "grid-cols-[140px_1fr_150px_80px_80px_60px_90px]";
+
+// Convert string to Title Case
+function toTitleCase(str: string): string {
+  return str
+    .toLowerCase()
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
 
 function SortableHeader({
   column,
@@ -177,6 +201,235 @@ function FilterPopover({
   );
 }
 
+// Single subject pill component (reusable)
+function SubjectPill({
+  subject,
+  count,
+  isSelected,
+  onClick,
+  size = "sm",
+}: {
+  subject: string;
+  count?: number;
+  isSelected?: boolean;
+  onClick?: () => void;
+  size?: "xs" | "sm";
+}) {
+  const sizeClasses = size === "xs" 
+    ? "px-1.5 py-0.5 text-[10px]" 
+    : "px-2 py-0.5 text-xs";
+  
+  const Component = onClick ? "button" : "span";
+  
+  return (
+    <Component
+      onClick={onClick}
+      className={`inline-flex items-center gap-1 rounded-full font-medium transition-colors whitespace-nowrap ${sizeClasses} ${
+        isSelected
+          ? "bg-un-blue text-white"
+          : onClick
+          ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
+          : "bg-gray-100 text-gray-600"
+      }`}
+    >
+      <span>{toTitleCase(subject)}</span>
+      {count !== undefined && (
+        <span className={`text-[9px] ${isSelected ? "text-blue-200" : "text-gray-400"}`}>
+          {count}
+        </span>
+      )}
+    </Component>
+  );
+}
+
+// Subject filter popover with search and pills
+function SubjectFilterPopover({
+  subjects,
+  selectedSubjects,
+  onToggle,
+}: {
+  subjects: SubjectCount[];
+  selectedSubjects: string[];
+  onToggle: (subject: string) => void;
+}) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  // Filter subjects by search (count > 1 already filtered on backend)
+  const filteredSubjects = useMemo(() => {
+    if (!searchQuery) return subjects;
+    const query = searchQuery.toLowerCase();
+    return subjects.filter((s) => s.subject.toLowerCase().includes(query));
+  }, [subjects, searchQuery]);
+  
+  const DEFAULT_VISIBLE = 20;
+  const visibleSubjects = isExpanded 
+    ? filteredSubjects 
+    : filteredSubjects.slice(0, DEFAULT_VISIBLE);
+  const hasMore = filteredSubjects.length > DEFAULT_VISIBLE;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          className={`ml-1 inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
+            selectedSubjects.length > 0
+              ? "bg-un-blue text-white"
+              : "text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+          }`}
+        >
+          <Filter className="h-3 w-3" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-3" align="start">
+        <div className="space-y-3">
+          {/* Search input */}
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+            <Input
+              placeholder="Search subjects..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-8 text-sm pl-7"
+            />
+          </div>
+          
+          {/* Clear button */}
+          {selectedSubjects.length > 0 && (
+            <button
+              onClick={() => selectedSubjects.forEach((s) => onToggle(s))}
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+            >
+              <X className="h-3 w-3" /> Clear {selectedSubjects.length} selected
+            </button>
+          )}
+          
+          {/* Pills */}
+          <div className="flex flex-wrap gap-1.5 max-h-64 overflow-y-auto">
+            {visibleSubjects.map(({ subject, count }) => (
+              <SubjectPill
+                key={subject}
+                subject={subject}
+                count={count}
+                isSelected={selectedSubjects.includes(subject)}
+                onClick={() => onToggle(subject)}
+              />
+            ))}
+            {filteredSubjects.length === 0 && (
+              <p className="text-xs text-gray-400 py-2">No subjects found</p>
+            )}
+          </div>
+          
+          {/* Show more/less */}
+          {hasMore && !searchQuery && (
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
+            >
+              {isExpanded ? (
+                "Show less"
+              ) : (
+                <>
+                  +{filteredSubjects.length - DEFAULT_VISIBLE} more
+                  <ChevronRight className="h-3 w-3" />
+                </>
+              )}
+            </button>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// Searchable filter popover (for entities, etc.)
+function SearchableFilterPopover({
+  options,
+  selected,
+  onChange,
+  placeholder = "Search...",
+}: {
+  options: string[];
+  selected: string[];
+  onChange: (values: string[]) => void;
+  placeholder?: string;
+}) {
+  const [searchQuery, setSearchQuery] = useState("");
+  
+  const filteredOptions = useMemo(() => {
+    if (!searchQuery) return options;
+    const query = searchQuery.toLowerCase();
+    return options.filter((o) => o.toLowerCase().includes(query));
+  }, [options, searchQuery]);
+
+  const toggleOption = (option: string) => {
+    if (selected.includes(option)) {
+      onChange(selected.filter((v) => v !== option));
+    } else {
+      onChange([...selected, option]);
+    }
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          className={`ml-1 inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
+            selected.length > 0
+              ? "bg-un-blue text-white"
+              : "text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+          }`}
+        >
+          <Filter className="h-3 w-3" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-3" align="start">
+        <div className="space-y-3">
+          {/* Search input */}
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+            <Input
+              placeholder={placeholder}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-8 text-sm pl-7"
+            />
+          </div>
+          
+          {/* Clear button */}
+          {selected.length > 0 && (
+            <button
+              onClick={() => onChange([])}
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+            >
+              <X className="h-3 w-3" /> Clear {selected.length} selected
+            </button>
+          )}
+          
+          {/* Options list */}
+          <div className="space-y-1 max-h-64 overflow-y-auto">
+            {filteredOptions.map((option) => (
+              <label
+                key={option}
+                className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-100 rounded cursor-pointer text-sm"
+              >
+                <Checkbox
+                  checked={selected.includes(option)}
+                  onCheckedChange={() => toggleOption(option)}
+                />
+                <span>{option}</span>
+              </label>
+            ))}
+            {filteredOptions.length === 0 && (
+              <p className="text-xs text-gray-400 py-2 px-2">No results found</p>
+            )}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function ColumnHeaders({
   sortColumn,
   sortDirection,
@@ -184,6 +437,7 @@ function ColumnHeaders({
   filterOptions,
   filters,
   onFilterChange,
+  subjectCounts,
 }: {
   sortColumn: SortColumn | null;
   sortDirection: SortDirection;
@@ -191,6 +445,7 @@ function ColumnHeaders({
   filterOptions: FilterOptions | null;
   filters: Filters;
   onFilterChange: (filters: Filters) => void;
+  subjectCounts: SubjectCount[];
 }) {
   return (
     <div
@@ -213,6 +468,38 @@ function ColumnHeaders({
           sortDirection={sortDirection}
           onSort={onSort}
         />
+      </div>
+      <div className="flex items-center">
+        <span className="uppercase">Subjects</span>
+        {subjectCounts.length > 0 && (
+          <SubjectFilterPopover
+            subjects={subjectCounts}
+            selectedSubjects={filters.subjects}
+            onToggle={(subject) => {
+              const newSubjects = filters.subjects.includes(subject)
+                ? filters.subjects.filter((s) => s !== subject)
+                : [...filters.subjects, subject];
+              onFilterChange({ ...filters, subjects: newSubjects });
+            }}
+          />
+        )}
+      </div>
+      <div className="flex items-center">
+        <SortableHeader
+          column="entity"
+          label="Entity"
+          sortColumn={sortColumn}
+          sortDirection={sortDirection}
+          onSort={onSort}
+        />
+        {filterOptions?.entities && filterOptions.entities.length > 0 && (
+          <SearchableFilterPopover
+            options={filterOptions.entities}
+            selected={filters.entities}
+            onChange={(v) => onFilterChange({ ...filters, entities: v })}
+            placeholder="Search entities..."
+          />
+        )}
       </div>
       <div className="flex items-center">
         <SortableHeader
@@ -430,9 +717,27 @@ function ReportSidebar({
                 </span>
               )}
             </div>
+            
+            {/* Entity info */}
+            {report.entity && (
+              <div className="py-1.5 px-2 bg-gray-50 rounded">
+                <span className="text-sm font-medium text-gray-700">{report.entity}</span>
+                <span className="text-xs text-gray-400 ml-1.5">
+                  {report.entityManual ? "(manual list)" : report.entityDri ? "(DRI)" : ""}
+                </span>
+              </div>
+            )}
+            
             <p className="text-sm text-gray-500">
               {report.count} version{report.count !== 1 ? "s" : ""} • Latest: {report.latestYear ?? "—"}
             </p>
+            {report.subjectTerms && report.subjectTerms.length > 0 && (
+              <div className="flex flex-wrap gap-1 pt-1">
+                {report.subjectTerms.map((term) => (
+                  <SubjectPill key={term} subject={term} size="xs" />
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Pattern visualization */}
@@ -533,6 +838,32 @@ function ReportRow({
         {report.title || <span className="text-gray-400 italic">No title</span>}
       </div>
 
+      {/* Subjects */}
+      <div className="flex items-center gap-1 overflow-hidden">
+        {report.subjectTerms && report.subjectTerms.length > 0 ? (
+          <>
+            {report.subjectTerms.slice(0, 2).map((term) => (
+              <SubjectPill key={term} subject={term} size="xs" />
+            ))}
+            {report.subjectTerms.length > 2 && (
+              <span className="text-[10px] text-gray-400 flex-shrink-0">
+                +{report.subjectTerms.length - 2}
+              </span>
+            )}
+          </>
+        ) : (
+          <span className="text-gray-300 text-xs">—</span>
+        )}
+      </div>
+
+      {/* Entity */}
+      <div 
+        className="text-xs text-gray-600 truncate" 
+        title={report.entity ? `${report.entity}${report.entityManual ? ' (manual)' : report.entityDri ? ' (DRI)' : ''}` : undefined}
+      >
+        {report.entity || <span className="text-gray-300">—</span>}
+      </div>
+
       {/* Body */}
       <div className="text-xs text-gray-500" title={report.body ?? undefined}>
         {abbreviateBody(report.body) ?? "—"}
@@ -561,26 +892,36 @@ function ReportRow({
   );
 }
 
-export function SGReportsList() {
+interface SGReportsListProps {
+  userEntity?: string | null;
+}
+
+export function SGReportsList({ userEntity }: SGReportsListProps) {
   const [data, setData] = useState<APIResponse | null>(null);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [selectedReport, setSelectedReport] = useState<ReportGroup | null>(null);
   const [filters, setFilters] = useState<Filters>({
+    search: "",
     symbol: "",
     title: "",
     bodies: [],
     years: [],
     frequencies: [],
+    subjects: [],
+    entities: [],
   });
   const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [showMyEntityOnly, setShowMyEntityOnly] = useState(false);
 
   // Debounced text inputs
-  const [symbolInput, setSymbolInput] = useState("");
-  const [titleInput, setTitleInput] = useState("");
+  const [searchInput, setSearchInput] = useState("");
 
   const limit = 20;
+
+  // Determine entity filter: toggle overrides, or use manual filter
+  const effectiveEntityFilters = showMyEntityOnly && userEntity ? [userEntity] : filters.entities;
 
   const fetchData = useCallback(() => {
     setLoading(true);
@@ -589,17 +930,24 @@ export function SGReportsList() {
       limit: String(limit),
     });
 
+    // Unified search
+    if (filters.search) params.set("filterSearch", filters.search);
+    // Legacy filters (kept for compatibility)
     if (filters.symbol) params.set("filterSymbol", filters.symbol);
     if (filters.title) params.set("filterTitle", filters.title);
+    
     filters.bodies.forEach((b) => params.append("filterBody", b));
     filters.years.forEach((y) => params.append("filterYear", String(y)));
     filters.frequencies.forEach((f) => params.append("filterFrequency", f));
+    filters.subjects.forEach((s) => params.append("filterSubject", s));
+    // Entity filter (supports multiple)
+    effectiveEntityFilters.forEach((e) => params.append("filterEntity", e));
 
     fetch(`/api/sg-reports?${params.toString()}`)
       .then((r) => r.json())
       .then(setData)
       .finally(() => setLoading(false));
-  }, [page, filters]);
+  }, [page, filters, effectiveEntityFilters]);
 
   useEffect(() => {
     fetchData();
@@ -608,13 +956,13 @@ export function SGReportsList() {
   // Debounce text filters
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (symbolInput !== filters.symbol || titleInput !== filters.title) {
-        setFilters((f) => ({ ...f, symbol: symbolInput, title: titleInput }));
+      if (searchInput !== filters.search) {
+        setFilters((f) => ({ ...f, search: searchInput }));
         setPage(1);
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [symbolInput, titleInput, filters.symbol, filters.title]);
+  }, [searchInput, filters.search]);
 
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
@@ -648,6 +996,13 @@ export function SGReportsList() {
           if (titleA && !titleB) return sortDirection === "asc" ? -1 : 1;
           comparison = titleA.localeCompare(titleB);
           break;
+        case "entity":
+          const entityA = a.entity || "";
+          const entityB = b.entity || "";
+          if (!entityA && entityB) return sortDirection === "asc" ? 1 : -1;
+          if (entityA && !entityB) return sortDirection === "asc" ? -1 : 1;
+          comparison = entityA.localeCompare(entityB);
+          break;
         case "body":
           const bodyA = a.body || "";
           const bodyB = b.body || "";
@@ -679,11 +1034,15 @@ export function SGReportsList() {
   const totalPages = data ? Math.ceil(data.total / limit) : 0;
 
   const hasActiveFilters =
+    filters.search ||
     filters.symbol ||
     filters.title ||
     filters.bodies.length > 0 ||
     filters.years.length > 0 ||
-    filters.frequencies.length > 0;
+    filters.frequencies.length > 0 ||
+    filters.subjects.length > 0 ||
+    filters.entities.length > 0 ||
+    showMyEntityOnly;
 
   if (loading && !data)
     return (
@@ -696,51 +1055,57 @@ export function SGReportsList() {
     <div className="space-y-4">
       {/* Search filters */}
       <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
-          <Input
-            placeholder="Filter by symbol..."
-            value={symbolInput}
-            onChange={(e) => setSymbolInput(e.target.value)}
-            className="h-8 text-sm pl-3"
-          />
-          {symbolInput && (
-            <button
-              onClick={() => setSymbolInput("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          )}
-        </div>
         <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
-            placeholder="Filter by title..."
-            value={titleInput}
-            onChange={(e) => setTitleInput(e.target.value)}
-            className="h-8 text-sm pl-3"
+            placeholder="Search by symbol or title..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="h-9 text-sm pl-9"
           />
-          {titleInput && (
+          {searchInput && (
             <button
-              onClick={() => setTitleInput("")}
+              onClick={() => setSearchInput("")}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
             >
               <X className="h-3 w-3" />
             </button>
           )}
         </div>
+        
+        {/* Entity toggle - only show if user has an entity */}
+        {userEntity && (
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg">
+            <Switch
+              id="my-entity-toggle"
+              checked={showMyEntityOnly}
+              onCheckedChange={setShowMyEntityOnly}
+            />
+            <label 
+              htmlFor="my-entity-toggle" 
+              className="text-sm text-gray-600 cursor-pointer select-none whitespace-nowrap"
+            >
+              {userEntity} reports only
+            </label>
+          </div>
+        )}
+        
         {hasActiveFilters && (
           <Button
             variant="ghost"
             size="sm"
             onClick={() => {
-              setSymbolInput("");
-              setTitleInput("");
+              setSearchInput("");
+              setShowMyEntityOnly(false);
               setFilters({
+                search: "",
                 symbol: "",
                 title: "",
                 bodies: [],
                 years: [],
                 frequencies: [],
+                subjects: [],
+                entities: [],
               });
               setPage(1);
             }}
@@ -771,6 +1136,7 @@ export function SGReportsList() {
             setFilters(newFilters);
             setPage(1);
           }}
+          subjectCounts={data?.subjectCounts || []}
         />
 
         <div className="divide-y divide-gray-100">

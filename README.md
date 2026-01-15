@@ -29,14 +29,14 @@ cp .env.template .env.local
 
 Edit `.env.local`:
 - `DATABASE_URL` - PostgreSQL connection string
-- `DB_SCHEMA` - Schema for auth tables (e.g. `myapp` → `myapp.users`, `myapp.magic_tokens`)
+- `DB_SCHEMA` - Schema for auth tables (e.g. `sg_reports_survey` → `sg_reports_survey.users`, `sg_reports_survey.magic_tokens`)
 - `AUTH_SECRET` - Generate with `openssl rand -hex 32`
 - `SMTP_*` - Mail server for magic links
 - `BASE_URL` - Your app URL (for magic link emails)
 
 ### 3. Create database tables
 
-Edit `sql/auth_tables.sql` and replace `myapp` with your schema name (must match `DB_SCHEMA`), then:
+Edit `sql/auth_tables.sql` and replace `sg_reports_survey` with your schema name (must match `DB_SCHEMA`), then:
 
 ```bash
 psql $DATABASE_URL -f sql/auth_tables.sql

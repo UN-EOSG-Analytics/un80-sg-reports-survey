@@ -106,7 +106,7 @@ def store_reports_in_db(df: pd.DataFrame) -> int:
         "session_or_year", "date", "date_year", "publication_date",
         "proper_title", "title", "subtitle", "other_title", "uniform_title",
         "resource_type_level2", "resource_type_level3",
-        "corporate_name_level1", "corporate_name_level2", "conference_name",
+        "un_body", "corporate_name_level1", "corporate_name_level2", "conference_name",
         "subject_terms", "agenda_document_symbol", "agenda_item_number",
         "agenda_item_title", "agenda_subjects", "related_resource_identifier",
         "is_part", "symbol_without_prefix", "symbol_without_prefix_split",
@@ -188,7 +188,7 @@ def store_reports_in_db(df: pd.DataFrame) -> int:
 
 if __name__ == "__main__":
     # Fetch raw reports from API
-    raw_reports = get_reports_metadata(doc_type="Secretary-General's Reports", start_date=2025)
+    raw_reports = get_reports_metadata(doc_type="Secretary-General's Reports", start_date=2020)
     print(f"Fetched {len(raw_reports)} raw reports")
     
     # Create DataFrame with raw_json column (propagates through explode)

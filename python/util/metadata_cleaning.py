@@ -497,7 +497,6 @@ DROP_COLUMNS = [
     "publisher",
     "responsibility",
     "vote_summary_and_meeting_number",
-    "un_body",
     "resource_type_level1",  # all "Documents and Publications", not useful
 ]
 

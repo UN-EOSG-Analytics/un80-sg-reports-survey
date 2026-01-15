@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS sg_reports_survey.reports (
   resource_type_level3 TEXT[],
   
   -- Organizational
+  un_body TEXT,
   corporate_name_level1 TEXT,
   corporate_name_level2 TEXT,
   conference_name TEXT,

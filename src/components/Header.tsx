@@ -7,8 +7,8 @@ interface Props {
   children?: React.ReactNode;
 }
 
-export const SITE_TITLE = "UN Web App";
-export const SITE_SUBTITLE = "A modern web application for the United Nations";
+export const SITE_TITLE = "SG Reports Survey";
+export const SITE_SUBTITLE = "Streamlining reports of the UN Secretary-General";
 
 export function Header({ user, children }: Props) {
   return (

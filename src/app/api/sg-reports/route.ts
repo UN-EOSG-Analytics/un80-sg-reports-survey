@@ -10,6 +10,7 @@ interface ReportRow {
   bodies: (string | null)[];
   publication_dates: (string | null)[];
   record_numbers: (string | null)[];
+  word_counts: (number | null)[];
   subject_terms_agg: (string[] | unknown)[];
   entities: (string | null)[];
   entities_manual: (string | null)[];
@@ -73,7 +74,12 @@ export async function GET(req: NextRequest) {
   }
 
   // Build WHERE clauses for filters
-  const whereClauses: string[] = ["r.proper_title IS NOT NULL"];
+  // Exclude corrigenda (CORR) and revisions (REV) - these are corrections to existing documents
+  const whereClauses: string[] = [
+    "r.proper_title IS NOT NULL",
+    "r.symbol NOT LIKE '%/CORR.%'",
+    "r.symbol NOT LIKE '%/REV.%'",
+  ];
   const params: (string | number)[] = [];
   let paramIndex = 1;
 
@@ -130,6 +136,7 @@ export async function GET(req: NextRequest) {
         array_agg(un_body ORDER BY effective_year DESC NULLS LAST, symbol) as bodies,
         array_agg(publication_date ORDER BY effective_year DESC NULLS LAST, symbol) as publication_dates,
         array_agg(record_number ORDER BY effective_year DESC NULLS LAST, symbol) as record_numbers,
+        array_agg(word_count ORDER BY effective_year DESC NULLS LAST, symbol) as word_counts,
         array_agg(to_json(COALESCE(subject_terms, ARRAY[]::text[])) ORDER BY effective_year DESC NULLS LAST, symbol) as subject_terms_agg,
         array_agg(entity ORDER BY effective_year DESC NULLS LAST, symbol) as entities,
         array_agg(entity_manual ORDER BY effective_year DESC NULLS LAST, symbol) as entities_manual,
@@ -143,6 +150,7 @@ export async function GET(req: NextRequest) {
           r.un_body,
           r.publication_date,
           r.record_number,
+          r.word_count,
           r.subject_terms,
           re.entity,
           re.entity_manual,
@@ -263,6 +271,7 @@ export async function GET(req: NextRequest) {
         year: r.years[i],
         publicationDate: r.publication_dates[i],
         recordNumber: r.record_numbers[i],
+        wordCount: r.word_counts[i],
       })),
       count: r.count,
       latestYear: r.latest_year,

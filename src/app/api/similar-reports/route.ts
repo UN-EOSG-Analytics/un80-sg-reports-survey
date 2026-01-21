@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 
   try {
     // Find similar reports using vector similarity search
-    // Excludes other versions of the same report (same proper_title)
+    // Excludes other versions of the same report series (same proper_title)
     const similar = await query<SimilarReport>(
       `WITH source AS (
         SELECT embedding, proper_title
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
       CROSS JOIN source s
       LEFT JOIN ${DB_SCHEMA}.reporting_entities re ON r.symbol = re.symbol
       WHERE r.embedding IS NOT NULL
-        AND r.proper_title IS DISTINCT FROM s.proper_title
+        AND (s.proper_title IS NULL OR r.proper_title IS NULL OR TRIM(r.proper_title) != TRIM(s.proper_title))
         AND r.symbol != $1
         AND r.symbol NOT LIKE '%/CORR.%'
         AND r.symbol NOT LIKE '%/REV.%'

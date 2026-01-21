@@ -121,7 +121,7 @@ type SortColumn = "symbol" | "title" | "subjects" | "entity" | "body" | "year" |
 type SortDirection = "asc" | "desc";
 
 // Columns: Symbol, Title, Entity, Body, Year, Subjects, Frequency, Decision
-const GRID_COLS = "grid-cols-[150px_1fr_80px_70px_50px_140px_80px_100px]";
+const GRID_COLS = "grid-cols-[120px_1fr_90px_75px_65px_120px_115px_95px]";
 
 // Convert string to Title Case
 function toTitleCase(str: string): string {
@@ -132,15 +132,13 @@ function toTitleCase(str: string): string {
     .join(" ");
 }
 
-function SortableHeader({
+function SortArrow({
   column,
-  label,
   sortColumn,
   sortDirection,
   onSort,
 }: {
   column: SortColumn;
-  label: string;
   sortColumn: SortColumn | null;
   sortDirection: SortDirection;
   onSort: (column: SortColumn) => void;
@@ -149,9 +147,8 @@ function SortableHeader({
   return (
     <button
       onClick={() => onSort(column)}
-      className="flex items-center gap-1 uppercase hover:text-gray-600 transition-colors"
+      className="hover:text-gray-600 transition-colors"
     >
-      <span>{label}</span>
       {isActive ? (
         sortDirection === "asc" ? (
           <ChevronUp className="h-3.5 w-3.5 text-un-blue" />
@@ -193,7 +190,7 @@ function CountFilterPopover({
     <Popover>
       <PopoverTrigger asChild>
         <button
-          className={`ml-1 inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
+          className={`inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
             selected.length > 0
               ? "bg-un-blue text-white"
               : "text-gray-400 hover:bg-gray-200 hover:text-gray-600"
@@ -268,7 +265,7 @@ function FrequencyFilterPopover({
     <Popover>
       <PopoverTrigger asChild>
         <button
-          className={`ml-1 inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
+          className={`inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
             selected.length > 0
               ? "bg-un-blue text-white"
               : "text-gray-400 hover:bg-gray-200 hover:text-gray-600"
@@ -337,7 +334,7 @@ function YearRangeFilter({
     <Popover>
       <PopoverTrigger asChild>
         <button
-          className={`ml-1 inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
+          className={`inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
             isActive ? "bg-un-blue text-white" : "text-gray-400 hover:bg-gray-200 hover:text-gray-600"
           }`}
         >
@@ -540,7 +537,7 @@ function SubjectFilterPopover({
     <Popover>
       <PopoverTrigger asChild>
         <button
-          className={`ml-1 inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
+          className={`inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
             selectedSubjects.length > 0
               ? "bg-un-blue text-white"
               : "text-gray-400 hover:bg-gray-200 hover:text-gray-600"
@@ -630,34 +627,18 @@ function ColumnHeaders({
 }) {
   return (
     <div
-      className={`grid ${GRID_COLS} items-center gap-x-3 px-4 py-2 text-[10px] font-medium tracking-wider text-gray-400 uppercase bg-gray-50 border-b`}
+      className={`grid ${GRID_COLS} items-center gap-x-4 px-4 py-2 text-[10px] font-medium tracking-wider text-gray-400 uppercase bg-gray-50 border-b`}
     >
-      <div className="flex items-center">
-        <SortableHeader
-          column="symbol"
-          label="Symbol"
-          sortColumn={sortColumn}
-          sortDirection={sortDirection}
-          onSort={onSort}
-        />
+      <div className="flex items-center gap-1">
+        <span>Symbol</span>
+        <SortArrow column="symbol" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
       </div>
-      <div className="flex items-center">
-        <SortableHeader
-          column="title"
-          label="Title"
-          sortColumn={sortColumn}
-          sortDirection={sortDirection}
-          onSort={onSort}
-        />
+      <div className="flex items-center gap-1">
+        <span>Title</span>
+        <SortArrow column="title" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
       </div>
-      <div className="flex items-center">
-        <SortableHeader
-          column="entity"
-          label="Entity"
-          sortColumn={sortColumn}
-          sortDirection={sortDirection}
-          onSort={onSort}
-        />
+      <div className="flex items-center gap-1">
+        <span>Entity</span>
         {filterOptions?.entities && filterOptions.entities.length > 0 && (
           <CountFilterPopover
             options={filterOptions.entities}
@@ -666,15 +647,10 @@ function ColumnHeaders({
             label="entities"
           />
         )}
+        <SortArrow column="entity" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
       </div>
-      <div className="flex items-center">
-        <SortableHeader
-          column="body"
-          label="Body"
-          sortColumn={sortColumn}
-          sortDirection={sortDirection}
-          onSort={onSort}
-        />
+      <div className="flex items-center gap-1">
+        <span>Body</span>
         {filterOptions?.bodies && filterOptions.bodies.length > 0 && (
           <CountFilterPopover
             options={filterOptions.bodies}
@@ -683,15 +659,10 @@ function ColumnHeaders({
             label="bodies"
           />
         )}
+        <SortArrow column="body" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
       </div>
-      <div className="flex items-center">
-        <SortableHeader
-          column="year"
-          label="Year"
-          sortColumn={sortColumn}
-          sortDirection={sortDirection}
-          onSort={onSort}
-        />
+      <div className="flex items-center gap-1">
+        <span>Year</span>
         {filterOptions?.yearRange && (
           <YearRangeFilter
             min={filterOptions.yearRange.min}
@@ -700,9 +671,10 @@ function ColumnHeaders({
             onChange={(v) => onFilterChange({ ...filters, yearRange: v })}
           />
         )}
+        <SortArrow column="year" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
       </div>
-      <div className="flex items-center">
-        <span className="uppercase">Subjects</span>
+      <div className="flex items-center gap-1">
+        <span>Subjects</span>
         {subjectCounts.length > 0 && (
           <SubjectFilterPopover
             subjects={subjectCounts}
@@ -716,14 +688,8 @@ function ColumnHeaders({
           />
         )}
       </div>
-      <div className="flex items-center">
-        <SortableHeader
-          column="frequency"
-          label="Frequency"
-          sortColumn={sortColumn}
-          sortDirection={sortDirection}
-          onSort={onSort}
-        />
+      <div className="flex items-center gap-1">
+        <span>Frequency</span>
         {filterOptions?.frequencies && filterOptions.frequencies.length > 0 && (
           <FrequencyFilterPopover
             options={filterOptions.frequencies}
@@ -731,9 +697,10 @@ function ColumnHeaders({
             onChange={(v) => onFilterChange({ ...filters, frequencies: v })}
           />
         )}
+        <SortArrow column="frequency" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
       </div>
-      <div className="flex items-center">
-        <span className="uppercase">Decision</span>
+      <div className="flex items-center gap-1">
+        <span>Decision</span>
       </div>
     </div>
   );
@@ -767,7 +734,7 @@ function getQuarter(publicationDate: string | null): number | null {
   return Math.ceil(month / 3);
 }
 
-// Publication pattern visualization
+// Reporting pattern visualization
 function PublicationPattern({ versions }: { versions: Version[] }) {
   // Get year range (last 6 years from most recent)
   const years = versions
@@ -792,7 +759,7 @@ function PublicationPattern({ versions }: { versions: Version[] }) {
   return (
     <div className="space-y-1">
       <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">
-        Publication Pattern
+        Reporting Pattern
       </div>
       <div className="flex gap-2">
         {displayYears.map((year) => {
@@ -846,8 +813,8 @@ function PublicationPattern({ versions }: { versions: Version[] }) {
 
 // Recommendation types
 type RecommendationStatus = "continue" | "merge" | "discontinue" | null;
-type FrequencyRecommendation = "keep" | "annual" | "biennial" | "triennial" | "quadrennial" | "one-time" | null;
-type FormatRecommendation = "keep" | "shorter" | "oral" | "dashboard" | "other" | null;
+type FrequencyRecommendation = "annual" | "biennial" | "triennial" | "quadrennial" | "one-time" | null;
+type FormatRecommendation = "shorter" | "oral" | "dashboard" | "other" | null;
 
 interface Recommendation {
   status: RecommendationStatus;
@@ -860,40 +827,57 @@ interface Recommendation {
 }
 
 const FREQUENCY_OPTIONS = [
-  { value: "keep", label: "Keep current frequency" },
+  { value: "one-time", label: "One-time only" },
   { value: "annual", label: "Annual" },
   { value: "biennial", label: "Biennial (every 2 years)" },
   { value: "triennial", label: "Triennial (every 3 years)" },
   { value: "quadrennial", label: "Quadrennial (every 4 years)" },
-  { value: "one-time", label: "One-time only" },
 ];
 
 const FORMAT_OPTIONS = [
-  { value: "keep", label: "Keep current format" },
   { value: "shorter", label: "Shorter written report" },
   { value: "oral", label: "Oral update only" },
   { value: "dashboard", label: "Dashboard / data format" },
   { value: "other", label: "Other (specify)" },
 ];
 
+function SelectItemWithCurrent({ value, label, currentValue }: { value: string; label: string; currentValue?: string | null }) {
+  const isCurrent = currentValue?.toLowerCase() === value;
+  return (
+    <SelectItem value={value}>
+      <span className="flex justify-between w-full">
+        <span>{label}</span>
+        {isCurrent && <span className="text-gray-400">current</span>}
+      </span>
+    </SelectItem>
+  );
+}
+
 // Recommendation form component
 function RecommendationForm({
   report,
-  allReports,
+  similarReports,
+  mergeTargets,
+  onMergeTargetsChange,
+  externalMergeStatus,
+  onMergeStatusConsumed,
   onSave,
   userEntity,
 }: {
   report: ReportGroup;
-  allReports: ReportGroup[];
+  similarReports: SimilarReport[];
+  mergeTargets: string[];
+  onMergeTargetsChange: (targets: string[]) => void;
+  externalMergeStatus?: "merge" | null;
+  onMergeStatusConsumed?: () => void;
   onSave?: () => void;
   userEntity?: string | null;
 }) {
   // Check if user can edit this report
   const canEdit = userEntity && report.entity === userEntity;
   
-  const [recommendation, setRecommendation] = useState<Recommendation>({
+  const [recommendation, setRecommendation] = useState<Omit<Recommendation, 'mergeTargets'>>({
     status: null,
-    mergeTargets: [],
     discontinueReason: "",
     frequency: null,
     format: null,
@@ -916,24 +900,24 @@ function RecommendationForm({
         if (data.response) {
           setRecommendation({
             status: data.response.status as RecommendationStatus,
-            mergeTargets: data.response.mergeTargets || [],
             discontinueReason: data.response.discontinueReason || "",
             frequency: data.response.frequency as FrequencyRecommendation,
             format: data.response.format as FormatRecommendation,
             formatOther: data.response.formatOther || "",
             comments: data.response.comments || "",
           });
+          onMergeTargetsChange(data.response.mergeTargets || []);
         } else {
           // Reset form for new report
           setRecommendation({
             status: null,
-            mergeTargets: [],
             discontinueReason: "",
             frequency: null,
             format: null,
             formatOther: "",
             comments: "",
           });
+          onMergeTargetsChange([]);
         }
       })
       .catch(() => {
@@ -942,27 +926,29 @@ function RecommendationForm({
       .finally(() => setLoadingExisting(false));
   }, [report.title]);
   
-  // Filter out current report from merge options
-  const mergeOptions = useMemo(() => 
-    allReports.filter((r) => r.symbol !== report.symbol),
-    [allReports, report.symbol]
-  );
+  // Handle external merge status trigger (from Similar tab)
+  useEffect(() => {
+    if (externalMergeStatus === "merge") {
+      setRecommendation((prev) => ({ ...prev, status: "merge" }));
+      setSaveSuccess(false);
+      onMergeStatusConsumed?.();
+    }
+  }, [externalMergeStatus, onMergeStatusConsumed]);
   
-  const updateRecommendation = <K extends keyof Recommendation>(
+  const updateRecommendation = <K extends keyof Omit<Recommendation, 'mergeTargets'>>(
     key: K,
-    value: Recommendation[K]
+    value: Omit<Recommendation, 'mergeTargets'>[K]
   ) => {
     setRecommendation((prev) => ({ ...prev, [key]: value }));
-    setSaveSuccess(false); // Clear success state on any change
+    setSaveSuccess(false);
   };
 
   const toggleMergeTarget = (symbol: string) => {
-    setRecommendation((prev) => ({
-      ...prev,
-      mergeTargets: prev.mergeTargets.includes(symbol)
-        ? prev.mergeTargets.filter((s) => s !== symbol)
-        : [...prev.mergeTargets, symbol],
-    }));
+    onMergeTargetsChange(
+      mergeTargets.includes(symbol)
+        ? mergeTargets.filter((s) => s !== symbol)
+        : [...mergeTargets, symbol]
+    );
     setSaveSuccess(false);
   };
   
@@ -977,7 +963,7 @@ function RecommendationForm({
     }
     
     if (recommendation.status === "merge") {
-      if (recommendation.mergeTargets.length === 0) return false;
+      if (mergeTargets.length === 0) return false;
     }
     
     if (recommendation.status === "discontinue") {
@@ -1004,7 +990,7 @@ function RecommendationForm({
           frequency: recommendation.frequency,
           format: recommendation.format,
           formatOther: recommendation.formatOther,
-          mergeTargets: recommendation.mergeTargets,
+          mergeTargets: mergeTargets,
           discontinueReason: recommendation.discontinueReason,
           comments: recommendation.comments,
         }),
@@ -1028,16 +1014,20 @@ function RecommendationForm({
   if (!canEdit) {
     return (
       <div className="space-y-4">
-        <div className="rounded-lg bg-gray-50 border border-gray-200 p-4 text-center">
-          <p className="text-sm text-gray-500">
-            {!userEntity ? (
-              "Please log in to submit a recommendation."
-            ) : !report.entity ? (
-              "This report has no assigned entity."
-            ) : (
-              <>Only <span className="font-medium text-gray-700">{report.entity}</span> can submit a recommendation for this report.</>
-            )}
-          </p>
+        <div className={`rounded-lg p-4 text-center border ${!userEntity ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-200"}`}>
+          {!userEntity ? (
+            <p className="text-sm text-amber-700">
+              <a href="/login" className="font-medium underline hover:text-amber-900">Log in</a> to submit a recommendation.
+            </p>
+          ) : (
+            <p className="text-sm text-gray-500">
+              {!report.entity ? (
+                "This report has no assigned entity."
+              ) : (
+                <>Only <span className="font-medium text-gray-700">{report.entity}</span> can submit a recommendation for this report.</>
+              )}
+            </p>
+          )}
         </div>
         {/* Show grayed out form preview */}
         <div className="opacity-50 pointer-events-none select-none">
@@ -1107,9 +1097,9 @@ function RecommendationForm({
                   aria-expanded={mergePickerOpen}
                   className="w-full justify-between h-auto min-h-9 py-2"
                 >
-                  {recommendation.mergeTargets.length > 0 ? (
+                  {mergeTargets.length > 0 ? (
                     <div className="flex flex-wrap gap-1">
-                      {recommendation.mergeTargets.map((symbol) => (
+                      {mergeTargets.map((symbol) => (
                         <span
                           key={symbol}
                           className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs"
@@ -1126,26 +1116,27 @@ function RecommendationForm({
                       ))}
                     </div>
                   ) : (
-                    <span className="text-gray-500">Select reports to merge with...</span>
+                    <span className="text-gray-500">Select from similar reports...</span>
                   )}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-[350px] p-0" align="start">
+              <PopoverContent className="w-[544px] p-0" align="start">
                 <Command>
-                  <CommandInput placeholder="Search reports..." />
+                  <CommandInput placeholder="Search similar reports..." />
                   <CommandList>
-                    <CommandEmpty>No reports found.</CommandEmpty>
-                    <CommandGroup>
-                      {mergeOptions.slice(0, 50).map((r) => (
+                    <CommandEmpty>No similar reports found.</CommandEmpty>
+                    <CommandGroup className="p-0">
+                      {similarReports.map((r) => (
                         <CommandItem
                           key={r.symbol}
                           value={`${r.symbol} ${r.title}`}
                           onSelect={() => toggleMergeTarget(r.symbol)}
+                          className="px-2 rounded-none"
                         >
                           <Check
                             className={`mr-2 h-4 w-4 ${
-                              recommendation.mergeTargets.includes(r.symbol)
+                              mergeTargets.includes(r.symbol)
                                 ? "opacity-100"
                                 : "opacity-0"
                             }`}
@@ -1186,11 +1177,6 @@ function RecommendationForm({
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">
                 Recommended frequency <span className="text-red-500">*</span>
-                {report.frequency && (
-                  <span className="ml-2 text-xs font-normal text-gray-400">
-                    (currently: {report.frequency})
-                  </span>
-                )}
               </label>
               <Select
                 value={recommendation.frequency ?? undefined}
@@ -1201,9 +1187,7 @@ function RecommendationForm({
                 </SelectTrigger>
                 <SelectContent>
                   {FREQUENCY_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
+                    <SelectItemWithCurrent key={opt.value} value={opt.value} label={opt.label} currentValue={report.frequency} />
                   ))}
                 </SelectContent>
               </Select>
@@ -1221,9 +1205,7 @@ function RecommendationForm({
                 </SelectTrigger>
                 <SelectContent>
                   {FORMAT_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
+                    <SelectItemWithCurrent key={opt.value} value={opt.value} label={opt.label} />
                   ))}
                 </SelectContent>
               </Select>
@@ -1288,28 +1270,19 @@ interface SimilarReport {
 }
 
 // Similar reports component
-function SimilarReports({ symbol }: { symbol: string }) {
-  const [similar, setSimilar] = useState<SimilarReport[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setLoading(true);
-    setError(null);
-    
-    fetch(`/api/similar-reports?symbol=${encodeURIComponent(symbol)}&limit=5`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.error) {
-          setError(data.error);
-        } else {
-          setSimilar(data.similar || []);
-        }
-      })
-      .catch(() => setError("Failed to load similar reports"))
-      .finally(() => setLoading(false));
-  }, [symbol]);
-
+function SimilarReports({
+  similar,
+  loading,
+  error,
+  onMerge,
+  mergeTargets,
+}: {
+  similar: SimilarReport[];
+  loading: boolean;
+  error: string | null;
+  onMerge?: (symbol: string) => void;
+  mergeTargets?: string[];
+}) {
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-sm text-gray-400 py-4">
@@ -1329,31 +1302,46 @@ function SimilarReports({ symbol }: { symbol: string }) {
 
   return (
     <div className="divide-y divide-gray-100">
-      {similar.map((r) => (
-        <a
-          key={r.symbol}
-          href={buildDLLink(r.symbol)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-start gap-3 py-3 hover:bg-gray-50 rounded -mx-2 px-2 transition-colors"
-        >
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-gray-900" title={r.title}>
-              {r.title}
-            </p>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-xs text-gray-500">
-                {r.symbol} • {r.year ?? "—"}
-              </span>
-              {r.entity && (
-                <span className="inline-block rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
-                  {r.entity}
+      {similar.map((r) => {
+        const isInMerge = mergeTargets?.includes(r.symbol);
+        return (
+          <div key={r.symbol} className="flex items-start gap-3 py-3">
+            <div className="flex-1 min-w-0">
+              <a
+                href={buildDLLink(r.symbol)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-gray-900 hover:text-un-blue"
+                title={r.title}
+              >
+                {r.title}
+              </a>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xs text-gray-500">
+                  {r.symbol} • {r.year ?? "—"}
                 </span>
-              )}
+                {r.entity && (
+                  <span className="inline-block rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
+                    {r.entity}
+                  </span>
+                )}
+              </div>
             </div>
+            {onMerge && (
+              <button
+                onClick={() => onMerge(r.symbol)}
+                className={`flex-shrink-0 px-2 py-1 text-xs font-medium rounded transition-colors ${
+                  isInMerge
+                    ? "bg-green-100 text-green-700"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                {isInMerge ? "Added" : "Merge"}
+              </button>
+            )}
           </div>
-        </a>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -1516,19 +1504,55 @@ function InfoTabContent({ report, subjectCounts }: { report: ReportGroup; subjec
 function ReportSidebar({
   report,
   onClose,
-  allReports,
   subjectCounts,
   onSave,
   userEntity,
 }: {
   report: ReportGroup | null;
   onClose: () => void;
-  allReports: ReportGroup[];
   subjectCounts: SubjectCount[];
   onSave?: () => void;
   userEntity?: string | null;
 }) {
   const [activeTab, setActiveTab] = useState<"decision" | "info" | "similar">("decision");
+  const [similar, setSimilar] = useState<SimilarReport[]>([]);
+  const [similarLoading, setSimilarLoading] = useState(false);
+  const [similarError, setSimilarError] = useState<string | null>(null);
+  const [mergeTargets, setMergeTargets] = useState<string[]>([]);
+  const [mergeStatus, setMergeStatus] = useState<"merge" | null>(null);
+
+  // Fetch similar reports when report changes
+  useEffect(() => {
+    if (!report) return;
+    setSimilarLoading(true);
+    setSimilarError(null);
+    setMergeTargets([]);
+    setMergeStatus(null);
+    
+    fetch(`/api/similar-reports?symbol=${encodeURIComponent(report.symbol)}&limit=10`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.error) setSimilarError(data.error);
+        else setSimilar(data.similar || []);
+      })
+      .catch(() => setSimilarError("Failed to load similar reports"))
+      .finally(() => setSimilarLoading(false));
+  }, [report?.symbol]);
+
+  const handleMergeFromSimilar = useCallback((symbol: string) => {
+    // Add to merge targets if not already there
+    setMergeTargets((prev) => prev.includes(symbol) ? prev : [...prev, symbol]);
+    // Set status to merge
+    setMergeStatus("merge");
+    // Switch to decision tab
+    setActiveTab("decision");
+  }, []);
+
+  const toggleMergeTarget = useCallback((symbol: string) => {
+    setMergeTargets((prev) =>
+      prev.includes(symbol) ? prev.filter((s) => s !== symbol) : [...prev, symbol]
+    );
+  }, []);
 
   if (!report) return null;
 
@@ -1546,7 +1570,7 @@ function ReportSidebar({
         onClick={onClose}
       />
       {/* Sidebar */}
-      <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-xl z-50 flex flex-col">
+      <div className="fixed right-0 top-0 h-full w-full max-w-xl bg-white shadow-xl z-50 flex flex-col">
         {/* Header with tabs */}
         <div className="flex-shrink-0 bg-gray-50 border-b">
           <div className="flex items-center justify-between px-1 pt-1">
@@ -1574,17 +1598,30 @@ function ReportSidebar({
           </div>
         </div>
 
-        {/* Tab content - scrollable */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {activeTab === "decision" && (
-            <RecommendationForm report={report} allReports={allReports} onSave={onSave} userEntity={userEntity} />
-          )}
-          {activeTab === "info" && (
-            <InfoTabContent report={report} subjectCounts={subjectCounts} />
-          )}
-          {activeTab === "similar" && (
-            <SimilarReports symbol={report.symbol} />
-          )}
+        {/* Tab content - scrollable (use hidden instead of unmounting to preserve state) */}
+        <div className={`flex-1 overflow-y-auto p-4 ${activeTab !== "decision" ? "hidden" : ""}`}>
+          <RecommendationForm
+            report={report}
+            similarReports={similar}
+            mergeTargets={mergeTargets}
+            onMergeTargetsChange={setMergeTargets}
+            externalMergeStatus={mergeStatus}
+            onMergeStatusConsumed={() => setMergeStatus(null)}
+            onSave={onSave}
+            userEntity={userEntity}
+          />
+        </div>
+        <div className={`flex-1 overflow-y-auto p-4 ${activeTab !== "info" ? "hidden" : ""}`}>
+          <InfoTabContent report={report} subjectCounts={subjectCounts} />
+        </div>
+        <div className={`flex-1 overflow-y-auto p-4 ${activeTab !== "similar" ? "hidden" : ""}`}>
+          <SimilarReports
+            similar={similar}
+            loading={similarLoading}
+            error={similarError}
+            onMerge={handleMergeFromSimilar}
+            mergeTargets={mergeTargets}
+          />
         </div>
       </div>
     </>
@@ -1606,7 +1643,7 @@ function ReportRow({
 }) {
   return (
     <div
-      className={`grid ${GRID_COLS} items-center gap-x-3 px-4 py-3 text-sm border-b transition-colors cursor-pointer ${
+      className={`grid ${GRID_COLS} items-center gap-x-4 px-4 py-3 text-sm border-b transition-colors cursor-pointer ${
         isSelected ? "bg-blue-50 border-l-2 border-l-un-blue" : "hover:bg-gray-50"
       }`}
       onClick={onSelect}
@@ -1614,11 +1651,11 @@ function ReportRow({
       {/* Symbol */}
       <div className="flex items-center">
         <span
-          className="inline-block rounded bg-blue-50 px-2 py-0.5 text-xs font-medium whitespace-nowrap text-un-blue truncate max-w-[150px]"
+          className="inline-block rounded bg-blue-50 px-2 py-0.5 text-xs font-medium whitespace-nowrap text-un-blue truncate max-w-[120px]"
           title={report.symbol}
         >
-          {report.symbol.length > 18
-            ? `${report.symbol.slice(0, 18)}…`
+          {report.symbol.length > 14
+            ? `${report.symbol.slice(0, 14)}…`
             : report.symbol}
         </span>
       </div>
@@ -1737,7 +1774,12 @@ export function SGReportsList({ userEntity }: SGReportsListProps) {
   });
   const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-  const [showMyEntityOnly, setShowMyEntityOnly] = useState(false);
+  const [showMyEntityOnly, setShowMyEntityOnly] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("showMyEntityOnly") === "true";
+    }
+    return false;
+  });
   const [surveyResponses, setSurveyResponses] = useState<Record<string, { status: string; frequency: string | null; format: string | null }>>({});
 
   // Debounced text inputs
@@ -1920,6 +1962,7 @@ export function SGReportsList({ userEntity }: SGReportsListProps) {
               checked={showMyEntityOnly}
               onCheckedChange={(checked) => {
                 setShowMyEntityOnly(checked);
+                localStorage.setItem("showMyEntityOnly", String(checked));
                 setPage(1);
               }}
             />
@@ -1941,6 +1984,7 @@ export function SGReportsList({ userEntity }: SGReportsListProps) {
             onClick={() => {
               setSearchInput("");
               setShowMyEntityOnly(false);
+              localStorage.setItem("showMyEntityOnly", "false");
               setFilters({
                 search: "",
                 symbol: "",
@@ -2030,7 +2074,6 @@ export function SGReportsList({ userEntity }: SGReportsListProps) {
       <ReportSidebar
         report={selectedReport}
         onClose={() => setSelectedReport(null)}
-        allReports={data?.reports || []}
         subjectCounts={data?.subjectCounts || []}
         userEntity={userEntity}
         onSave={() => {

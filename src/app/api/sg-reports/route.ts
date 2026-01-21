@@ -80,11 +80,12 @@ export async function GET(req: NextRequest) {
   }
 
   // Build WHERE clauses for filters
-  // Exclude corrigenda (CORR) and revisions (REV) - these are corrections to existing documents
+  // Exclude corrigenda (CORR), revisions (REV), and credentials reports
   const whereClauses: string[] = [
     "r.proper_title IS NOT NULL",
     "r.symbol NOT LIKE '%/CORR.%'",
     "r.symbol NOT LIKE '%/REV.%'",
+    "NOT (r.subject_terms @> ARRAY['Representative''s credentials'])",
   ];
   const params: (string | number)[] = [];
   let paramIndex = 1;
@@ -202,11 +203,12 @@ export async function GET(req: NextRequest) {
        WHERE proper_title IS NOT NULL`
     ),
     // Get subject term counts - count by unique report title (not by version/symbol)
-    // Only include subjects that appear in more than one report
+    // Only include subjects that appear in more than one report (excluding credentials)
     query<SubjectCount>(
       `SELECT subject as subject, COUNT(DISTINCT proper_title)::int as count
        FROM ${DB_SCHEMA}.reports, unnest(subject_terms) as subject
        WHERE proper_title IS NOT NULL
+         AND subject != 'Representative''s credentials'
        GROUP BY subject
        HAVING COUNT(DISTINCT proper_title) > 1
        ORDER BY count DESC, subject`

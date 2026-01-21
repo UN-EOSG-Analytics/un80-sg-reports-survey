@@ -34,6 +34,11 @@ interface SingleReportRow {
   updated_at: Date;
 }
 
+interface CountItem {
+  value: string;
+  count: number;
+}
+
 interface SubjectCount {
   subject: string;
   count: number;
@@ -50,7 +55,8 @@ export async function GET(req: NextRequest) {
   const filterTitle = req.nextUrl.searchParams.get("filterTitle") || "";
   const filterSearch = req.nextUrl.searchParams.get("filterSearch") || ""; // Unified search for symbol OR title
   const filterBodies = req.nextUrl.searchParams.getAll("filterBody");
-  const filterYears = req.nextUrl.searchParams.getAll("filterYear").map(Number).filter(Boolean);
+  const filterYearMin = parseInt(req.nextUrl.searchParams.get("filterYearMin") || "") || null;
+  const filterYearMax = parseInt(req.nextUrl.searchParams.get("filterYearMax") || "") || null;
   const filterFrequencies = req.nextUrl.searchParams.getAll("filterFrequency");
   const filterSubjects = req.nextUrl.searchParams.getAll("filterSubject");
   const filterEntities = req.nextUrl.searchParams.getAll("filterEntity"); // Filter by reporting entities
@@ -104,9 +110,11 @@ export async function GET(req: NextRequest) {
   }
 
   if (filterBodies.length > 0) {
-    whereClauses.push(`r.un_body = ANY($${paramIndex})`);
-    params.push(filterBodies as unknown as string);
-    paramIndex++;
+    // Handle PostgreSQL array format in un_body (e.g. '{"General Assembly"}')
+    const bodyConditions = filterBodies.map((_, i) => `r.un_body LIKE '%' || $${paramIndex + i} || '%'`).join(' OR ');
+    whereClauses.push(`(${bodyConditions})`);
+    filterBodies.forEach((b) => params.push(b));
+    paramIndex += filterBodies.length;
   }
 
   if (filterSubjects.length > 0) {
@@ -127,7 +135,7 @@ export async function GET(req: NextRequest) {
   // Otherwise, return paginated list grouped by title
   // Use COALESCE to fall back to publication_date year when date_year is null
   // Extract year from publication_date using substring (format: YYYY-MM-DD or similar)
-  const [reports, countResult, distinctBodies, distinctYears, subjectCounts, distinctEntities] = await Promise.all([
+  const [reports, countResult, bodyCounts, yearRange, subjectCounts, entityCounts] = await Promise.all([
     query<ReportRow>(
       `SELECT 
         proper_title,
@@ -178,19 +186,20 @@ export async function GET(req: NextRequest) {
        WHERE ${whereClause}`,
       params
     ),
-    query<{ body: string }>(
-      `SELECT DISTINCT un_body as body FROM ${DB_SCHEMA}.reports 
-       WHERE un_body IS NOT NULL ORDER BY un_body`
+    // Body counts by distinct proper_title
+    query<{ body: string; count: number }>(
+      `SELECT un_body as body, COUNT(DISTINCT proper_title)::int as count 
+       FROM ${DB_SCHEMA}.reports 
+       WHERE un_body IS NOT NULL AND proper_title IS NOT NULL
+       GROUP BY un_body ORDER BY count DESC`
     ),
-    query<{ year: number }>(
-      `SELECT DISTINCT COALESCE(
-        date_year,
-        CASE WHEN publication_date ~ '^\\d{4}' 
-        THEN SUBSTRING(publication_date FROM 1 FOR 4)::int END
-      ) as year
-      FROM ${DB_SCHEMA}.reports 
-      WHERE proper_title IS NOT NULL
-      ORDER BY year DESC NULLS LAST`
+    // Year range (min/max)
+    query<{ min_year: number; max_year: number }>(
+      `SELECT 
+        MIN(COALESCE(date_year, CASE WHEN publication_date ~ '^\\d{4}' THEN SUBSTRING(publication_date FROM 1 FOR 4)::int END))::int as min_year,
+        MAX(COALESCE(date_year, CASE WHEN publication_date ~ '^\\d{4}' THEN SUBSTRING(publication_date FROM 1 FOR 4)::int END))::int as max_year
+       FROM ${DB_SCHEMA}.reports 
+       WHERE proper_title IS NOT NULL`
     ),
     // Get subject term counts - count by unique report title (not by version/symbol)
     // Only include subjects that appear in more than one report
@@ -202,10 +211,13 @@ export async function GET(req: NextRequest) {
        HAVING COUNT(DISTINCT proper_title) > 1
        ORDER BY count DESC, subject`
     ),
-    // Get distinct entities
-    query<{ entity: string }>(
-      `SELECT DISTINCT entity FROM ${DB_SCHEMA}.reporting_entities 
-       WHERE entity IS NOT NULL ORDER BY entity`
+    // Entity counts by distinct proper_title
+    query<{ entity: string; count: number }>(
+      `SELECT re.entity, COUNT(DISTINCT r.proper_title)::int as count 
+       FROM ${DB_SCHEMA}.reporting_entities re
+       JOIN ${DB_SCHEMA}.reports r ON re.symbol = r.symbol
+       WHERE re.entity IS NOT NULL AND r.proper_title IS NOT NULL
+       GROUP BY re.entity ORDER BY count DESC`
     ),
   ]);
 
@@ -280,9 +292,9 @@ export async function GET(req: NextRequest) {
     };
   });
 
-  // Apply year filter
-  if (filterYears.length > 0) {
-    filteredReports = filteredReports.filter((r) => r.year && filterYears.includes(r.year));
+  // Apply year range filter
+  if (filterYearMin !== null && filterYearMax !== null) {
+    filteredReports = filteredReports.filter((r) => r.year && r.year >= filterYearMin && r.year <= filterYearMax);
   }
 
   // Apply frequency filter
@@ -293,16 +305,26 @@ export async function GET(req: NextRequest) {
   // Get unique frequencies from all data
   const allFrequencies = ["One-time", "Annual", "Biennial", "Triennial", "Quadrennial", "Quinquennial"];
 
+  // Parse and dedupe body counts
+  const bodyCountMap = new Map<string, number>();
+  bodyCounts.forEach((b) => {
+    const parsed = parseBodyString(b.body);
+    if (parsed) bodyCountMap.set(parsed, (bodyCountMap.get(parsed) || 0) + b.count);
+  });
+  const parsedBodyCounts = Array.from(bodyCountMap.entries())
+    .map(([value, count]) => ({ value, count }))
+    .sort((a, b) => b.count - a.count);
+
   return NextResponse.json({
     reports: filteredReports,
     total: countResult[0]?.total || 0,
     page,
     limit,
     filterOptions: {
-      bodies: distinctBodies.map((b) => b.body),
-      years: distinctYears.map((y) => y.year).filter((y): y is number => y !== null),
+      bodies: parsedBodyCounts,
+      yearRange: { min: yearRange[0]?.min_year || 2000, max: yearRange[0]?.max_year || new Date().getFullYear() },
       frequencies: allFrequencies,
-      entities: distinctEntities.map((e) => e.entity),
+      entities: entityCounts.map((e) => ({ value: e.entity, count: e.count })),
     },
     subjectCounts: subjectCounts.map((s) => ({ subject: s.subject, count: s.count })),
   });

@@ -60,11 +60,16 @@ interface SubjectCount {
   count: number;
 }
 
+interface CountItem {
+  value: string;
+  count: number;
+}
+
 interface FilterOptions {
-  bodies: string[];
-  years: number[];
+  bodies: CountItem[];
+  yearRange: { min: number; max: number };
   frequencies: string[];
-  entities: string[];
+  entities: CountItem[];
 }
 
 interface APIResponse {
@@ -81,7 +86,7 @@ interface Filters {
   symbol: string;
   title: string;
   bodies: string[];
-  years: number[];
+  yearRange: [number, number] | null; // [min, max] or null for no filter
   frequencies: string[];
   subjects: string[];
   entities: string[]; // Filter by reporting entities
@@ -144,37 +149,44 @@ function SortableHeader({
   return (
     <button
       onClick={() => onSort(column)}
-      className="flex items-center gap-0.5 uppercase hover:text-gray-600 transition-colors"
+      className="flex items-center gap-1 uppercase hover:text-gray-600 transition-colors"
     >
       <span>{label}</span>
       {isActive ? (
         sortDirection === "asc" ? (
-          <ChevronUp className="h-2.5 w-2.5" />
+          <ChevronUp className="h-3.5 w-3.5 text-un-blue" />
         ) : (
-          <ChevronDown className="h-2.5 w-2.5" />
+          <ChevronDown className="h-3.5 w-3.5 text-un-blue" />
         )
       ) : (
-        <ChevronDown className="h-2.5 w-2.5 opacity-30 hover:opacity-60" />
+        <ChevronDown className="h-3.5 w-3.5 opacity-40" />
       )}
     </button>
   );
 }
 
-function FilterPopover({
+// Filter popover with counts (pill-style like subjects)
+function CountFilterPopover({
   options,
   selected,
   onChange,
+  label,
 }: {
-  options: (string | number)[];
-  selected: (string | number)[];
-  onChange: (values: (string | number)[]) => void;
+  options: CountItem[];
+  selected: string[];
+  onChange: (values: string[]) => void;
+  label?: string;
 }) {
-  const toggleOption = (option: string | number) => {
-    if (selected.includes(option)) {
-      onChange(selected.filter((v) => v !== option));
-    } else {
-      onChange([...selected, option]);
-    }
+  const [searchQuery, setSearchQuery] = useState("");
+  
+  const filtered = useMemo(() => {
+    if (!searchQuery) return options;
+    const q = searchQuery.toLowerCase();
+    return options.filter((o) => o.value.toLowerCase().includes(q));
+  }, [options, searchQuery]);
+
+  const toggleOption = (value: string) => {
+    onChange(selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value]);
   };
 
   return (
@@ -190,7 +202,82 @@ function FilterPopover({
           <Filter className="h-3 w-3" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-56 p-2 max-h-64 overflow-y-auto" align="start">
+      <PopoverContent className="w-72 p-3" align="start">
+        <div className="space-y-3">
+          {options.length > 8 && (
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+              <Input
+                placeholder={`Search ${label || "options"}...`}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-8 text-sm pl-7"
+              />
+            </div>
+          )}
+          {selected.length > 0 && (
+            <button
+              onClick={() => onChange([])}
+              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+            >
+              <X className="h-3 w-3" /> Clear {selected.length} selected
+            </button>
+          )}
+          <div className="flex flex-wrap gap-1.5 max-h-64 overflow-y-auto">
+            {filtered.map(({ value, count }) => (
+              <button
+                key={value}
+                onClick={() => toggleOption(value)}
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium transition-colors whitespace-nowrap ${
+                  selected.includes(value)
+                    ? "bg-un-blue text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                <span>{value}</span>
+                <span className={`text-[9px] ${selected.includes(value) ? "text-blue-200" : "text-gray-400"}`}>
+                  {count}
+                </span>
+              </button>
+            ))}
+            {filtered.length === 0 && (
+              <p className="text-xs text-gray-400 py-2">No options found</p>
+            )}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// Simple frequency filter (no counts, just list)
+function FrequencyFilterPopover({
+  options,
+  selected,
+  onChange,
+}: {
+  options: string[];
+  selected: string[];
+  onChange: (values: string[]) => void;
+}) {
+  const toggleOption = (value: string) => {
+    onChange(selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value]);
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          className={`ml-1 inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
+            selected.length > 0
+              ? "bg-un-blue text-white"
+              : "text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+          }`}
+        >
+          <Filter className="h-3 w-3" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-2" align="start">
         <div className="space-y-1">
           {selected.length > 0 && (
             <button
@@ -200,23 +287,107 @@ function FilterPopover({
               <X className="h-3 w-3" /> Clear filter
             </button>
           )}
-          {options.slice(0, 30).map((option) => (
+          {options.map((opt) => (
             <label
-              key={String(option)}
+              key={opt}
               className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 rounded cursor-pointer text-sm"
             >
               <Checkbox
-                checked={selected.includes(option)}
-                onCheckedChange={() => toggleOption(option)}
+                checked={selected.includes(opt)}
+                onCheckedChange={() => toggleOption(opt)}
               />
-              <span className="truncate">{String(option)}</span>
+              <span>{opt}</span>
             </label>
           ))}
-          {options.length > 30 && (
-            <p className="text-xs text-gray-500 px-2">
-              +{options.length - 30} more...
-            </p>
-          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// Year range slider filter (dual-handle)
+function YearRangeFilter({
+  min,
+  max,
+  value,
+  onChange,
+}: {
+  min: number;
+  max: number;
+  value: [number, number] | null;
+  onChange: (range: [number, number] | null) => void;
+}) {
+  const [localRange, setLocalRange] = useState<[number, number]>(value || [min, max]);
+  const isActive = value !== null;
+  
+  useEffect(() => {
+    if (value) setLocalRange(value);
+    else setLocalRange([min, max]);
+  }, [value, min, max]);
+
+  const handleApply = () => {
+    if (localRange[0] === min && localRange[1] === max) onChange(null);
+    else onChange(localRange);
+  };
+
+  const leftPercent = ((localRange[0] - min) / (max - min)) * 100;
+  const rightPercent = ((localRange[1] - min) / (max - min)) * 100;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          className={`ml-1 inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
+            isActive ? "bg-un-blue text-white" : "text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+          }`}
+        >
+          <Filter className="h-3 w-3" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-4" align="start">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-medium text-gray-700">{localRange[0]}</span>
+            <span className="text-gray-400">–</span>
+            <span className="font-medium text-gray-700">{localRange[1]}</span>
+          </div>
+          <div className="relative h-6 flex items-center">
+            {/* Track background */}
+            <div className="absolute h-1.5 w-full bg-gray-200 rounded" />
+            {/* Active track */}
+            <div
+              className="absolute h-1.5 bg-un-blue rounded"
+              style={{ left: `${leftPercent}%`, right: `${100 - rightPercent}%` }}
+            />
+            {/* Min slider */}
+            <input
+              type="range"
+              min={min}
+              max={max}
+              value={localRange[0]}
+              onChange={(e) => setLocalRange([Math.min(Number(e.target.value), localRange[1] - 1), localRange[1]])}
+              className="absolute w-full h-1.5 appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-un-blue [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-un-blue [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:shadow [&::-moz-range-thumb]:cursor-pointer"
+            />
+            {/* Max slider */}
+            <input
+              type="range"
+              min={min}
+              max={max}
+              value={localRange[1]}
+              onChange={(e) => setLocalRange([localRange[0], Math.max(Number(e.target.value), localRange[0] + 1)])}
+              className="absolute w-full h-1.5 appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-un-blue [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-un-blue [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:shadow [&::-moz-range-thumb]:cursor-pointer"
+            />
+          </div>
+          <div className="flex gap-2">
+            {isActive && (
+              <Button variant="ghost" size="sm" className="flex-1 h-8" onClick={() => onChange(null)}>
+                Clear
+              </Button>
+            )}
+            <Button size="sm" className="flex-1 h-8" onClick={handleApply}>
+              Apply
+            </Button>
+          </div>
         </div>
       </PopoverContent>
     </Popover>
@@ -439,93 +610,6 @@ function SubjectFilterPopover({
   );
 }
 
-// Searchable filter popover (for entities, etc.)
-function SearchableFilterPopover({
-  options,
-  selected,
-  onChange,
-  placeholder = "Search...",
-}: {
-  options: string[];
-  selected: string[];
-  onChange: (values: string[]) => void;
-  placeholder?: string;
-}) {
-  const [searchQuery, setSearchQuery] = useState("");
-  
-  const filteredOptions = useMemo(() => {
-    if (!searchQuery) return options;
-    const query = searchQuery.toLowerCase();
-    return options.filter((o) => o.toLowerCase().includes(query));
-  }, [options, searchQuery]);
-
-  const toggleOption = (option: string) => {
-    if (selected.includes(option)) {
-      onChange(selected.filter((v) => v !== option));
-    } else {
-      onChange([...selected, option]);
-    }
-  };
-
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <button
-          className={`ml-1 inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
-            selected.length > 0
-              ? "bg-un-blue text-white"
-              : "text-gray-400 hover:bg-gray-200 hover:text-gray-600"
-          }`}
-        >
-          <Filter className="h-3 w-3" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-64 p-3" align="start">
-        <div className="space-y-3">
-          {/* Search input */}
-          <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-            <Input
-              placeholder={placeholder}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-8 text-sm pl-7"
-            />
-          </div>
-          
-          {/* Clear button */}
-          {selected.length > 0 && (
-            <button
-              onClick={() => onChange([])}
-              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
-            >
-              <X className="h-3 w-3" /> Clear {selected.length} selected
-            </button>
-          )}
-          
-          {/* Options list */}
-          <div className="space-y-1 max-h-64 overflow-y-auto">
-            {filteredOptions.map((option) => (
-              <label
-                key={option}
-                className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-100 rounded cursor-pointer text-sm"
-              >
-                <Checkbox
-                  checked={selected.includes(option)}
-                  onCheckedChange={() => toggleOption(option)}
-                />
-                <span>{option}</span>
-              </label>
-            ))}
-            {filteredOptions.length === 0 && (
-              <p className="text-xs text-gray-400 py-2 px-2">No results found</p>
-            )}
-          </div>
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
 
 function ColumnHeaders({
   sortColumn,
@@ -575,11 +659,11 @@ function ColumnHeaders({
           onSort={onSort}
         />
         {filterOptions?.entities && filterOptions.entities.length > 0 && (
-          <SearchableFilterPopover
+          <CountFilterPopover
             options={filterOptions.entities}
             selected={filters.entities}
             onChange={(v) => onFilterChange({ ...filters, entities: v })}
-            placeholder="Search entities..."
+            label="entities"
           />
         )}
       </div>
@@ -592,12 +676,11 @@ function ColumnHeaders({
           onSort={onSort}
         />
         {filterOptions?.bodies && filterOptions.bodies.length > 0 && (
-          <FilterPopover
+          <CountFilterPopover
             options={filterOptions.bodies}
             selected={filters.bodies}
-            onChange={(v) =>
-              onFilterChange({ ...filters, bodies: v as string[] })
-            }
+            onChange={(v) => onFilterChange({ ...filters, bodies: v })}
+            label="bodies"
           />
         )}
       </div>
@@ -609,13 +692,12 @@ function ColumnHeaders({
           sortDirection={sortDirection}
           onSort={onSort}
         />
-        {filterOptions?.years && filterOptions.years.length > 0 && (
-          <FilterPopover
-            options={filterOptions.years}
-            selected={filters.years}
-            onChange={(v) =>
-              onFilterChange({ ...filters, years: v as number[] })
-            }
+        {filterOptions?.yearRange && (
+          <YearRangeFilter
+            min={filterOptions.yearRange.min}
+            max={filterOptions.yearRange.max}
+            value={filters.yearRange}
+            onChange={(v) => onFilterChange({ ...filters, yearRange: v })}
           />
         )}
       </div>
@@ -643,12 +725,10 @@ function ColumnHeaders({
           onSort={onSort}
         />
         {filterOptions?.frequencies && filterOptions.frequencies.length > 0 && (
-          <FilterPopover
+          <FrequencyFilterPopover
             options={filterOptions.frequencies}
             selected={filters.frequencies}
-            onChange={(v) =>
-              onFilterChange({ ...filters, frequencies: v as string[] })
-            }
+            onChange={(v) => onFilterChange({ ...filters, frequencies: v })}
           />
         )}
       </div>
@@ -801,11 +881,16 @@ function RecommendationForm({
   report,
   allReports,
   onSave,
+  userEntity,
 }: {
   report: ReportGroup;
   allReports: ReportGroup[];
   onSave?: () => void;
+  userEntity?: string | null;
 }) {
+  // Check if user can edit this report
+  const canEdit = userEntity && report.entity === userEntity;
+  
   const [recommendation, setRecommendation] = useState<Recommendation>({
     status: null,
     mergeTargets: [],
@@ -938,6 +1023,45 @@ function RecommendationForm({
       setSaving(false);
     }
   };
+
+  // Show disabled message if user can't edit
+  if (!canEdit) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-lg bg-gray-50 border border-gray-200 p-4 text-center">
+          <p className="text-sm text-gray-500">
+            {!userEntity ? (
+              "Please log in to submit a recommendation."
+            ) : !report.entity ? (
+              "This report has no assigned entity."
+            ) : (
+              <>Only <span className="font-medium text-gray-700">{report.entity}</span> can submit a recommendation for this report.</>
+            )}
+          </p>
+        </div>
+        {/* Show grayed out form preview */}
+        <div className="opacity-50 pointer-events-none select-none">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">
+              What should happen to this report?
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {["Continue", "Merge", "Discontinue"].map((label) => (
+                <div key={label} className="px-3 py-2 text-sm font-medium rounded-lg border bg-white text-gray-400 border-gray-200">
+                  {label}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-2 mt-4">
+            <label className="text-sm font-medium text-gray-700">Additional comments</label>
+            <div className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm h-20 bg-gray-50" />
+          </div>
+          <div className="mt-4 w-full h-10 rounded-md bg-gray-200" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -1395,16 +1519,24 @@ function ReportSidebar({
   allReports,
   subjectCounts,
   onSave,
+  userEntity,
 }: {
   report: ReportGroup | null;
   onClose: () => void;
   allReports: ReportGroup[];
   subjectCounts: SubjectCount[];
   onSave?: () => void;
+  userEntity?: string | null;
 }) {
-  const [activeTab, setActiveTab] = useState<"info" | "similar">("info");
+  const [activeTab, setActiveTab] = useState<"decision" | "info" | "similar">("decision");
 
   if (!report) return null;
+
+  const tabs = [
+    { key: "decision", label: "Decision" },
+    { key: "info", label: "Info" },
+    { key: "similar", label: "Similar" },
+  ] as const;
 
   return (
     <>
@@ -1415,55 +1547,42 @@ function ReportSidebar({
       />
       {/* Sidebar */}
       <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-xl z-50 flex flex-col">
-        {/* Header */}
-        <div className="flex-shrink-0 border-b px-4 py-3 flex items-center justify-between">
-          <h2 className="font-semibold text-gray-900 truncate pr-4">
-            {report.title}
-          </h2>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-gray-100 rounded transition-colors"
-          >
-            <X className="h-5 w-5 text-gray-500" />
-          </button>
-        </div>
-
-        {/* Survey form - at top */}
-        <div className="flex-shrink-0 border-b px-4 py-4">
-          <RecommendationForm report={report} allReports={allReports} onSave={onSave} />
-        </div>
-
-        {/* Tabs */}
-        <div className="flex-shrink-0 border-b px-4">
-          <div className="flex gap-4">
+        {/* Header with tabs */}
+        <div className="flex-shrink-0 bg-gray-50 border-b">
+          <div className="flex items-center justify-between px-1 pt-1">
+            <div className="flex">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors ${
+                    activeTab === tab.key
+                      ? "bg-white text-gray-900 border-t border-x border-gray-200"
+                      : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
             <button
-              onClick={() => setActiveTab("info")}
-              className={`py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "info"
-                  ? "border-un-blue text-un-blue"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
+              onClick={onClose}
+              className="p-1.5 mr-1 hover:bg-gray-200 rounded transition-colors"
             >
-              Info
-            </button>
-            <button
-              onClick={() => setActiveTab("similar")}
-              className={`py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "similar"
-                  ? "border-un-blue text-un-blue"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              Similar Reports
+              <X className="h-4 w-4 text-gray-500" />
             </button>
           </div>
         </div>
 
         {/* Tab content - scrollable */}
         <div className="flex-1 overflow-y-auto p-4">
-          {activeTab === "info" ? (
+          {activeTab === "decision" && (
+            <RecommendationForm report={report} allReports={allReports} onSave={onSave} userEntity={userEntity} />
+          )}
+          {activeTab === "info" && (
             <InfoTabContent report={report} subjectCounts={subjectCounts} />
-          ) : (
+          )}
+          {activeTab === "similar" && (
             <SimilarReports symbol={report.symbol} />
           )}
         </div>
@@ -1611,7 +1730,7 @@ export function SGReportsList({ userEntity }: SGReportsListProps) {
     symbol: "",
     title: "",
     bodies: [],
-    years: [],
+    yearRange: null,
     frequencies: [],
     subjects: [],
     entities: [],
@@ -1654,7 +1773,10 @@ export function SGReportsList({ userEntity }: SGReportsListProps) {
     if (filters.title) params.set("filterTitle", filters.title);
     
     filters.bodies.forEach((b) => params.append("filterBody", b));
-    filters.years.forEach((y) => params.append("filterYear", String(y)));
+    if (filters.yearRange) {
+      params.set("filterYearMin", String(filters.yearRange[0]));
+      params.set("filterYearMax", String(filters.yearRange[1]));
+    }
     filters.frequencies.forEach((f) => params.append("filterFrequency", f));
     filters.subjects.forEach((s) => params.append("filterSubject", s));
     // Entity filter (supports multiple)
@@ -1755,7 +1877,7 @@ export function SGReportsList({ userEntity }: SGReportsListProps) {
     filters.symbol ||
     filters.title ||
     filters.bodies.length > 0 ||
-    filters.years.length > 0 ||
+    filters.yearRange !== null ||
     filters.frequencies.length > 0 ||
     filters.subjects.length > 0 ||
     filters.entities.length > 0 ||
@@ -1824,7 +1946,7 @@ export function SGReportsList({ userEntity }: SGReportsListProps) {
                 symbol: "",
                 title: "",
                 bodies: [],
-                years: [],
+                yearRange: null,
                 frequencies: [],
                 subjects: [],
                 entities: [],
@@ -1910,6 +2032,7 @@ export function SGReportsList({ userEntity }: SGReportsListProps) {
         onClose={() => setSelectedReport(null)}
         allReports={data?.reports || []}
         subjectCounts={data?.subjectCounts || []}
+        userEntity={userEntity}
         onSave={() => {
           // Refetch survey responses after save
           fetch("/api/survey-responses/my-responses")

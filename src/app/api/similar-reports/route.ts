@@ -41,9 +41,10 @@ export async function GET(req: NextRequest) {
           THEN SUBSTRING(r.publication_date FROM 1 FOR 4)::int END
         ) as year,
         1 - (r.embedding <=> s.embedding) as similarity,
-        COALESCE(r.entity_manual, r.entity_dri) as entity
+        re.entity
       FROM ${DB_SCHEMA}.reports r
       CROSS JOIN source s
+      LEFT JOIN ${DB_SCHEMA}.reporting_entities re ON r.symbol = re.symbol
       WHERE r.embedding IS NOT NULL
         AND r.proper_title IS DISTINCT FROM s.proper_title
         AND r.symbol != $1

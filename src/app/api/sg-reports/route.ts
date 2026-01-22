@@ -187,39 +187,33 @@ export async function GET(req: NextRequest) {
        WHERE ${whereClause}`,
       params
     ),
-    // Body counts by distinct proper_title
+    // Body counts (from latest_versions view - one per series)
     query<{ body: string; count: number }>(
-      `SELECT un_body as body, COUNT(DISTINCT proper_title)::int as count 
-       FROM ${DB_SCHEMA}.reports 
-       WHERE un_body IS NOT NULL AND proper_title IS NOT NULL
+      `SELECT un_body as body, COUNT(*)::int as count 
+       FROM ${DB_SCHEMA}.latest_versions 
+       WHERE un_body IS NOT NULL
        GROUP BY un_body ORDER BY count DESC`
     ),
-    // Year range (min/max)
+    // Year range (from latest_versions view)
     query<{ min_year: number; max_year: number }>(
-      `SELECT 
-        MIN(COALESCE(date_year, CASE WHEN publication_date ~ '^\\d{4}' THEN SUBSTRING(publication_date FROM 1 FOR 4)::int END))::int as min_year,
-        MAX(COALESCE(date_year, CASE WHEN publication_date ~ '^\\d{4}' THEN SUBSTRING(publication_date FROM 1 FOR 4)::int END))::int as max_year
-       FROM ${DB_SCHEMA}.reports 
-       WHERE proper_title IS NOT NULL`
+      `SELECT MIN(effective_year)::int as min_year, MAX(effective_year)::int as max_year
+       FROM ${DB_SCHEMA}.latest_versions`
     ),
-    // Get subject term counts - count by unique report title (not by version/symbol)
-    // Only include subjects that appear in more than one report (excluding credentials)
+    // Subject term counts (from latest_versions - one per series, excluding credentials)
     query<SubjectCount>(
-      `SELECT subject as subject, COUNT(DISTINCT proper_title)::int as count
-       FROM ${DB_SCHEMA}.reports, unnest(subject_terms) as subject
-       WHERE proper_title IS NOT NULL
-         AND subject != 'Representative''s credentials'
+      `SELECT subject, COUNT(*)::int as count
+       FROM ${DB_SCHEMA}.latest_versions, unnest(subject_terms) as subject
+       WHERE subject != 'Representative''s credentials'
        GROUP BY subject
-       HAVING COUNT(DISTINCT proper_title) > 1
+       HAVING COUNT(*) > 1
        ORDER BY count DESC, subject`
     ),
-    // Entity counts by distinct proper_title
+    // Entity counts (from latest_versions view)
     query<{ entity: string; count: number }>(
-      `SELECT re.entity, COUNT(DISTINCT r.proper_title)::int as count 
-       FROM ${DB_SCHEMA}.reporting_entities re
-       JOIN ${DB_SCHEMA}.reports r ON re.symbol = r.symbol
-       WHERE re.entity IS NOT NULL AND r.proper_title IS NOT NULL
-       GROUP BY re.entity ORDER BY count DESC`
+      `SELECT entity, COUNT(*)::int as count 
+       FROM ${DB_SCHEMA}.latest_versions 
+       WHERE entity IS NOT NULL
+       GROUP BY entity ORDER BY count DESC`
     ),
   ]);
 

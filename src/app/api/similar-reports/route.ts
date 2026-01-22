@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 
   try {
     // Find similar reports using vector similarity search
-    // Excludes other versions of the same report series (same proper_title)
+    // Source from reports table (any version), results from latest_versions only
     const similar = await query<SimilarReport>(
       `WITH source AS (
         SELECT embedding, proper_title
@@ -33,31 +33,23 @@ export async function GET(req: NextRequest) {
         AND embedding IS NOT NULL
       )
       SELECT 
-        r.symbol,
-        r.proper_title,
-        COALESCE(
-          r.date_year,
-          CASE WHEN r.publication_date ~ '^\\d{4}' 
-          THEN SUBSTRING(r.publication_date FROM 1 FOR 4)::int END
-        ) as year,
-        1 - (r.embedding <=> s.embedding) as similarity,
-        re.entity
-      FROM ${DB_SCHEMA}.reports r
+        lv.symbol,
+        lv.proper_title,
+        lv.effective_year as year,
+        1 - (lv.embedding <=> s.embedding) as similarity,
+        lv.entity
+      FROM ${DB_SCHEMA}.latest_versions lv
       CROSS JOIN source s
-      LEFT JOIN ${DB_SCHEMA}.reporting_entities re ON r.symbol = re.symbol
-      WHERE r.embedding IS NOT NULL
-        AND (s.proper_title IS NULL OR r.proper_title IS NULL OR TRIM(r.proper_title) != TRIM(s.proper_title))
-        AND r.symbol != $1
-        AND r.symbol NOT LIKE '%/CORR.%'
-        AND r.symbol NOT LIKE '%/REV.%'
-      ORDER BY r.embedding <=> s.embedding
+      WHERE lv.embedding IS NOT NULL
+        AND (s.proper_title IS NULL OR lv.proper_title IS NULL OR TRIM(lv.proper_title) != TRIM(s.proper_title))
+        AND lv.symbol != $1
+      ORDER BY lv.embedding <=> s.embedding
       LIMIT $2`,
       [symbol, limit]
     );
 
     // If no embedding exists for the source report, return empty
     if (similar.length === 0) {
-      // Check if the source report has an embedding
       const hasEmbedding = await query<{ has_embedding: boolean }>(
         `SELECT embedding IS NOT NULL as has_embedding 
          FROM ${DB_SCHEMA}.reports 

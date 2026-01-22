@@ -80,7 +80,8 @@ export async function GET(req: NextRequest) {
   }
 
   // Build WHERE clauses for filters
-  // Exclude corrigenda (CORR), revisions (REV), and credentials reports
+  // Uses sg_reports view (SG reports from multiple sources)
+  // Exclude corrigenda, revisions, and credentials
   const whereClauses: string[] = [
     "r.proper_title IS NOT NULL",
     "r.symbol NOT LIKE '%/CORR.%'",
@@ -171,7 +172,7 @@ export async function GET(req: NextRequest) {
               THEN SUBSTRING(r.publication_date FROM 1 FOR 4)::int 
             END
           ) as effective_year
-        FROM ${DB_SCHEMA}.reports r
+        FROM ${DB_SCHEMA}.sg_reports r
         LEFT JOIN ${DB_SCHEMA}.reporting_entities re ON r.symbol = re.symbol
         WHERE ${whereClause}
       ) sub
@@ -182,7 +183,7 @@ export async function GET(req: NextRequest) {
     ),
     query<{ total: number }>(
       `SELECT COUNT(DISTINCT r.proper_title)::int as total
-       FROM ${DB_SCHEMA}.reports r
+       FROM ${DB_SCHEMA}.sg_reports r
        LEFT JOIN ${DB_SCHEMA}.reporting_entities re ON r.symbol = re.symbol
        WHERE ${whereClause}`,
       params

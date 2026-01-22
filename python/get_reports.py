@@ -50,11 +50,11 @@ def _search_document_symbols(
     return res.json()
 
 
-def get_reports_metadata(doc_type = "Reports", start_date=2024):
+def get_reports_metadata(doc_type="Reports", tag="989__c", start_date=2024):
     all_results, skip, limit, old_streak = [], 0, 100, 0
     while True:
         batch = _search_document_symbols(
-            query=f"'{doc_type}'", tag="989__c", skip=skip, limit=limit
+            query=f"'{doc_type}'", tag=tag, skip=skip, limit=limit
         )
         if not batch:
             break
@@ -186,23 +186,57 @@ def store_reports_in_db(df: pd.DataFrame) -> int:
         conn.close()
 
 
-if __name__ == "__main__":
-    # Fetch raw reports from API
-    raw_reports = get_reports_metadata(doc_type="Secretary-General's Reports", start_date=2020)
-    print(f"Fetched {len(raw_reports)} raw reports")
+def fetch_and_store(doc_type: str, tag: str, start_date: int, fetch_text: bool = True):
+    """Fetch reports of given type, clean, optionally fetch PDFs, and store in DB."""
+    print(f"\n{'='*60}\nFetching: {doc_type} (tag: {tag})\n{'='*60}")
+    raw_reports = get_reports_metadata(doc_type=doc_type, tag=tag, start_date=start_date)
+    print(f"Fetched {len(raw_reports)} raw records")
     
-    # Create DataFrame with raw_json column (propagates through explode)
+    if not raw_reports:
+        return 0
+    
     df = pd.DataFrame(raw_reports)
-    df["raw_json"] = raw_reports  # Each row gets its original dict
-    
-    # Clean metadata (explodes symbols, so raw_json stays with each row)
+    df["raw_json"] = raw_reports
     df = clean_metadata(df)
     print(f"After cleaning: {len(df)} reports")
     
-    # Fetch full text for each report
-    df["text"] = [get_fulltext_or_none(symbol) for symbol in tqdm(df["symbol"], desc="Fetching PDFs")]
+    if fetch_text:
+        df["text"] = [get_fulltext_or_none(s) for s in tqdm(df["symbol"], desc="Fetching PDFs")]
+    else:
+        df["text"] = None
     
-    # Store in database
     store_reports_in_db(df)
+    return len(df)
+
+
+# Sources to fetch for comprehensive SG reports coverage
+SOURCES = [
+    # Approach 1: Classified as SG Reports
+    ("Secretary-General's Reports", "989__c"),
+    # Approach 2: General reports (will be filtered by title in SQL view)
+    ("Reports", "989__b"),
+    # Approach 3: Letters/notes (will be filtered by title in SQL view)
+    ("Letters and Notes Verbales", "989__b"),
+]
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--sg-only", action="store_true", help="Only fetch SG reports (989__c)")
+    parser.add_argument("--no-text", action="store_true", help="Skip PDF text extraction")
+    parser.add_argument("--start-year", type=int, default=2020)
+    args = parser.parse_args()
     
-    print(df.head())
+    fetch_text = not args.no_text
+    counts = {}
+    
+    if args.sg_only:
+        counts["SG Reports"] = fetch_and_store("Secretary-General's Reports", "989__c", args.start_year, fetch_text)
+    else:
+        for doc_type, tag in SOURCES:
+            counts[doc_type] = fetch_and_store(doc_type, tag, args.start_year, fetch_text)
+    
+    print(f"\n{'='*60}\nSUMMARY\n{'='*60}")
+    for src, cnt in counts.items():
+        print(f"  {src}: {cnt} reports")

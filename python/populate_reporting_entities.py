@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Populate reporting_entities table from manual_list.xlsx and dri.xlsx
+Populate reporting_entities table from dgacm_list.xlsx and dri.xlsx
 
 This script:
-1. Reads manual_list.xlsx to get symbol → entity mapping (direct match)
+1. Reads dgacm_list.xlsx to get symbol → entity mapping (direct match)
 2. Reads dri.xlsx and uses fuzzy title matching to map DRI entities to symbols
 3. Inserts/updates the reporting_entities table with both sources
 """
@@ -41,20 +41,19 @@ def fuzzy_match_score(s1: str, s2: str) -> float:
     return SequenceMatcher(None, s1, s2).ratio()
 
 
-def load_manual_list(filepath: str) -> pd.DataFrame:
-    """Load and process manual_list.xlsx."""
+def load_dgacm_list(filepath: str) -> pd.DataFrame:
+    """Load and process dgacm_list.xlsx."""
     print(f"Loading {filepath}...")
-    df = pd.read_excel(filepath, header=1)
+    df = pd.read_excel(filepath)
     
-    # Clean up
-    df = df[df["Report Symbol"].notna()].copy()
-    df["Report Symbol"] = df["Report Symbol"].str.strip()
-    df["Lead entity"] = df["Lead entity"].str.strip() if "Lead entity" in df.columns else None
+    df = df[df["Official Symbol"].notna()].copy()
+    df["Official Symbol"] = df["Official Symbol"].str.strip()
+    df["Dept(Author)"] = df["Dept(Author)"].str.strip()
     
     print(f"  Loaded {len(df)} records with symbols")
-    return df[["Report Symbol", "Lead entity"]].rename(columns={
-        "Report Symbol": "symbol",
-        "Lead entity": "entity"
+    return df[["Official Symbol", "Dept(Author)"]].rename(columns={
+        "Official Symbol": "symbol",
+        "Dept(Author)": "entity"
     })
 
 
@@ -180,7 +179,7 @@ def populate_table(conn, manual_df: pd.DataFrame, dri_matches: dict):
     # Collect all data
     all_data = {}
     
-    # Add manual list data (higher priority)
+    # Add DGACM list data (higher priority)
     for _, row in manual_df.iterrows():
         symbol = row["symbol"]
         entity = row["entity"]
@@ -249,11 +248,11 @@ def main():
     print("=" * 60)
     
     # File paths
-    manual_path = "data/manual_list.xlsx"
+    dgacm_path = "data/dgacm_list.xlsx"
     dri_path = "data/dri.xlsx"
     
     # Check files exist
-    for path in [manual_path, dri_path]:
+    for path in [dgacm_path, dri_path]:
         if not os.path.exists(path):
             raise FileNotFoundError(f"Required file not found: {path}")
     
@@ -263,7 +262,7 @@ def main():
     
     try:
         # Load data
-        manual_df = load_manual_list(manual_path)
+        dgacm_df = load_dgacm_list(dgacm_path)
         dri_df = load_dri(dri_path)
         db_df = load_db_reports(conn)
         
@@ -271,7 +270,7 @@ def main():
         dri_matches = match_dri_to_db(dri_df, db_df, threshold=0.8)
         
         # Populate table
-        populate_table(conn, manual_df, dri_matches)
+        populate_table(conn, dgacm_df, dri_matches)
         
         print("\n" + "=" * 60)
         print("Done!")

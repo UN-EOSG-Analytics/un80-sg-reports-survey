@@ -132,61 +132,168 @@ export async function GET(req: NextRequest) {
     paramIndex++;
   }
 
+  // Year range filter (on effective_year, filter on MAX year of the series)
+  // We'll add this as a HAVING clause for proper_title groups
+  const havingClauses: string[] = [];
+  const havingParams: (string | number)[] = [];
+  let havingParamIndex = paramIndex;
+
+  if (filterYearMin !== null) {
+    havingClauses.push(`MAX(effective_year) >= $${havingParamIndex}`);
+    havingParams.push(filterYearMin);
+    havingParamIndex++;
+  }
+  if (filterYearMax !== null) {
+    havingClauses.push(`MAX(effective_year) <= $${havingParamIndex}`);
+    havingParams.push(filterYearMax);
+    havingParamIndex++;
+  }
+
+  // Frequency filter - needs to be calculated and filtered in SQL
+  // We'll use a CTE to calculate frequency and then filter
+  const frequencyFilterSQL = filterFrequencies.length > 0
+    ? `AND frequency = ANY($${havingParamIndex})`
+    : "";
+  if (filterFrequencies.length > 0) {
+    havingParams.push(filterFrequencies as unknown as string);
+    havingParamIndex++;
+  }
+
   const whereClause = whereClauses.join(" AND ");
+  const havingClause = havingClauses.length > 0 ? `HAVING ${havingClauses.join(" AND ")}` : "";
+
+  // Build the main query with CTE to calculate frequency
+  const allParams = [...params, ...havingParams];
+  const limitParamIndex = havingParamIndex;
 
   // Otherwise, return paginated list grouped by title
   // Use COALESCE to fall back to publication_date year when date_year is null
   // Extract year from publication_date using substring (format: YYYY-MM-DD or similar)
   const [reports, countResult, bodyCounts, yearRange, subjectCounts, entityCounts] = await Promise.all([
-    query<ReportRow>(
-      `SELECT 
-        proper_title,
-        array_agg(symbol ORDER BY effective_year DESC NULLS LAST, symbol) as symbols,
-        array_agg(effective_year ORDER BY effective_year DESC NULLS LAST, symbol) as years,
-        array_agg(un_body ORDER BY effective_year DESC NULLS LAST, symbol) as bodies,
-        array_agg(publication_date ORDER BY effective_year DESC NULLS LAST, symbol) as publication_dates,
-        array_agg(record_number ORDER BY effective_year DESC NULLS LAST, symbol) as record_numbers,
-        array_agg(word_count ORDER BY effective_year DESC NULLS LAST, symbol) as word_counts,
-        array_agg(to_json(COALESCE(subject_terms, ARRAY[]::text[])) ORDER BY effective_year DESC NULLS LAST, symbol) as subject_terms_agg,
-        array_agg(entity ORDER BY effective_year DESC NULLS LAST, symbol) as entities,
-        array_agg(entity_manual ORDER BY effective_year DESC NULLS LAST, symbol) as entities_manual,
-        array_agg(entity_dri ORDER BY effective_year DESC NULLS LAST, symbol) as entities_dri,
-        COUNT(*)::int as count,
-        MAX(effective_year) as latest_year
-      FROM (
+    query<ReportRow & { frequency: string }>(
+      `WITH grouped AS (
         SELECT 
-          r.proper_title,
-          r.symbol,
-          r.un_body,
-          r.publication_date,
-          r.record_number,
-          r.word_count,
-          r.subject_terms,
-          re.entity,
-          re.entity_manual,
-          re.entity_dri,
-          COALESCE(
-            r.date_year,
-            CASE 
-              WHEN r.publication_date ~ '^\\d{4}' 
-              THEN SUBSTRING(r.publication_date FROM 1 FOR 4)::int 
-            END
-          ) as effective_year
-        FROM ${DB_SCHEMA}.sg_reports r
-        LEFT JOIN ${DB_SCHEMA}.reporting_entities re ON r.symbol = re.symbol
-        WHERE ${whereClause}
-      ) sub
-      GROUP BY proper_title
+          proper_title,
+          array_agg(symbol ORDER BY effective_year DESC NULLS LAST, symbol) as symbols,
+          array_agg(effective_year ORDER BY effective_year DESC NULLS LAST, symbol) as years,
+          array_agg(un_body ORDER BY effective_year DESC NULLS LAST, symbol) as bodies,
+          array_agg(publication_date ORDER BY effective_year DESC NULLS LAST, symbol) as publication_dates,
+          array_agg(record_number ORDER BY effective_year DESC NULLS LAST, symbol) as record_numbers,
+          array_agg(word_count ORDER BY effective_year DESC NULLS LAST, symbol) as word_counts,
+          array_agg(to_json(COALESCE(subject_terms, ARRAY[]::text[])) ORDER BY effective_year DESC NULLS LAST, symbol) as subject_terms_agg,
+          array_agg(entity ORDER BY effective_year DESC NULLS LAST, symbol) as entities,
+          array_agg(entity_manual ORDER BY effective_year DESC NULLS LAST, symbol) as entities_manual,
+          array_agg(entity_dri ORDER BY effective_year DESC NULLS LAST, symbol) as entities_dri,
+          COUNT(*)::int as count,
+          MAX(effective_year) as latest_year
+        FROM (
+          SELECT 
+            r.proper_title,
+            r.symbol,
+            r.un_body,
+            r.publication_date,
+            r.record_number,
+            r.word_count,
+            r.subject_terms,
+            re.entity,
+            re.entity_manual,
+            re.entity_dri,
+            COALESCE(
+              r.date_year,
+              CASE 
+                WHEN r.publication_date ~ '^\\d{4}' 
+                THEN SUBSTRING(r.publication_date FROM 1 FOR 4)::int 
+              END
+            ) as effective_year
+          FROM ${DB_SCHEMA}.sg_reports r
+          LEFT JOIN ${DB_SCHEMA}.reporting_entities re ON r.symbol = re.symbol
+          WHERE ${whereClause}
+        ) sub
+        GROUP BY proper_title
+        ${havingClause}
+      ),
+      with_frequency AS (
+        SELECT *,
+          CASE 
+            WHEN count = 1 THEN 'One-time'
+            WHEN (SELECT COUNT(DISTINCT y) FROM unnest(years) y WHERE y IS NOT NULL) < 2 THEN 'One-time'
+            ELSE (
+              SELECT CASE 
+                WHEN gap = 1 THEN 'Annual'
+                WHEN gap = 2 THEN 'Biennial'
+                WHEN gap = 3 THEN 'Triennial'
+                WHEN gap = 4 THEN 'Quadrennial'
+                WHEN gap = 5 THEN 'Quinquennial'
+                ELSE 'Every ' || gap || ' years'
+              END
+              FROM (
+                SELECT (sorted_years[1] - sorted_years[2]) as gap
+                FROM (
+                  SELECT ARRAY(SELECT DISTINCT y FROM unnest(years) y WHERE y IS NOT NULL ORDER BY y DESC LIMIT 2) as sorted_years
+                ) t
+              ) t2
+            )
+          END as frequency
+        FROM grouped
+      )
+      SELECT * FROM with_frequency
+      WHERE 1=1 ${frequencyFilterSQL}
       ORDER BY latest_year DESC NULLS LAST, proper_title
-      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
-      [...params, limit, offset]
+      LIMIT $${limitParamIndex} OFFSET $${limitParamIndex + 1}`,
+      [...allParams, limit, offset]
     ),
+    // Count query with same filters
     query<{ total: number }>(
-      `SELECT COUNT(DISTINCT r.proper_title)::int as total
-       FROM ${DB_SCHEMA}.sg_reports r
-       LEFT JOIN ${DB_SCHEMA}.reporting_entities re ON r.symbol = re.symbol
-       WHERE ${whereClause}`,
-      params
+      `WITH grouped AS (
+        SELECT 
+          proper_title,
+          array_agg(effective_year ORDER BY effective_year DESC NULLS LAST) as years,
+          COUNT(*)::int as count,
+          MAX(effective_year) as latest_year
+        FROM (
+          SELECT 
+            r.proper_title,
+            COALESCE(
+              r.date_year,
+              CASE 
+                WHEN r.publication_date ~ '^\\d{4}' 
+                THEN SUBSTRING(r.publication_date FROM 1 FOR 4)::int 
+              END
+            ) as effective_year
+          FROM ${DB_SCHEMA}.sg_reports r
+          LEFT JOIN ${DB_SCHEMA}.reporting_entities re ON r.symbol = re.symbol
+          WHERE ${whereClause}
+        ) sub
+        GROUP BY proper_title
+        ${havingClause}
+      ),
+      with_frequency AS (
+        SELECT *,
+          CASE 
+            WHEN count = 1 THEN 'One-time'
+            WHEN (SELECT COUNT(DISTINCT y) FROM unnest(years) y WHERE y IS NOT NULL) < 2 THEN 'One-time'
+            ELSE (
+              SELECT CASE 
+                WHEN gap = 1 THEN 'Annual'
+                WHEN gap = 2 THEN 'Biennial'
+                WHEN gap = 3 THEN 'Triennial'
+                WHEN gap = 4 THEN 'Quadrennial'
+                WHEN gap = 5 THEN 'Quinquennial'
+                ELSE 'Every ' || gap || ' years'
+              END
+              FROM (
+                SELECT (sorted_years[1] - sorted_years[2]) as gap
+                FROM (
+                  SELECT ARRAY(SELECT DISTINCT y FROM unnest(years) y WHERE y IS NOT NULL ORDER BY y DESC LIMIT 2) as sorted_years
+                ) t
+              ) t2
+            )
+          END as frequency
+        FROM grouped
+      )
+      SELECT COUNT(*)::int as total FROM with_frequency
+      WHERE 1=1 ${frequencyFilterSQL}`,
+      allParams
     ),
     // Body counts (from latest_versions view - one per series)
     query<{ body: string; count: number }>(
@@ -234,26 +341,8 @@ export async function GET(req: NextRequest) {
     return bodyStr;
   }
 
-  // Calculate frequency from the gap between the two most recent distinct years
-  function calculateFrequency(years: (number | null)[], count: number): string {
-    if (count === 1) return "One-time";
-    
-    const distinctYears = [...new Set(years.filter((y): y is number => y !== null))].sort((a, b) => b - a);
-    if (distinctYears.length < 2) return "One-time";
-    
-    const gap = distinctYears[0] - distinctYears[1];
-    if (gap === 1) return "Annual";
-    if (gap === 2) return "Biennial";
-    if (gap === 3) return "Triennial";
-    if (gap === 4) return "Quadrennial";
-    if (gap === 5) return "Quinquennial";
-    if (gap > 5) return `Every ${gap} years`;
-    return "One-time";
-  }
-
-  // Post-filter by year and frequency (done after grouping)
-  let filteredReports = reports.map((r) => {
-    const frequency = calculateFrequency(r.years, r.count);
+  // Transform reports to response format (frequency is now calculated in SQL)
+  const filteredReports = reports.map((r) => {
     // Collect unique subject terms from all versions (now stored as JSON)
     const allSubjects = new Set<string>();
     r.subject_terms_agg?.forEach((terms) => {
@@ -284,20 +373,10 @@ export async function GET(req: NextRequest) {
       })),
       count: r.count,
       latestYear: r.latest_year,
-      frequency,
+      frequency: r.frequency, // Use frequency calculated in SQL
       subjectTerms: Array.from(allSubjects),
     };
   });
-
-  // Apply year range filter
-  if (filterYearMin !== null && filterYearMax !== null) {
-    filteredReports = filteredReports.filter((r) => r.year && r.year >= filterYearMin && r.year <= filterYearMax);
-  }
-
-  // Apply frequency filter
-  if (filterFrequencies.length > 0) {
-    filteredReports = filteredReports.filter((r) => r.frequency && filterFrequencies.includes(r.frequency));
-  }
 
   // Get unique frequencies from all data
   const allFrequencies = ["One-time", "Annual", "Biennial", "Triennial", "Quadrennial", "Quinquennial"];

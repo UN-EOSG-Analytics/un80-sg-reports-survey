@@ -725,92 +725,6 @@ function buildDLLink(symbol: string): string {
   return `https://digitallibrary.un.org/search?ln=en&p=${encodeURIComponent(symbol)}&f=&c=Resource%20Type&c=UN%20Bodies&sf=&so=d&rg=50&fti=0`;
 }
 
-// Get quarter from publication date (format: YYYY-MM-DD or similar)
-function getQuarter(publicationDate: string | null): number | null {
-  if (!publicationDate) return null;
-  const match = publicationDate.match(/^\d{4}-(\d{2})/);
-  if (!match) return null;
-  const month = parseInt(match[1], 10);
-  return Math.ceil(month / 3);
-}
-
-// Reporting pattern visualization
-function PublicationPattern({ versions }: { versions: Version[] }) {
-  // Get year range (last 6 years from most recent)
-  const years = versions
-    .map((v) => v.year)
-    .filter((y): y is number => y !== null);
-  if (years.length === 0) return null;
-
-  const maxYear = Math.max(...years);
-  const minDisplayYear = maxYear - 5;
-  const displayYears = Array.from({ length: 6 }, (_, i) => minDisplayYear + i);
-
-  // Map versions to year/quarter
-  const versionMap = new Map<number, Set<number>>();
-  versions.forEach((v) => {
-    if (v.year === null) return;
-    if (!versionMap.has(v.year)) versionMap.set(v.year, new Set());
-    const q = getQuarter(v.publicationDate);
-    if (q) versionMap.get(v.year)!.add(q);
-    else versionMap.get(v.year)!.add(0); // Unknown quarter
-  });
-
-  return (
-    <div className="space-y-1">
-      <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">
-        Reporting Pattern
-      </div>
-      <div className="flex gap-2">
-        {displayYears.map((year) => {
-          const quarters = versionMap.get(year);
-          const hasPublication = !!quarters;
-          const hasUnknownQuarter = quarters?.has(0);
-
-          return (
-            <div key={year} className="flex-1 min-w-0">
-              {/* Quarter blocks */}
-              <div className="flex gap-[1px] mb-1.5">
-                {[1, 2, 3, 4].map((q) => {
-                  // Only fill if this specific quarter has a publication
-                  const isFilled = quarters?.has(q) || (hasUnknownQuarter && q === 1);
-                  return (
-                    <div
-                      key={q}
-                      className={`h-5 flex-1 transition-colors ${
-                        isFilled ? "bg-un-blue" : "bg-gray-100"
-                      }`}
-                      title={isFilled ? `Published Q${q} ${year}` : `${year} Q${q}`}
-                    />
-                  );
-                })}
-              </div>
-              {/* Year label */}
-              <div
-                className={`text-[10px] text-center ${
-                  hasPublication ? "text-gray-700 font-medium" : "text-gray-300"
-                }`}
-              >
-                {year}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div className="flex items-center gap-4 mt-3 text-[10px] text-gray-400">
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 bg-un-blue" />
-          <span>Published</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 bg-gray-100" />
-          <span>No publication</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // Recommendation types
 type RecommendationStatus = "continue" | "merge" | "discontinue" | null;
 type FrequencyRecommendation = "annual" | "biennial" | "triennial" | "quadrennial" | "one-time" | null;
@@ -853,104 +767,33 @@ function SelectItemWithCurrent({ value, label, currentValue }: { value: string; 
   );
 }
 
-// Recommendation form component
-function RecommendationForm({
+// Compact recommendation form with progressive disclosure
+function CompactRecommendationForm({
   report,
-  similarReports,
   mergeTargets,
   onMergeTargetsChange,
-  externalMergeStatus,
-  onMergeStatusConsumed,
   onSave,
   userEntity,
+  loadingExisting,
+  recommendation,
+  onRecommendationChange,
+  saving,
+  saveSuccess,
+  onSaveClick,
 }: {
   report: ReportGroup;
-  similarReports: SimilarReport[];
   mergeTargets: string[];
   onMergeTargetsChange: (targets: string[]) => void;
-  externalMergeStatus?: "merge" | null;
-  onMergeStatusConsumed?: () => void;
   onSave?: () => void;
   userEntity?: string | null;
+  loadingExisting: boolean;
+  recommendation: Omit<Recommendation, 'mergeTargets'>;
+  onRecommendationChange: <K extends keyof Omit<Recommendation, 'mergeTargets'>>(key: K, value: Omit<Recommendation, 'mergeTargets'>[K]) => void;
+  saving: boolean;
+  saveSuccess: boolean;
+  onSaveClick: () => void;
 }) {
-  // Check if user can edit this report
   const canEdit = userEntity && report.entity === userEntity;
-  
-  const [recommendation, setRecommendation] = useState<Omit<Recommendation, 'mergeTargets'>>({
-    status: null,
-    discontinueReason: "",
-    frequency: null,
-    format: null,
-    formatOther: "",
-    comments: "",
-  });
-  
-  const [mergePickerOpen, setMergePickerOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [loadingExisting, setLoadingExisting] = useState(true);
-  
-  // Load existing response when report changes
-  useEffect(() => {
-    setLoadingExisting(true);
-    setSaveSuccess(false);
-    fetch(`/api/survey-responses?properTitle=${encodeURIComponent(report.title)}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.response) {
-          setRecommendation({
-            status: data.response.status as RecommendationStatus,
-            discontinueReason: data.response.discontinueReason || "",
-            frequency: data.response.frequency as FrequencyRecommendation,
-            format: data.response.format as FormatRecommendation,
-            formatOther: data.response.formatOther || "",
-            comments: data.response.comments || "",
-          });
-          onMergeTargetsChange(data.response.mergeTargets || []);
-        } else {
-          // Reset form for new report
-          setRecommendation({
-            status: null,
-            discontinueReason: "",
-            frequency: null,
-            format: null,
-            formatOther: "",
-            comments: "",
-          });
-          onMergeTargetsChange([]);
-        }
-      })
-      .catch(() => {
-        // Silently fail - user can still fill form
-      })
-      .finally(() => setLoadingExisting(false));
-  }, [report.title]);
-  
-  // Handle external merge status trigger (from Similar tab)
-  useEffect(() => {
-    if (externalMergeStatus === "merge") {
-      setRecommendation((prev) => ({ ...prev, status: "merge" }));
-      setSaveSuccess(false);
-      onMergeStatusConsumed?.();
-    }
-  }, [externalMergeStatus, onMergeStatusConsumed]);
-  
-  const updateRecommendation = <K extends keyof Omit<Recommendation, 'mergeTargets'>>(
-    key: K,
-    value: Omit<Recommendation, 'mergeTargets'>[K]
-  ) => {
-    setRecommendation((prev) => ({ ...prev, [key]: value }));
-    setSaveSuccess(false);
-  };
-
-  const toggleMergeTarget = (symbol: string) => {
-    onMergeTargetsChange(
-      mergeTargets.includes(symbol)
-        ? mergeTargets.filter((s) => s !== symbol)
-        : [...mergeTargets, symbol]
-    );
-    setSaveSuccess(false);
-  };
   
   // Validation logic
   const isFormValid = useMemo(() => {
@@ -971,219 +814,89 @@ function RecommendationForm({
     }
     
     return true;
-  }, [recommendation]);
-
-  const handleSave = async () => {
-    if (!isFormValid) return;
-    
-    setSaving(true);
-    setSaveSuccess(false);
-    
-    try {
-      const response = await fetch("/api/survey-responses", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          properTitle: report.title,
-          latestSymbol: report.symbol,
-          status: recommendation.status,
-          frequency: recommendation.frequency,
-          format: recommendation.format,
-          formatOther: recommendation.formatOther,
-          mergeTargets: mergeTargets,
-          discontinueReason: recommendation.discontinueReason,
-          comments: recommendation.comments,
-        }),
-      });
-      
-      if (response.ok) {
-        setSaveSuccess(true);
-        onSave?.();
-      } else {
-        const data = await response.json();
-        console.error("Failed to save:", data.error);
-      }
-    } catch (error) {
-      console.error("Failed to save:", error);
-    } finally {
-      setSaving(false);
-    }
-  };
+  }, [recommendation, mergeTargets]);
 
   // Show disabled message if user can't edit
   if (!canEdit) {
     return (
-      <div className="space-y-4">
-        <div className={`rounded-lg p-4 text-center border ${!userEntity ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-200"}`}>
-          {!userEntity ? (
-            <p className="text-sm text-amber-700">
-              <a href="/login" className="font-medium underline hover:text-amber-900">Log in</a> to submit a recommendation.
-            </p>
-          ) : (
-            <p className="text-sm text-gray-500">
-              {!report.entity ? (
-                "This report has no assigned entity."
-              ) : (
-                <>Only <span className="font-medium text-gray-700">{report.entity}</span> can submit a recommendation for this report.</>
-              )}
-            </p>
-          )}
-        </div>
-        {/* Show grayed out form preview */}
-        <div className="opacity-50 pointer-events-none select-none">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">
-              What should happen to this report?
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {["Continue", "Merge", "Discontinue"].map((label) => (
-                <div key={label} className="px-3 py-2 text-sm font-medium rounded-lg border bg-white text-gray-400 border-gray-200">
-                  {label}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-2 mt-4">
-            <label className="text-sm font-medium text-gray-700">Additional comments</label>
-            <div className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm h-20 bg-gray-50" />
-          </div>
-          <div className="mt-4 w-full h-10 rounded-md bg-gray-200" />
-        </div>
+      <div className={`rounded-lg p-3 text-center border text-sm ${!userEntity ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-200"}`}>
+        {!userEntity ? (
+          <p className="text-amber-700">
+            <a href="/login" className="font-medium underline hover:text-amber-900">Log in</a> to submit a recommendation.
+          </p>
+        ) : (
+          <p className="text-gray-500">
+            {!report.entity ? (
+              "No assigned entity."
+            ) : (
+              <>Only <span className="font-medium text-gray-700">{report.entity}</span> can submit.</>
+            )}
+          </p>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {/* Status - segmented control style */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-gray-700">
-          What should happen to this report? <span className="text-red-500">*</span>
-        </label>
-        <div className="grid grid-cols-3 gap-2">
-          {[
-            { value: "continue", label: "Continue" },
-            { value: "merge", label: "Merge" },
-            { value: "discontinue", label: "Discontinue" },
-          ].map((option) => (
-            <button
-              key={option.value}
-              onClick={() => updateRecommendation("status", option.value as RecommendationStatus)}
-              className={`px-3 py-2 text-sm font-medium rounded-lg border transition-all ${
-                recommendation.status === option.value
-                  ? "bg-un-blue text-white border-un-blue"
-                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
+    <div className="space-y-3">
+      {/* Main decision dropdown */}
+      <Select
+        value={recommendation.status ?? undefined}
+        onValueChange={(v) => onRecommendationChange("status", v as RecommendationStatus)}
+      >
+        <SelectTrigger className="w-full">
+          <SelectValue placeholder="What should happen to this report?" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="continue">Continue reporting</SelectItem>
+          <SelectItem value="merge">Merge with another report</SelectItem>
+          <SelectItem value="discontinue">Discontinue</SelectItem>
+        </SelectContent>
+      </Select>
 
-      {/* Conditional content wrapper */}
-      <div className="space-y-4">
-        {/* Merge target picker - shown when merge is selected */}
-        {recommendation.status === "merge" && (
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">
-              Merge with which report(s)? <span className="text-red-500">*</span>
-            </label>
-            <Popover open={mergePickerOpen} onOpenChange={setMergePickerOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={mergePickerOpen}
-                  className="w-full justify-between h-auto min-h-9 py-2"
+      {/* Progressive disclosure - only show when status is selected */}
+      {recommendation.status && (
+        <div className="space-y-3 pt-1">
+          {/* Merge targets - shown inline as chips when merge selected */}
+          {recommendation.status === "merge" && mergeTargets.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {mergeTargets.map((symbol) => (
+                <span
+                  key={symbol}
+                  className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs"
                 >
-                  {mergeTargets.length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {mergeTargets.map((symbol) => (
-                        <span
-                          key={symbol}
-                          className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs"
-                        >
-                          {symbol}
-                          <X
-                            className="h-3 w-3 cursor-pointer hover:text-blue-900"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleMergeTarget(symbol);
-                            }}
-                          />
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-gray-500">Select from similar reports...</span>
-                  )}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[544px] p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Search similar reports..." />
-                  <CommandList>
-                    <CommandEmpty>No similar reports found.</CommandEmpty>
-                    <CommandGroup className="p-0">
-                      {similarReports.map((r) => (
-                        <CommandItem
-                          key={r.symbol}
-                          value={`${r.symbol} ${r.title}`}
-                          onSelect={() => toggleMergeTarget(r.symbol)}
-                          className="px-2 rounded-none"
-                        >
-                          <Check
-                            className={`mr-2 h-4 w-4 ${
-                              mergeTargets.includes(r.symbol)
-                                ? "opacity-100"
-                                : "opacity-0"
-                            }`}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm truncate">{r.title}</p>
-                            <p className="text-xs text-gray-500">{r.symbol}</p>
-                          </div>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          </div>
-        )}
+                  {symbol}
+                  <button
+                    onClick={() => onMergeTargetsChange(mergeTargets.filter((s) => s !== symbol))}
+                    className="hover:text-blue-900"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
 
-        {/* Discontinue reason - shown when discontinue is selected */}
-        {recommendation.status === "discontinue" && (
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">
-              Why should this report be discontinued? <span className="text-red-500">*</span>
-            </label>
+          {/* Discontinue reason */}
+          {recommendation.status === "discontinue" && (
             <textarea
               value={recommendation.discontinueReason}
-              onChange={(e) => updateRecommendation("discontinueReason", e.target.value)}
-              placeholder="Please provide a reason..."
+              onChange={(e) => onRecommendationChange("discontinueReason", e.target.value)}
+              placeholder="Reason for discontinuation..."
               className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-un-blue focus:ring-1 focus:ring-un-blue resize-none"
               rows={2}
             />
-          </div>
-        )}
+          )}
 
-        {/* Continue/Merge options - frequency and format */}
-        {(recommendation.status === "continue" || recommendation.status === "merge") && (
-          <div className="space-y-3">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">
-                Recommended frequency <span className="text-red-500">*</span>
-              </label>
+          {/* Frequency and format for continue/merge */}
+          {(recommendation.status === "continue" || recommendation.status === "merge") && (
+            <div className="grid grid-cols-2 gap-2">
               <Select
                 value={recommendation.frequency ?? undefined}
-                onValueChange={(v) => updateRecommendation("frequency", v as FrequencyRecommendation)}
+                onValueChange={(v) => onRecommendationChange("frequency", v as FrequencyRecommendation)}
               >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select frequency..." />
+                <SelectTrigger className="w-full text-sm h-9">
+                  <SelectValue placeholder="Frequency..." />
                 </SelectTrigger>
                 <SelectContent>
                   {FREQUENCY_OPTIONS.map((opt) => (
@@ -1191,17 +904,12 @@ function RecommendationForm({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">
-                Recommended format <span className="text-red-500">*</span>
-              </label>
               <Select
                 value={recommendation.format ?? undefined}
-                onValueChange={(v) => updateRecommendation("format", v as FormatRecommendation)}
+                onValueChange={(v) => onRecommendationChange("format", v as FormatRecommendation)}
               >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select format..." />
+                <SelectTrigger className="w-full text-sm h-9">
+                  <SelectValue placeholder="Format..." />
                 </SelectTrigger>
                 <SelectContent>
                   {FORMAT_OPTIONS.map((opt) => (
@@ -1209,55 +917,60 @@ function RecommendationForm({
                   ))}
                 </SelectContent>
               </Select>
-              {recommendation.format === "other" && (
-                <Input
-                  value={recommendation.formatOther}
-                  onChange={(e) => updateRecommendation("formatOther", e.target.value)}
-                  placeholder="Describe the format..."
-                  className="mt-2"
-                />
-              )}
             </div>
-          </div>
-        )}
-      </div>
+          )}
+          
+          {recommendation.format === "other" && (
+            <Input
+              value={recommendation.formatOther}
+              onChange={(e) => onRecommendationChange("formatOther", e.target.value)}
+              placeholder="Describe the format..."
+              className="h-9 text-sm"
+            />
+          )}
 
-      {/* Comments */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-gray-700">
-          Additional comments <span className="text-gray-400 text-xs font-normal">(optional)</span>
-        </label>
-        <textarea
-          value={recommendation.comments}
-          onChange={(e) => updateRecommendation("comments", e.target.value)}
-          placeholder="Any other suggestions or notes..."
-          className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-un-blue focus:ring-1 focus:ring-un-blue resize-none"
-          rows={3}
-        />
-      </div>
+          {/* Comments - compact */}
+          <textarea
+            value={recommendation.comments}
+            onChange={(e) => onRecommendationChange("comments", e.target.value)}
+            placeholder="Additional comments (optional)..."
+            className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-un-blue focus:ring-1 focus:ring-un-blue resize-none"
+            rows={2}
+          />
+        </div>
+      )}
 
-      {/* Save button */}
-      <Button 
-        className="w-full" 
-        disabled={!isFormValid || saving || loadingExisting}
-        onClick={handleSave}
-      >
-        {saving ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            Saving...
-          </>
-        ) : saveSuccess ? (
-          <>
-            <Check className="h-4 w-4 mr-2" />
-            Saved
-          </>
-        ) : (
-          "Save Recommendation"
-        )}
-      </Button>
+      {/* Save button - only show when form has content */}
+      {recommendation.status && (
+        <Button 
+          className="w-full h-9" 
+          disabled={!isFormValid || saving || loadingExisting}
+          onClick={onSaveClick}
+        >
+          {saving ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              Saving...
+            </>
+          ) : saveSuccess ? (
+            <>
+              <Check className="h-4 w-4 mr-2" />
+              Saved
+            </>
+          ) : (
+            "Save Recommendation"
+          )}
+        </Button>
+      )}
     </div>
   );
+}
+
+// Resolution info interface
+interface ResolutionInfo {
+  symbol: string;
+  title: string | null;
+  date_year: number | null;
 }
 
 // Similar reports interface
@@ -1269,79 +982,105 @@ interface SimilarReport {
   entity: string | null;
 }
 
-// Similar reports component
-function SimilarReports({
+// Similar reports grid component - cleaner layout
+function SimilarReportsGrid({
   similar,
   loading,
   error,
   onMerge,
   mergeTargets,
+  showMergeActions,
+  defaultVisible = 4,
 }: {
   similar: SimilarReport[];
   loading: boolean;
   error: string | null;
   onMerge?: (symbol: string) => void;
   mergeTargets?: string[];
+  showMergeActions?: boolean;
+  defaultVisible?: number;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-gray-400 py-4">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        Finding similar reports...
+      <div className="flex items-center gap-2 text-xs text-gray-400 py-2">
+        <Loader2 className="h-3 w-3 animate-spin" />
+        Finding similar...
       </div>
     );
   }
 
   if (error || similar.length === 0) {
     return (
-      <p className="text-sm text-gray-400 py-4">
+      <p className="text-xs text-gray-400 py-2">
         {error || "No similar reports found"}
       </p>
     );
   }
 
+  const visible = expanded ? similar : similar.slice(0, defaultVisible);
+  const hasMore = similar.length > defaultVisible;
+
   return (
-    <div className="divide-y divide-gray-100">
-      {similar.map((r) => {
+    <div className="space-y-1">
+      {visible.map((r) => {
         const isInMerge = mergeTargets?.includes(r.symbol);
         return (
-          <div key={r.symbol} className="flex items-start gap-3 py-3">
-            <div className="flex-1 min-w-0">
-              <a
-                href={buildDLLink(r.symbol)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-gray-900 hover:text-un-blue"
-                title={r.title}
-              >
+          <div 
+            key={r.symbol} 
+            className={`grid grid-cols-[1fr_auto] gap-2 p-2 rounded border transition-colors ${
+              isInMerge 
+                ? "bg-blue-50 border-blue-200" 
+                : "bg-gray-50 border-transparent hover:border-gray-200"
+            }`}
+          >
+            <div className="min-w-0">
+              <p className="text-sm text-gray-800 truncate" title={r.title}>
                 {r.title}
-              </a>
+              </p>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-xs text-gray-500">
-                  {r.symbol} • {r.year ?? "—"}
+                <span className="text-[11px] text-gray-500 font-medium">
+                  {r.symbol}
+                </span>
+                <span className="text-[11px] text-gray-400">
+                  {r.year ?? "—"}
                 </span>
                 {r.entity && (
-                  <span className="inline-block rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
+                  <span className="text-[10px] text-gray-400 truncate">
                     {r.entity}
                   </span>
                 )}
               </div>
             </div>
-            {onMerge && (
+            {showMergeActions && onMerge && (
               <button
                 onClick={() => onMerge(r.symbol)}
-                className={`flex-shrink-0 px-2 py-1 text-xs font-medium rounded transition-colors ${
+                className={`self-center flex-shrink-0 w-7 h-7 flex items-center justify-center rounded transition-colors ${
                   isInMerge
-                    ? "bg-green-100 text-green-700"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    ? "bg-un-blue text-white"
+                    : "bg-white border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300"
                 }`}
+                title={isInMerge ? "Remove from merge" : "Add to merge"}
               >
-                {isInMerge ? "Added" : "Merge"}
+                {isInMerge ? <Check className="h-3.5 w-3.5" /> : <span className="text-lg leading-none">+</span>}
               </button>
             )}
           </div>
         );
       })}
+      {hasMore && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-full text-xs text-gray-500 hover:text-gray-700 py-1.5 flex items-center justify-center gap-1"
+        >
+          {expanded ? (
+            <>Show less <ChevronUp className="h-3 w-3" /></>
+          ) : (
+            <>Show {similar.length - defaultVisible} more <ChevronDown className="h-3 w-3" /></>
+          )}
+        </button>
+      )}
     </div>
   );
 }
@@ -1399,108 +1138,114 @@ function VersionRow({ v }: { v: Version }) {
   );
 }
 
-// Info tab content
-function InfoTabContent({ report, subjectCounts }: { report: ReportGroup; subjectCounts: SubjectCount[] }) {
-  const [showAllVersions, setShowAllVersions] = useState(false);
-  const MAX_VERSIONS = 3;
-  const hasMoreVersions = report.versions.length > MAX_VERSIONS;
-  const visibleVersions = showAllVersions
-    ? report.versions
-    : report.versions.slice(0, MAX_VERSIONS);
+// Interactive publication pattern with expandable versions
+function InteractivePublicationPattern({ 
+  versions, 
+  expanded, 
+  onToggle 
+}: { 
+  versions: Version[]; 
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  // Get year range (last 6 years from most recent)
+  const years = versions
+    .map((v) => v.year)
+    .filter((y): y is number => y !== null);
+  
+  if (years.length === 0) return null;
+
+  const maxYear = Math.max(...years);
+  const minDisplayYear = maxYear - 5;
+  const displayYears = Array.from({ length: 6 }, (_, i) => minDisplayYear + i);
+
+  // Map versions to year/quarter
+  const versionMap = new Map<number, Set<number>>();
+  versions.forEach((v) => {
+    if (v.year === null) return;
+    if (!versionMap.has(v.year)) versionMap.set(v.year, new Set());
+    const q = getQuarter(v.publicationDate);
+    if (q) versionMap.get(v.year)!.add(q);
+    else versionMap.get(v.year)!.add(0);
+  });
 
   return (
-    <div className="space-y-4">
-      {/* Full title */}
-      <p className="text-sm text-gray-800 leading-relaxed">
-        {report.title}
-      </p>
-      
-      {/* Metadata pills */}
-      <div className="space-y-2">
-        <div className="flex flex-wrap gap-2">
-          <span className="inline-block rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-un-blue">
-            {report.symbol}
+    <div className="space-y-2">
+      {/* Clickable pattern */}
+      <button
+        onClick={onToggle}
+        className="w-full text-left group"
+      >
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Reporting Pattern
           </span>
-          {report.entity && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="inline-block rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 cursor-default">
-                  {report.entity}
-                </span>
-              </TooltipTrigger>
-              {(report.entityManual || report.entityDri) && (
-                <TooltipContent>
-                  Source: {report.entityManual ? "Manual list" : "DRI"}
-                </TooltipContent>
-              )}
-            </Tooltip>
-          )}
-          {report.body && (
-            <span className="inline-block rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-              {report.body}
-            </span>
-          )}
-          {report.frequency && (
-            <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${
-              report.frequency === "One-time"
-                ? "bg-gray-100 text-gray-600"
-                : "bg-blue-100 text-blue-700"
-            }`}>
-              {report.frequency}
-            </span>
-          )}
+          <span className="text-xs text-gray-400 group-hover:text-gray-600 flex items-center gap-1">
+            {versions.length} versions
+            {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          </span>
         </div>
-        
-        {report.subjectTerms && report.subjectTerms.length > 0 && (
-          <div className="pt-1">
-            <SortedSubjectPills
-              subjects={report.subjectTerms}
-              subjectCounts={subjectCounts}
-              size="xs"
-            />
-          </div>
-        )}
-      </div>
+        <div className="flex gap-2">
+          {displayYears.map((year) => {
+            const quarters = versionMap.get(year);
+            const hasPublication = !!quarters;
+            const hasUnknownQuarter = quarters?.has(0);
 
-      {/* Pattern visualization */}
-      <div className="bg-gray-50 rounded-lg p-4">
-        <PublicationPattern versions={report.versions} />
-      </div>
-
-      {/* Versions list */}
-      <div className="space-y-2">
-        <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-          Versions ({report.count})
+            return (
+              <div key={year} className="flex-1 min-w-0">
+                <div className="flex gap-[1px] mb-1">
+                  {[1, 2, 3, 4].map((q) => {
+                    const isFilled = quarters?.has(q) || (hasUnknownQuarter && q === 1);
+                    return (
+                      <div
+                        key={q}
+                        className={`h-4 flex-1 transition-colors ${
+                          isFilled ? "bg-un-blue" : "bg-gray-100"
+                        }`}
+                      />
+                    );
+                  })}
+                </div>
+                <div
+                  className={`text-[9px] text-center ${
+                    hasPublication ? "text-gray-600 font-medium" : "text-gray-300"
+                  }`}
+                >
+                  {year}
+                </div>
+              </div>
+            );
+          })}
         </div>
-        <div className="divide-y divide-gray-100">
-          {visibleVersions.map((v) => (
+      </button>
+
+      {/* Expandable versions list */}
+      {expanded && (
+        <div className="mt-3 pt-3 border-t border-gray-100 space-y-1">
+          {versions.slice(0, 10).map((v) => (
             <VersionRow key={v.symbol} v={v} />
           ))}
+          {versions.length > 10 && (
+            <p className="text-xs text-gray-400 pt-1">
+              +{versions.length - 10} more versions
+            </p>
+          )}
         </div>
-        {hasMoreVersions && (
-          <button
-            onClick={() => setShowAllVersions(!showAllVersions)}
-            className="text-sm text-un-blue hover:text-blue-700 font-medium flex items-center gap-1"
-          >
-            {showAllVersions ? (
-              <>
-                <ChevronUp className="h-4 w-4" />
-                Show less
-              </>
-            ) : (
-              <>
-                <ChevronDown className="h-4 w-4" />
-                Show {report.versions.length - MAX_VERSIONS} more versions
-              </>
-            )}
-          </button>
-        )}
-      </div>
+      )}
     </div>
   );
 }
 
-// Sidebar component
+// Get quarter helper (moved outside for reuse)
+function getQuarter(publicationDate: string | null): number | null {
+  if (!publicationDate) return null;
+  const match = publicationDate.match(/^\d{4}-(\d{2})/);
+  if (!match) return null;
+  const month = parseInt(match[1], 10);
+  return Math.ceil(month / 3);
+}
+
+// Consolidated sidebar component - single scrollable view
 function ReportSidebar({
   report,
   onClose,
@@ -1514,21 +1259,38 @@ function ReportSidebar({
   onSave?: () => void;
   userEntity?: string | null;
 }) {
-  const [activeTab, setActiveTab] = useState<"decision" | "info" | "similar">("decision");
   const [similar, setSimilar] = useState<SimilarReport[]>([]);
   const [similarLoading, setSimilarLoading] = useState(false);
   const [similarError, setSimilarError] = useState<string | null>(null);
   const [mergeTargets, setMergeTargets] = useState<string[]>([]);
-  const [mergeStatus, setMergeStatus] = useState<"merge" | null>(null);
+  const [versionsExpanded, setVersionsExpanded] = useState(false);
+  const [resolutions, setResolutions] = useState<ResolutionInfo[]>([]);
+  const [resolutionsLoading, setResolutionsLoading] = useState(false);
+  
+  // Form state
+  const [recommendation, setRecommendation] = useState<Omit<Recommendation, 'mergeTargets'>>({
+    status: null,
+    discontinueReason: "",
+    frequency: null,
+    format: null,
+    formatOther: "",
+    comments: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [loadingExisting, setLoadingExisting] = useState(true);
 
-  // Fetch similar reports when report changes
+  // Fetch similar reports and resolutions when report changes
   useEffect(() => {
     if (!report) return;
     setSimilarLoading(true);
     setSimilarError(null);
     setMergeTargets([]);
-    setMergeStatus(null);
+    setVersionsExpanded(false);
+    setResolutions([]);
+    setResolutionsLoading(true);
     
+    // Fetch similar reports
     fetch(`/api/similar-reports?symbol=${encodeURIComponent(report.symbol)}&limit=10`)
       .then((r) => r.json())
       .then((data) => {
@@ -1537,30 +1299,113 @@ function ReportSidebar({
       })
       .catch(() => setSimilarError("Failed to load similar reports"))
       .finally(() => setSimilarLoading(false));
+    
+    // Fetch report details including resolutions
+    fetch(`/api/sg-reports?symbol=${encodeURIComponent(report.symbol)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.resolutions) setResolutions(data.resolutions);
+        else if (data.based_on_resolution_symbols) {
+          // If resolutions not found in DB, show symbols only
+          setResolutions(data.based_on_resolution_symbols.map((s: string) => ({ symbol: s, title: null, date_year: null })));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setResolutionsLoading(false));
   }, [report?.symbol]);
 
-  const handleMergeFromSimilar = useCallback((symbol: string) => {
-    // Add to merge targets if not already there
-    setMergeTargets((prev) => prev.includes(symbol) ? prev : [...prev, symbol]);
-    // Set status to merge
-    setMergeStatus("merge");
-    // Switch to decision tab
-    setActiveTab("decision");
+  // Load existing response when report changes
+  useEffect(() => {
+    if (!report) return;
+    setLoadingExisting(true);
+    setSaveSuccess(false);
+    fetch(`/api/survey-responses?properTitle=${encodeURIComponent(report.title)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.response) {
+          setRecommendation({
+            status: data.response.status as RecommendationStatus,
+            discontinueReason: data.response.discontinueReason || "",
+            frequency: data.response.frequency as FrequencyRecommendation,
+            format: data.response.format as FormatRecommendation,
+            formatOther: data.response.formatOther || "",
+            comments: data.response.comments || "",
+          });
+          setMergeTargets(data.response.mergeTargets || []);
+        } else {
+          setRecommendation({
+            status: null,
+            discontinueReason: "",
+            frequency: null,
+            format: null,
+            formatOther: "",
+            comments: "",
+          });
+          setMergeTargets([]);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingExisting(false));
+  }, [report?.title]);
+
+  const updateRecommendation = useCallback(<K extends keyof Omit<Recommendation, 'mergeTargets'>>(
+    key: K,
+    value: Omit<Recommendation, 'mergeTargets'>[K]
+  ) => {
+    setRecommendation((prev) => ({ ...prev, [key]: value }));
+    setSaveSuccess(false);
   }, []);
 
   const toggleMergeTarget = useCallback((symbol: string) => {
-    setMergeTargets((prev) =>
-      prev.includes(symbol) ? prev.filter((s) => s !== symbol) : [...prev, symbol]
-    );
-  }, []);
+    setMergeTargets((prev) => {
+      const newTargets = prev.includes(symbol) 
+        ? prev.filter((s) => s !== symbol) 
+        : [...prev, symbol];
+      // Auto-select merge status when adding first target
+      if (newTargets.length > 0 && !recommendation.status) {
+        setRecommendation((r) => ({ ...r, status: "merge" }));
+      }
+      return newTargets;
+    });
+    setSaveSuccess(false);
+  }, [recommendation.status]);
+
+  const handleSave = async () => {
+    if (!report) return;
+    setSaving(true);
+    setSaveSuccess(false);
+    
+    try {
+      const response = await fetch("/api/survey-responses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          properTitle: report.title,
+          latestSymbol: report.symbol,
+          status: recommendation.status,
+          frequency: recommendation.frequency,
+          format: recommendation.format,
+          formatOther: recommendation.formatOther,
+          mergeTargets: mergeTargets,
+          discontinueReason: recommendation.discontinueReason,
+          comments: recommendation.comments,
+        }),
+      });
+      
+      if (response.ok) {
+        setSaveSuccess(true);
+        onSave?.();
+      }
+    } catch (error) {
+      console.error("Failed to save:", error);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (!report) return null;
 
-  const tabs = [
-    { key: "decision", label: "Decision" },
-    { key: "info", label: "Info" },
-    { key: "similar", label: "Similar" },
-  ] as const;
+  const showMergeActions = recommendation.status === "merge" || mergeTargets.length > 0;
 
   return (
     <>
@@ -1570,58 +1415,158 @@ function ReportSidebar({
         onClick={onClose}
       />
       {/* Sidebar */}
-      <div className="fixed right-0 top-0 h-full w-full max-w-xl bg-white shadow-xl z-50 flex flex-col">
-        {/* Header with tabs */}
-        <div className="flex-shrink-0 bg-gray-50 border-b">
-          <div className="flex items-center justify-between px-1 pt-1">
-            <div className="flex">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`px-4 py-2.5 text-sm font-medium rounded-t-lg transition-colors ${
-                    activeTab === tab.key
-                      ? "bg-white text-gray-900 border-t border-x border-gray-200"
-                      : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+      <div className="fixed right-0 top-0 h-full w-full max-w-lg bg-white shadow-xl z-50 flex flex-col">
+        {/* Header - title only */}
+        <div className="flex-shrink-0 border-b px-4 py-3">
+          <div className="flex items-start justify-between gap-3">
+            <h2 className="flex-1 min-w-0 text-sm font-medium text-gray-900 leading-snug line-clamp-2" title={report.title}>
+              {report.title}
+            </h2>
             <button
               onClick={onClose}
-              className="p-1.5 mr-1 hover:bg-gray-200 rounded transition-colors"
+              className="p-1 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
             >
-              <X className="h-4 w-4 text-gray-500" />
+              <X className="h-4 w-4 text-gray-400" />
             </button>
           </div>
         </div>
 
-        {/* Tab content - scrollable (use hidden instead of unmounting to preserve state) */}
-        <div className={`flex-1 overflow-y-auto p-4 ${activeTab !== "decision" ? "hidden" : ""}`}>
-          <RecommendationForm
-            report={report}
-            similarReports={similar}
-            mergeTargets={mergeTargets}
-            onMergeTargetsChange={setMergeTargets}
-            externalMergeStatus={mergeStatus}
-            onMergeStatusConsumed={() => setMergeStatus(null)}
-            onSave={onSave}
-            userEntity={userEntity}
-          />
-        </div>
-        <div className={`flex-1 overflow-y-auto p-4 ${activeTab !== "info" ? "hidden" : ""}`}>
-          <InfoTabContent report={report} subjectCounts={subjectCounts} />
-        </div>
-        <div className={`flex-1 overflow-y-auto p-4 ${activeTab !== "similar" ? "hidden" : ""}`}>
-          <SimilarReports
-            similar={similar}
-            loading={similarLoading}
-            error={similarError}
-            onMerge={handleMergeFromSimilar}
-            mergeTargets={mergeTargets}
-          />
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-4 space-y-5">
+            {/* Metadata pills */}
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-1.5">
+                <span className="inline-block rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-un-blue">
+                  {report.symbol}
+                </span>
+                {report.entity && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-block rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 cursor-default">
+                        {report.entity}
+                      </span>
+                    </TooltipTrigger>
+                    {(report.entityManual || report.entityDri) && (
+                      <TooltipContent>
+                        Source: {report.entityManual ? "Manual list" : "DRI"}
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                )}
+                {report.body && (
+                  <span className="inline-block rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                    {abbreviateBody(report.body)}
+                  </span>
+                )}
+                {report.frequency && (
+                  <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${
+                    report.frequency === "One-time"
+                      ? "bg-gray-100 text-gray-600"
+                      : "bg-blue-100 text-blue-700"
+                  }`}>
+                    {report.frequency}
+                  </span>
+                )}
+              </div>
+              {/* Subjects */}
+              {report.subjectTerms && report.subjectTerms.length > 0 && (
+                <SortedSubjectPills
+                  subjects={report.subjectTerms}
+                  subjectCounts={subjectCounts}
+                  maxVisible={4}
+                  size="xs"
+                />
+              )}
+            </div>
+            {/* Mandating Resolutions */}
+            {(resolutions.length > 0 || resolutionsLoading) && (
+              <div className="space-y-2">
+                <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Based on Resolution{resolutions.length !== 1 ? "s" : ""}
+                </h3>
+                {resolutionsLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-gray-400">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Loading...
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {resolutions.map((res) => (
+                      <a
+                        key={res.symbol}
+                        href={buildDLLink(res.symbol)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block p-2 rounded border border-gray-100 bg-gray-50 hover:border-blue-200 hover:bg-blue-50 transition-colors group"
+                      >
+                        <div className="flex items-start gap-2">
+                          <span className="inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 flex-shrink-0">
+                            {res.symbol}
+                          </span>
+                          {res.date_year && (
+                            <span className="text-xs text-gray-400 flex-shrink-0">
+                              {res.date_year}
+                            </span>
+                          )}
+                        </div>
+                        {res.title && (
+                          <p className="mt-1 text-sm text-gray-600 line-clamp-2 group-hover:text-gray-800">
+                            {res.title}
+                          </p>
+                        )}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Publication Pattern - interactive */}
+            <div className="bg-gray-50 rounded-lg p-3">
+              <InteractivePublicationPattern
+                versions={report.versions}
+                expanded={versionsExpanded}
+                onToggle={() => setVersionsExpanded(!versionsExpanded)}
+              />
+            </div>
+
+            {/* Decision Form - progressive disclosure */}
+            <div className="space-y-2">
+              <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Your Recommendation
+              </h3>
+              <CompactRecommendationForm
+                report={report}
+                mergeTargets={mergeTargets}
+                onMergeTargetsChange={setMergeTargets}
+                onSave={onSave}
+                userEntity={userEntity}
+                loadingExisting={loadingExisting}
+                recommendation={recommendation}
+                onRecommendationChange={updateRecommendation}
+                saving={saving}
+                saveSuccess={saveSuccess}
+                onSaveClick={handleSave}
+              />
+            </div>
+
+            {/* Similar Reports - structured grid */}
+            <div className="space-y-2">
+              <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Similar Reports {!similarLoading && similar.length > 0 && `(${similar.length})`}
+              </h3>
+              <SimilarReportsGrid
+                similar={similar}
+                loading={similarLoading}
+                error={similarError}
+                onMerge={toggleMergeTarget}
+                mergeTargets={mergeTargets}
+                showMergeActions={showMergeActions}
+                defaultVisible={4}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </>

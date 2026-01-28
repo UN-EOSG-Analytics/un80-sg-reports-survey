@@ -1,6 +1,4 @@
-data/dri.xlsx
-data/manual_list.xlsx
-data/dgacm_list.xlsx
+data/
 .playwright-mcp/
 
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.

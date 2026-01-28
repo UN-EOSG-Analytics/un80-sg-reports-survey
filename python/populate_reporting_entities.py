@@ -170,17 +170,21 @@ def match_dri_to_db(dri_df: pd.DataFrame, db_df: pd.DataFrame, threshold: float 
     return matches
 
 
-def populate_table(conn, manual_df: pd.DataFrame, dri_matches: dict):
+def populate_table(conn, dgacm_df: pd.DataFrame, dri_matches: dict):
     """Populate the reporting_entities table."""
     print("Populating reporting_entities table...")
     
     cur = conn.cursor()
     
+    # Clear existing data
+    cur.execute(f"TRUNCATE TABLE {DB_SCHEMA}.reporting_entities")
+    print("  Cleared existing data")
+    
     # Collect all data
     all_data = {}
     
     # Add DGACM list data (higher priority)
-    for _, row in manual_df.iterrows():
+    for _, row in dgacm_df.iterrows():
         symbol = row["symbol"]
         entity = row["entity"]
         if symbol and entity:

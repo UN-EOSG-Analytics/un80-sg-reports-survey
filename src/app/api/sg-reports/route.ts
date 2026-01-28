@@ -173,8 +173,8 @@ export async function GET(req: NextRequest) {
   // This needs to be in HAVING clause since we join with report_entities after grouping
   if (filterEntities.length > 0) {
     havingClauses.push(`(
-      MAX(re.suggested_entities) && $${havingParamIndex}::text[] 
-      OR MAX(re.confirmed_entities) && $${havingParamIndex}::text[]
+      (SELECT re.suggested_entities FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) && $${havingParamIndex}::text[] 
+      OR (SELECT re.confirmed_entities FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) && $${havingParamIndex}::text[]
     )`);
     havingParams.push(filterEntities as unknown as string);
     havingParamIndex++;
@@ -223,13 +223,13 @@ export async function GET(req: NextRequest) {
           array_agg(record_number ORDER BY effective_year DESC NULLS LAST, symbol) as record_numbers,
           array_agg(word_count ORDER BY effective_year DESC NULLS LAST, symbol) as word_counts,
           array_agg(to_json(COALESCE(subject_terms, ARRAY[]::text[])) ORDER BY effective_year DESC NULLS LAST, symbol) as subject_terms_agg,
-          -- New entity fields from report_entities view
-          MAX(re.suggested_entities) as suggested_entities,
-          MAX(re.confirmed_entities) as confirmed_entities,
-          MAX(re.suggestions) as suggestions,
-          MAX(re.confirmations) as confirmations,
-          MAX(re.primary_entity) as primary_entity,
-          BOOL_OR(re.has_confirmation) as has_confirmation,
+          -- Entity fields using scalar subqueries to avoid array_agg on JSONB
+          (SELECT re.suggested_entities FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as suggested_entities,
+          (SELECT re.confirmed_entities FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as confirmed_entities,
+          (SELECT re.suggestions FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as suggestions,
+          (SELECT re.confirmations FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as confirmations,
+          (SELECT re.primary_entity FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as primary_entity,
+          (SELECT COALESCE(re.has_confirmation, false) FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as has_confirmation,
           COUNT(*)::int as count,
           MAX(effective_year) as latest_year
         FROM (
@@ -251,7 +251,6 @@ export async function GET(req: NextRequest) {
           FROM ${DB_SCHEMA}.sg_reports r
           WHERE ${whereClause}
         ) sub
-        LEFT JOIN ${DB_SCHEMA}.report_entities re ON sub.proper_title = re.proper_title
         GROUP BY sub.proper_title
         ${havingClause}
       ),

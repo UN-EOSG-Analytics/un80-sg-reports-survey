@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/about", "/login", "/verify", "/api/auth", "/api/documents"];
+const PUBLIC_PATHS = ["/about", "/login", "/verify", "/api/"];
 
 async function verifySessionToken(token: string): Promise<boolean> {
   try {

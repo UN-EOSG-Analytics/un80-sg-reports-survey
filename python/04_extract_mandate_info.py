@@ -1,85 +1,86 @@
-"""
-Extract mandate information from resolution texts using LLM.
+#!/usr/bin/env python3
+"""Extract mandate information from resolution texts using structured outputs."""
 
-Extracts:
-- Verbatim operative paragraph(s) that mandate the report
-- AI summary of mandated report content (1 sentence)
-- Explicit frequency (if stated)
-- Implicit frequency (inferred from context)
-"""
-
+import asyncio
 import json
 import os
-import time
+from typing import Literal
+
 import psycopg2
 from dotenv import load_dotenv
 from joblib import Memory
-from openai import AzureOpenAI
-from tqdm import tqdm
+from pydantic import BaseModel
+from tqdm.asyncio import tqdm_asyncio
+
+from util.ai_client import DEFAULT_MODEL, async_client, rate_limit
 
 load_dotenv()
 
-# Setup caching
-memory = Memory(location=".cache/mandate_extraction", verbose=0)
-
-# Database config
 DATABASE_URL = os.getenv("DATABASE_URL")
 DB_SCHEMA = os.getenv("DB_SCHEMA", "sg_reports_survey")
+cache = Memory(location=".cache/mandate_extraction", verbose=0)
 
-# Azure OpenAI config
-client = AzureOpenAI(
-    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-    api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
-    api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-)
 
-MODEL = "gpt-4o"  # Azure deployment name
+class Mandate(BaseModel):
+    verbatim_paragraph: str
+    summary: str
+    explicit_frequency: Literal["annual", "biennial", "triennial", "quadrennial", "one-time", "other"] | None
+    implicit_frequency: Literal["annual", "biennial", "triennial", "quadrennial", "one-time", "other"] | None
+    frequency_reasoning: str
+
+
+class MandateExtractionResponse(BaseModel):
+    mandates: list[Mandate]
+
 
 SYSTEM_PROMPT = """You are an expert at analyzing UN resolutions to extract information about mandated reports.
 
 Given a UN resolution text, extract information about any reports that are mandated/requested from the Secretary-General.
 
-Return a JSON object with:
-{
-  "mandates": [
-    {
-      "verbatim_paragraph": "The exact operative paragraph text that mandates the report",
-      "summary": "One sentence summary of what the report should contain/cover",
-      "explicit_frequency": "annual|biennial|triennial|quadrennial|one-time|other|null (if explicitly stated)",
-      "implicit_frequency": "annual|biennial|triennial|quadrennial|one-time|other|null (inferred from session numbers, dates, or patterns)",
-      "frequency_reasoning": "Brief explanation of how frequency was determined"
-    }
-  ]
-}
-
 Guidelines:
 - Look for operative paragraphs that "request", "invite", or "decide" that the Secretary-General submit a report
 - If multiple reports are mandated, include each as a separate mandate
 - For implicit frequency: look at session numbers (e.g., "79th and 81st sessions" = biennial), date patterns, or references to previous resolutions
-- If no report is mandated, return {"mandates": []}
+- If no report is mandated, return an empty mandates list
 - Keep summaries concise (1 sentence)
 - Include the FULL verbatim paragraph, not just a snippet"""
 
 
-@memory.cache
-def extract_mandate_info_llm(symbol: str, text: str) -> dict:
-    """Extract mandate info from resolution text using LLM (cached)."""
+async def extract_mandate_info_async(resolution: tuple) -> dict:
+    """Extract mandate info from resolution text using structured output."""
+    symbol, title, text = resolution
+
+    cache_file = cache.location / f"{hash(symbol) % 10000:04d}_{symbol.replace('/', '_')}.json"
+    if cache_file.exists():
+        try:
+            return json.load(open(cache_file))
+        except Exception:
+            pass
+
     try:
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"Resolution {symbol}:\n\n{text[:50000]}"}
-            ],
-            response_format={"type": "json_object"},
-            temperature=0,
-            max_tokens=4000,
-        )
-        result = json.loads(response.choices[0].message.content)
-        return {"symbol": symbol, "success": True, **result}
+        async with rate_limit:
+            response = await async_client.beta.chat.completions.parse(
+                model=DEFAULT_MODEL,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": f"Resolution {symbol}:\n\n{text[:50000]}"},
+                ],
+                response_format=MandateExtractionResponse,
+            )
+        parsed = response.choices[0].message.parsed
+        mandates = [m.model_dump() for m in parsed.mandates] if parsed else []
+        result = {"symbol": symbol, "success": True, "mandates": mandates}
     except Exception as e:
         print(f"Error processing {symbol}: {e}")
-        return {"symbol": symbol, "success": False, "error": str(e), "mandates": []}
+        result = {"symbol": symbol, "success": False, "error": str(e), "mandates": []}
+
+    try:
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        json.dump(result, open(cache_file, "w"))
+    except Exception:
+        pass
+
+    return result
 
 
 def get_resolutions_to_process(year_min: int = 2024) -> list[tuple[str, str, str]]:
@@ -89,7 +90,7 @@ def get_resolutions_to_process(year_min: int = 2024) -> list[tuple[str, str, str
         with conn.cursor() as cur:
             cur.execute(f"""
                 SELECT symbol, proper_title, text
-                FROM {DB_SCHEMA}.reports
+                FROM {DB_SCHEMA}.documents
                 WHERE document_category = 'resolution'
                   AND date_year >= %s
                   AND text IS NOT NULL
@@ -164,8 +165,8 @@ def store_mandate_results(results: list[dict]):
         conn.close()
 
 
-def main(year_min: int = 2024, limit: int | None = None):
-    """Main extraction pipeline."""
+async def main_async(year_min: int = 2024, limit: int | None = None):
+    """Main async entry point."""
     print(f"Loading resolutions from {year_min}+...")
     resolutions = get_resolutions_to_process(year_min)
     
@@ -174,13 +175,10 @@ def main(year_min: int = 2024, limit: int | None = None):
     
     print(f"Processing {len(resolutions)} resolutions...")
     
-    # Process with tqdm progress bar
-    results = []
-    for symbol, title, text in tqdm(resolutions, desc="Extracting mandates"):
-        result = extract_mandate_info_llm(symbol, text)
-        results.append(result)
-        # Small delay to avoid rate limiting (if not cached)
-        time.sleep(0.1)
+    results = await tqdm_asyncio.gather(
+        *[extract_mandate_info_async(r) for r in resolutions],
+        desc="Extracting mandates",
+    )
     
     # Summary stats
     successful = sum(1 for r in results if r.get("success"))
@@ -191,7 +189,7 @@ def main(year_min: int = 2024, limit: int | None = None):
     store_mandate_results(results)
     
     # Print sample results
-    print("\n" + "="*60 + "\nSample Results:\n" + "="*60)
+    print("\n" + "=" * 60 + "\nSample Results:\n" + "=" * 60)
     for result in results[:5]:
         if result.get("mandates"):
             print(f"\n{result['symbol']}:")
@@ -203,11 +201,15 @@ def main(year_min: int = 2024, limit: int | None = None):
     return results
 
 
+def main(year_min: int = 2024, limit: int | None = None):
+    """Sync wrapper for main."""
+    return asyncio.run(main_async(year_min=year_min, limit=limit))
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--year-min", type=int, default=2024, help="Minimum year to process")
     parser.add_argument("--limit", type=int, default=None, help="Limit number of resolutions")
     args = parser.parse_args()
-    
     main(year_min=args.year_min, limit=args.limit)

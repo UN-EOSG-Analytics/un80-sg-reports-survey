@@ -15,7 +15,7 @@ from util.metadata_link_extraction import extract_resolution_symbols_from_notes
 
 memory = Memory(location=".cache", verbose=0)
 
-load_dotenv()
+load_dotenv(override=True)
 AWS_API_URL = os.getenv("AWS_API_URL")
 DATABASE_URL = os.getenv("DATABASE_URL")
 DB_SCHEMA = os.getenv("DB_SCHEMA", "sg_reports_survey")
@@ -127,6 +127,9 @@ def store_documents_in_db(df: pd.DataFrame) -> int:
         Number of rows inserted/updated
     """
     # Columns to insert (must match SQL table)
+    # Compute word_count from text
+    df["word_count"] = df["text"].apply(lambda x: len(x.split()) if isinstance(x, str) and x else None)
+    
     columns = [
         "record_number", "symbol", "symbol_split", "symbol_split_n",
         "session_or_year", "date", "date_year", "publication_date",
@@ -137,7 +140,7 @@ def store_documents_in_db(df: pd.DataFrame) -> int:
         "agenda_item_title", "agenda_subjects", "related_resource_identifier",
         "is_part", "symbol_without_prefix", "symbol_without_prefix_split",
         "symbol_without_prefix_split_n", "note", "based_on_resolution_symbols",
-        "text", "raw_json"
+        "text", "word_count", "raw_json"
     ]
     
     def convert_value(val):
@@ -193,7 +196,7 @@ def store_documents_in_db(df: pd.DataFrame) -> int:
     update_str = ", ".join([f"{c} = EXCLUDED.{c}" for c in update_cols])
     
     insert_query = f"""
-        INSERT INTO {DB_SCHEMA}.reports ({cols_str})
+        INSERT INTO {DB_SCHEMA}.documents ({cols_str})
         VALUES %s
         ON CONFLICT (symbol) DO UPDATE SET
             {update_str},
@@ -296,7 +299,7 @@ def fetch_resolutions_for_stored_reports() -> int:
             # Get all referenced resolution symbols
             cur.execute(f"""
                 SELECT DISTINCT unnest(based_on_resolution_symbols) as symbol
-                FROM {DB_SCHEMA}.reports
+                FROM {DB_SCHEMA}.documents
                 WHERE based_on_resolution_symbols IS NOT NULL
                   AND array_length(based_on_resolution_symbols, 1) > 0
             """)
@@ -308,7 +311,7 @@ def fetch_resolutions_for_stored_reports() -> int:
             
             # Filter out resolutions we already have
             cur.execute(f"""
-                SELECT symbol FROM {DB_SCHEMA}.reports
+                SELECT symbol FROM {DB_SCHEMA}.documents
                 WHERE symbol = ANY(%s)
             """, (resolution_symbols,))
             existing = {row[0] for row in cur.fetchall()}
@@ -328,10 +331,10 @@ def fetch_resolutions_for_stored_reports() -> int:
 SOURCES = [
     # Approach 1: Classified as SG Reports
     ("Secretary-General's Reports", "989__c"),
-    # Approach 2: General reports (will be filtered by title in SQL view)
-    ("Reports", "989__b"),
-    # Approach 3: Letters/notes (will be filtered by title in SQL view)
-    ("Letters and Notes Verbales", "989__b"),
+    # # Approach 2: General reports (will be filtered by title in SQL view)
+    # ("Reports", "989__b"),
+    # # Approach 3: Letters/notes (will be filtered by title in SQL view)
+    # ("Letters and Notes Verbales", "989__b"),
 ]
 
 

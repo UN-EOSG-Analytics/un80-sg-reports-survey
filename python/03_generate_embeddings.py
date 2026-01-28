@@ -148,7 +148,7 @@ def fetch_reports_without_embeddings(conn, limit: int = None) -> list[dict]:
     
     query = f"""
         SELECT id, symbol, proper_title, subject_terms, text
-        FROM {DB_SCHEMA}.reports
+        FROM {DB_SCHEMA}.documents
         WHERE embedding IS NULL
         AND (proper_title IS NOT NULL OR text IS NOT NULL)
         ORDER BY id
@@ -178,7 +178,7 @@ def update_embeddings(conn, updates: list[tuple[int, list[float]]]):
         execute_values(
             cur,
             f"""
-            UPDATE {DB_SCHEMA}.reports AS r
+            UPDATE {DB_SCHEMA}.documents AS r
             SET embedding = v.embedding::vector, updated_at = NOW()
             FROM (VALUES %s) AS v(id, embedding)
             WHERE r.id = v.id
@@ -250,7 +250,7 @@ async def main(limit: int = None, batch_process_size: int = 500):
             SELECT 
                 COUNT(*) as total,
                 COUNT(embedding) as with_embedding
-            FROM {DB_SCHEMA}.reports
+            FROM {DB_SCHEMA}.documents
         """)
         stats = cur.fetchone()
         cur.close()

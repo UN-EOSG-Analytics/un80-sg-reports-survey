@@ -7,11 +7,14 @@ Based on: https://github.com/kleinlennart/un-website-boilerplate
 ## Features
 
 - UN branding (logo, colors, Roboto font)
-- Magic link authentication (@un.org emails only)
+- Magic link authentication (configurable email domains via DB)
+- Rate limiting on magic link requests (2 min cooldown)
+- 30-day session duration
 - PostgreSQL session/user storage
 - Configurable database schema per app
-- Entity autocomplete on first login
-- Entity and document search components
+- Entity selection on first login (with "Other" option)
+- Entity change dialog (click entity badge in header)
+- Public landing page (`/about`) + protected dashboard (`/`)
 
 ## Setup
 
@@ -42,6 +45,15 @@ Edit `sql/auth_tables.sql` and replace `sg_reports_survey` with your schema name
 psql $DATABASE_URL -f sql/auth_tables.sql
 ```
 
+The schema includes an `allowed_domains` table pre-populated with UN system domains (un.org, undp.org, unicef.org, who.int, etc.). Edit the SQL to remove domains you don't need, or add custom ones:
+
+```sql
+-- Add a custom domain
+INSERT INTO myapp.allowed_domains (entity, domain) VALUES
+  ('*', 'example.org'),        -- global: allow for all entities
+  ('PARTNER', 'partner.org');  -- entity-specific
+```
+
 ### 4. Run
 
 ```bash
@@ -52,18 +64,20 @@ Open [http://localhost:3000](http://localhost:3000) with your browser.
 
 ## Auth Flow
 
-1. User clicks "Login" in header → `/login`
-2. User enters @un.org email, magic link sent
-3. User clicks link → `/verify?token=...`
-4. First login: select entity (autocomplete); returning users: direct sign-in
-5. Session cookie set (7 days)
-6. Header shows user email, entity badge, and logout
+1. User visits `/about` (public landing page)
+2. User clicks "Sign In" → `/login`
+3. User enters email, magic link sent (rate limited: 2 min cooldown)
+4. User clicks link → `/verify?token=...`
+5. First login: select entity (combobox with "Other" option); returning users: direct sign-in
+6. Session cookie set (30 days)
+7. Header shows user email, clickable entity badge (to change), and logout
+8. Unauthenticated users accessing protected routes → redirect to `/about`
 
 ## Customization
 
 - **Site title/subtitle**: Edit `SITE_TITLE` and `SITE_SUBTITLE` in `src/components/Header.tsx`
-- **Email domain restriction**: Edit `isValidUnEmail()` in `src/lib/auth.ts`
-- **Entity list**: Query in `src/app/api/entities/route.ts`
+- **Allowed email domains**: Add to `allowed_domains` table in database
+- **Entity list**: Query in `fetchEntities()` in `src/app/api/entities/route.ts`
 - **Document search**: Query in `src/app/api/documents/search/route.ts`
 - **Protected routes**: Edit `PUBLIC_PATHS` in `src/middleware.ts`
 - **Auth schema**: Set `DB_SCHEMA` env var and update `sql/auth_tables.sql`
@@ -73,28 +87,34 @@ Open [http://localhost:3000](http://localhost:3000) with your browser.
 ```
 src/
 ├── app/
+│   ├── about/                # Public landing page
 │   ├── api/
-│   │   ├── auth/             # Auth API routes
+│   │   ├── auth/             # Auth API routes (backup, actions preferred)
 │   │   ├── documents/search/ # Document search
-│   │   └── entities/         # Entity list
-│   ├── login/                # Login page
+│   │   └── entities/         # Entity list + fetchEntities()
+│   ├── login/                # Login page + layout
 │   ├── verify/               # Token verification + entity selection
-│   └── page.tsx              # Public home page (demo)
+│   └── page.tsx              # Protected dashboard
 ├── components/
 │   ├── DocumentSearch.tsx    # Document autocomplete
-│   ├── EntitySearch.tsx      # Entity autocomplete
-│   ├── Header.tsx            # Site header
-│   ├── LoginForm.tsx         # Reusable login form
-│   └── UserMenu.tsx          # User email + logout
+│   ├── EntityChangeDialog.tsx # Dialog to change entity
+│   ├── EntityCombobox.tsx    # Entity dropdown with "Other" option
+│   ├── EntitySearch.tsx      # Entity autocomplete (for search)
+│   ├── Footer.tsx            # Site footer
+│   ├── Header.tsx            # Site header with maxWidth, hideAbout props
+│   ├── LoginForm.tsx         # Login form (uses server actions)
+│   ├── UserMenu.tsx          # Email + entity badge + logout
+│   └── VerifyForm.tsx        # Verify form with returning user detection
 ├── lib/
-│   ├── auth.ts               # Auth logic
-│   ├── config.ts             # DB_SCHEMA config
+│   ├── actions.ts            # Server actions for auth
+│   ├── auth.ts               # Auth logic (isAllowedDomain, sessions, etc.)
+│   ├── config.ts             # DB_SCHEMA config + table names
 │   ├── db.ts                 # PostgreSQL pool
 │   ├── mail.ts               # Magic link emails
 │   └── utils.ts              # Tailwind cn() helper
 └── middleware.ts             # Route protection
 sql/
-└── auth_tables.sql           # Database schema
+└── auth_tables.sql           # Database schema (users, tokens, allowed_domains)
 ```
 
 ## Maintenance
@@ -128,11 +148,6 @@ rm -rf node_modules .next && npm install
 - The `/public` directory should remain in the root of your project.
 - Config files like `package.json`, `next.config.js` and `tsconfig.json` should remain in the root of your project.
 - `.env.*` files should remain in the root of your project.
-- `src/app` or `src/pages` will be ignored if `app` or `pages` are present in the root directory.
-- If you are using a `src` directory, consider moving other application folders such as `/components` or `/lib` into `src` for consistency.
-- If you are using a Proxy, ensure it is placed inside the `src` folder.
-- When using Tailwind CSS, add the `/src` prefix to the `content` array in your `tailwind.config.js` file to ensure proper scanning.
-- If you use TypeScript path aliases like `@/*`, update the `paths` object in `tsconfig.json` to include `src/`.
 
 - [Next.js Documentation](https://nextjs.org/docs)
 - [Learn Next.js](https://nextjs.org/learn)

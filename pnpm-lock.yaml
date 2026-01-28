@@ -91,10 +91,10 @@ importers:
         specifier: ^2.8.32
         version: 2.9.17
       eslint:
-        specifier: ^9
+        specifier: ^9.39.1
         version: 9.39.2(jiti@2.6.1)
       eslint-config-next:
-        specifier: ^16.0.6
+        specifier: ^16.0.8
         version: 16.1.4(@typescript-eslint/parser@8.53.1(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3))(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
       prettier-plugin-tailwindcss:
         specifier: ^0.7.1

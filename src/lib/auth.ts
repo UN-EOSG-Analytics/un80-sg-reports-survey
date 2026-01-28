@@ -3,25 +3,46 @@ import { randomBytes, createHmac, timingSafeEqual } from "crypto";
 import { query } from "./db";
 import { tables } from "./config";
 
-const AUTH_SECRET = process.env.AUTH_SECRET;
-if (!AUTH_SECRET && process.env.NODE_ENV === "production") {
-  throw new Error("AUTH_SECRET must be set in production");
-}
-const SECRET = AUTH_SECRET || "dev-secret-change-me";
+const getSecret = () => {
+  const secret = process.env.AUTH_SECRET;
+  if (!secret && process.env.NODE_ENV === "production") {
+    throw new Error("AUTH_SECRET must be set in production");
+  }
+  return secret || "dev-secret-change-me";
+};
 const COOKIE_NAME = "auth_session";
 
-export function isValidUnEmail(email: string): boolean {
-  return email.toLowerCase().endsWith("@un.org");
+export async function isAllowedDomain(email: string): Promise<boolean> {
+  const domain = email.toLowerCase().split("@")[1];
+  if (!domain) return false;
+  const rows = await query<{ count: string }>(
+    `SELECT COUNT(*) as count FROM ${tables.allowed_domains} WHERE domain = $1`,
+    [domain]
+  );
+  return parseInt(rows[0]?.count || "0") > 0;
 }
 
 export function generateToken(): string {
   return randomBytes(32).toString("hex");
 }
 
+export async function recentTokenExists(email: string): Promise<boolean> {
+  // Block if unused token sent in last 2 minutes (token expires 15 min after creation)
+  const rows = await query<{ count: string }>(
+    `SELECT COUNT(*) as count FROM ${tables.magic_tokens} 
+     WHERE email = $1 AND used_at IS NULL AND expires_at > NOW() + INTERVAL '13 minutes'`,
+    [email.toLowerCase()]
+  );
+  return parseInt(rows[0]?.count || "0") > 0;
+}
+
 export async function createMagicToken(email: string): Promise<string> {
   const token = generateToken();
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-  await query(`INSERT INTO ${tables.magic_tokens} (token, email, expires_at) VALUES ($1, $2, $3)`, [token, email.toLowerCase(), expiresAt]);
+  await query(
+    `INSERT INTO ${tables.magic_tokens} (token, email, expires_at) VALUES ($1, $2, $3)`,
+    [token, email.toLowerCase(), expiresAt]
+  );
   return token;
 }
 
@@ -33,21 +54,18 @@ export async function verifyMagicToken(token: string): Promise<string | null> {
   return rows[0]?.email || null;
 }
 
-export async function upsertUser(email: string, entity?: string): Promise<string> {
+export async function upsertUser(email: string): Promise<string> {
   const rows = await query<{ id: string }>(
-    entity
-      ? `INSERT INTO ${tables.users} (email, entity, last_login_at) VALUES ($1, $2, NOW()) 
-         ON CONFLICT (email) DO UPDATE SET entity = COALESCE(${tables.users}.entity, $2), last_login_at = NOW() RETURNING id`
-      : `INSERT INTO ${tables.users} (email, last_login_at) VALUES ($1, NOW()) 
-         ON CONFLICT (email) DO UPDATE SET last_login_at = NOW() RETURNING id`,
-    entity ? [email.toLowerCase(), entity] : [email.toLowerCase()]
+    `INSERT INTO ${tables.users} (email, last_login_at) VALUES ($1, NOW()) 
+     ON CONFLICT (email) DO UPDATE SET last_login_at = NOW() RETURNING id`,
+    [email.toLowerCase()]
   );
   return rows[0].id;
 }
 
 function signSession(userId: string): string {
-  const payload = JSON.stringify({ userId, exp: Date.now() + 7 * 24 * 60 * 60 * 1000 });
-  const sig = createHmac("sha256", SECRET).update(payload).digest("hex");
+  const payload = JSON.stringify({ userId, exp: Date.now() + 30 * 24 * 60 * 60 * 1000 });
+  const sig = createHmac("sha256", getSecret()).update(payload).digest("hex");
   return Buffer.from(payload).toString("base64") + "." + sig;
 }
 
@@ -56,7 +74,7 @@ export function verifySession(token: string): { userId: string } | null {
     const [payloadB64, sig] = token.split(".");
     if (!payloadB64 || !sig) return null;
     const payload = Buffer.from(payloadB64, "base64").toString();
-    const expectedSig = createHmac("sha256", SECRET).update(payload).digest("hex");
+    const expectedSig = createHmac("sha256", getSecret()).update(payload).digest("hex");
     const sigBuf = Buffer.from(sig, "hex");
     const expectedBuf = Buffer.from(expectedSig, "hex");
     if (sigBuf.length !== expectedBuf.length || !timingSafeEqual(sigBuf, expectedBuf)) return null;
@@ -75,7 +93,7 @@ export async function createSession(userId: string) {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60,
+    maxAge: 30 * 24 * 60 * 60,
     path: "/",
   });
 }

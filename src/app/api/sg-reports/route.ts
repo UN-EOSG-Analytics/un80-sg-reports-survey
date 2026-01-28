@@ -28,10 +28,17 @@ interface SingleReportRow {
   publication_date: string | null;
   subject_terms: string[] | null;
   resource_type_level3: string[] | null;
+  based_on_resolution_symbols: string[] | null;
   text: string | null;
   raw_json: Record<string, unknown> | null;
   created_at: Date;
   updated_at: Date;
+}
+
+interface ResolutionInfo {
+  symbol: string;
+  title: string | null;
+  date_year: number | null;
 }
 
 interface CountItem {
@@ -65,9 +72,9 @@ export async function GET(req: NextRequest) {
   if (symbol) {
     const reports = await query<SingleReportRow>(
       `SELECT id, symbol, proper_title, title, date_year, publication_date,
-              subject_terms, resource_type_level3, text, raw_json,
-              created_at, updated_at
-       FROM ${DB_SCHEMA}.reports
+              subject_terms, resource_type_level3, based_on_resolution_symbols,
+              text, raw_json, created_at, updated_at
+       FROM ${DB_SCHEMA}.documents
        WHERE symbol = $1`,
       [symbol]
     );
@@ -76,7 +83,23 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Report not found" }, { status: 404 });
     }
 
-    return NextResponse.json(reports[0]);
+    const report = reports[0];
+    
+    // Fetch resolution details if report has mandating resolutions
+    let resolutions: ResolutionInfo[] = [];
+    if (report.based_on_resolution_symbols && report.based_on_resolution_symbols.length > 0) {
+      resolutions = await query<ResolutionInfo>(
+        `SELECT symbol, proper_title as title, date_year
+         FROM ${DB_SCHEMA}.documents
+         WHERE symbol = ANY($1)`,
+        [report.based_on_resolution_symbols]
+      );
+    }
+
+    return NextResponse.json({
+      ...report,
+      resolutions,
+    });
   }
 
   // Build WHERE clauses for filters

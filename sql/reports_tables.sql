@@ -1,4 +1,4 @@
--- Reports and reporting entities tables for SG Reports Survey
+-- Documents and reporting entities tables for SG Reports Survey
 -- Run: psql $DATABASE_URL -f sql/reports_tables.sql
 --
 -- AZURE SETUP: pg_vector extension must be enabled on your Azure PostgreSQL Flexible Server
@@ -9,10 +9,10 @@
 CREATE EXTENSION IF NOT EXISTS vector;
 
 --------------------------------------------------------------------------------
--- REPORTS TABLE
+-- DOCUMENTS TABLE (formerly 'reports' - now holds reports, resolutions, etc.)
 --------------------------------------------------------------------------------
 
-CREATE TABLE IF NOT EXISTS sg_reports_survey.reports (
+CREATE TABLE IF NOT EXISTS sg_reports_survey.documents (
   id SERIAL PRIMARY KEY,
   
   -- Core identifiers
@@ -20,6 +20,9 @@ CREATE TABLE IF NOT EXISTS sg_reports_survey.reports (
   symbol TEXT NOT NULL,
   symbol_split TEXT[],
   symbol_split_n INTEGER,
+  
+  -- Document categorization
+  document_category TEXT,  -- 'report', 'resolution', 'letter', etc.
   
   -- Session/year info
   session_or_year TEXT,
@@ -61,10 +64,14 @@ CREATE TABLE IF NOT EXISTS sg_reports_survey.reports (
   -- Notes
   note TEXT,
   
+  -- Mandate/basis information (for reports: which resolutions they're based on)
+  based_on_resolution_symbols TEXT[],
+  
   -- Full text content
   text TEXT,
   
   -- Vector embedding for semantic similarity search (1024 dimensions for text-embedding-3-large)
+  -- NULL for resolutions (we skip vector generation for them)
   embedding vector(1024),
   
   -- Complete raw JSON dump of the original record
@@ -75,28 +82,40 @@ CREATE TABLE IF NOT EXISTS sg_reports_survey.reports (
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   
   -- Constraints
-  CONSTRAINT unique_symbol UNIQUE (symbol)
+  CONSTRAINT unique_document_symbol UNIQUE (symbol)
 );
 
--- Indexes for reports table
-CREATE INDEX IF NOT EXISTS idx_reports_symbol ON sg_reports_survey.reports (symbol);
-CREATE INDEX IF NOT EXISTS idx_reports_proper_title ON sg_reports_survey.reports (proper_title);
-CREATE INDEX IF NOT EXISTS idx_reports_date_year ON sg_reports_survey.reports (date_year);
-CREATE INDEX IF NOT EXISTS idx_reports_resource_type_level3 ON sg_reports_survey.reports USING GIN (resource_type_level3);
-CREATE INDEX IF NOT EXISTS idx_reports_subject_terms ON sg_reports_survey.reports USING GIN (subject_terms);
-CREATE INDEX IF NOT EXISTS idx_reports_raw_json ON sg_reports_survey.reports USING GIN (raw_json);
+-- Indexes for documents table
+CREATE INDEX IF NOT EXISTS idx_documents_symbol ON sg_reports_survey.documents (symbol);
+CREATE INDEX IF NOT EXISTS idx_documents_document_category ON sg_reports_survey.documents (document_category);
+CREATE INDEX IF NOT EXISTS idx_documents_proper_title ON sg_reports_survey.documents (proper_title);
+CREATE INDEX IF NOT EXISTS idx_documents_date_year ON sg_reports_survey.documents (date_year);
+CREATE INDEX IF NOT EXISTS idx_documents_resource_type_level3 ON sg_reports_survey.documents USING GIN (resource_type_level3);
+CREATE INDEX IF NOT EXISTS idx_documents_subject_terms ON sg_reports_survey.documents USING GIN (subject_terms);
+CREATE INDEX IF NOT EXISTS idx_documents_based_on_resolution_symbols ON sg_reports_survey.documents USING GIN (based_on_resolution_symbols);
+CREATE INDEX IF NOT EXISTS idx_documents_raw_json ON sg_reports_survey.documents USING GIN (raw_json);
 
 -- Full-text search index on text content
-CREATE INDEX IF NOT EXISTS idx_reports_text_search ON sg_reports_survey.reports USING GIN (to_tsvector('english', COALESCE(text, '')));
+CREATE INDEX IF NOT EXISTS idx_documents_text_search ON sg_reports_survey.documents USING GIN (to_tsvector('english', COALESCE(text, '')));
 
 -- Vector similarity search index using HNSW (Hierarchical Navigable Small World)
-CREATE INDEX IF NOT EXISTS idx_reports_embedding 
-ON sg_reports_survey.reports 
+CREATE INDEX IF NOT EXISTS idx_documents_embedding 
+ON sg_reports_survey.documents 
 USING hnsw (embedding vector_cosine_ops)
 WITH (m = 16, ef_construction = 64);
 
 -- Comments
-COMMENT ON COLUMN sg_reports_survey.reports.embedding IS 'Vector embedding from text-embedding-3-large (1024 dimensions) for semantic similarity search';
+COMMENT ON TABLE sg_reports_survey.documents IS 'Holds all UN documents: reports, resolutions, letters, etc.';
+COMMENT ON COLUMN sg_reports_survey.documents.document_category IS 'High-level category: report, resolution, letter, etc.';
+COMMENT ON COLUMN sg_reports_survey.documents.based_on_resolution_symbols IS 'For reports: array of resolution symbols this report is based on (e.g., A/RES/78/70)';
+COMMENT ON COLUMN sg_reports_survey.documents.embedding IS 'Vector embedding from text-embedding-3-large (1024 dimensions) for semantic similarity search';
+
+--------------------------------------------------------------------------------
+-- BACKWARDS COMPATIBILITY: Create 'reports' as a view pointing to documents
+--------------------------------------------------------------------------------
+CREATE OR REPLACE VIEW sg_reports_survey.reports AS
+SELECT * FROM sg_reports_survey.documents
+WHERE document_category IN ('report', 'letter') OR document_category IS NULL;
 
 --------------------------------------------------------------------------------
 -- REPORTING ENTITIES TABLE
@@ -105,7 +124,7 @@ COMMENT ON COLUMN sg_reports_survey.reports.embedding IS 'Vector embedding from 
 CREATE TABLE IF NOT EXISTS sg_reports_survey.reporting_entities (
   id SERIAL PRIMARY KEY,
   
-  -- Symbol is the key for joining with reports table
+  -- Symbol is the key for joining with documents table
   symbol TEXT NOT NULL,
   
   -- Entity from manual_list.xlsx (higher priority source)

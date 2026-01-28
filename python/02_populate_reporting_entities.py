@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-Populate reporting_entities table from dgacm_list.xlsx and dri.xlsx
+Populate report_entity_suggestions table from dgacm_list.xlsx and dri.xlsx
 
 This script:
-1. Reads dgacm_list.xlsx to get symbol → entity mapping (direct match)
-2. Reads dri.xlsx and uses fuzzy title matching to map DRI entities to symbols
-3. Inserts/updates the reporting_entities table with both sources
+1. Loads master entity list from systemchart.entities for validation
+2. Reads dgacm_list.xlsx to get symbol → entity mapping, then maps to proper_title
+3. Reads dri.xlsx and uses fuzzy title matching to map DRI entities to proper_titles
+4. Inserts suggestions into report_entity_suggestions with source tracking
 """
 
+import json
 import os
 import re
 import pandas as pd
@@ -39,6 +41,17 @@ def normalize_title(t: str) -> str:
 def fuzzy_match_score(s1: str, s2: str) -> float:
     """Calculate fuzzy match score between two strings."""
     return SequenceMatcher(None, s1, s2).ratio()
+
+
+def load_valid_entities(conn) -> set:
+    """Load the set of valid entities from systemchart.entities."""
+    print("Loading valid entities from systemchart.entities...")
+    cur = conn.cursor()
+    cur.execute("SELECT entity FROM systemchart.entities")
+    entities = {row[0] for row in cur.fetchall()}
+    cur.close()
+    print(f"  Loaded {len(entities)} valid entities")
+    return entities
 
 
 def load_dgacm_list(filepath: str) -> pd.DataFrame:
@@ -75,12 +88,13 @@ def load_dri(filepath: str) -> pd.DataFrame:
 
 
 def load_db_reports(conn) -> pd.DataFrame:
-    """Load reports from database with their full titles."""
+    """Load reports from database with symbols and proper_titles."""
     print("Loading reports from database...")
     
     query = f"""
         SELECT 
             symbol,
+            proper_title,
             COALESCE(
                 regexp_replace(
                     COALESCE(raw_json->>'245__a', '') || ' ' || 
@@ -89,7 +103,8 @@ def load_db_reports(conn) -> pd.DataFrame:
                 ),
                 proper_title
             ) as full_title
-        FROM {DB_SCHEMA}.reports
+        FROM {DB_SCHEMA}.sg_reports
+        WHERE proper_title IS NOT NULL
     """
     
     df = pd.read_sql(query, conn)
@@ -101,18 +116,87 @@ def load_db_reports(conn) -> pd.DataFrame:
 
 def get_title_words(title: str) -> set:
     """Extract significant words from a title for pre-filtering."""
-    # Remove common words
     stopwords = {'the', 'of', 'and', 'to', 'a', 'in', 'for', 'on', 'by', 'report', 
                  'secretary-general', 'secretarygeneral', 'general', 'united', 'nations'}
     words = set(title.split())
     return words - stopwords
 
 
-def match_dri_to_db(dri_df: pd.DataFrame, db_df: pd.DataFrame, threshold: float = 0.8) -> dict:
+def map_dgacm_to_proper_titles(dgacm_df: pd.DataFrame, db_df: pd.DataFrame, valid_entities: set) -> list:
     """
-    Match DRI records to database records using fuzzy title matching.
-    Uses pre-filtering for speed.
-    Returns a dict of symbol -> entity mappings.
+    Map DGACM symbol → entity to proper_title → entity.
+    Returns list of (proper_title, entity, match_details) tuples.
+    """
+    print("Mapping DGACM symbols to proper_titles...")
+    
+    # Build symbol → proper_title lookup
+    symbol_to_proper_title = {}
+    for _, row in db_df.iterrows():
+        symbol = row["symbol"]
+        proper_title = row["proper_title"]
+        if symbol and proper_title:
+            symbol_to_proper_title[symbol] = proper_title
+    
+    # Map DGACM entries
+    suggestions = []
+    matched = 0
+    skipped_no_symbol = 0
+    skipped_invalid_entity = 0
+    
+    # Group by proper_title to avoid duplicates
+    proper_title_entities = {}
+    
+    for _, row in dgacm_df.iterrows():
+        symbol = row["symbol"]
+        entity = row["entity"]
+        
+        if not symbol or not entity:
+            skipped_no_symbol += 1
+            continue
+        
+        # Validate entity exists in master list
+        if entity not in valid_entities:
+            skipped_invalid_entity += 1
+            continue
+        
+        proper_title = symbol_to_proper_title.get(symbol)
+        if not proper_title:
+            continue
+        
+        # Track entity for this proper_title
+        if proper_title not in proper_title_entities:
+            proper_title_entities[proper_title] = {}
+        
+        if entity not in proper_title_entities[proper_title]:
+            proper_title_entities[proper_title][entity] = {
+                "symbols_matched": [],
+            }
+        
+        proper_title_entities[proper_title][entity]["symbols_matched"].append(symbol)
+        matched += 1
+    
+    # Convert to suggestions list
+    for proper_title, entities in proper_title_entities.items():
+        for entity, details in entities.items():
+            suggestions.append((
+                proper_title,
+                entity,
+                json.dumps(details)
+            ))
+    
+    print(f"  Matched {matched} DGACM records")
+    print(f"  Skipped {skipped_no_symbol} with missing symbol/entity")
+    print(f"  Skipped {skipped_invalid_entity} with invalid entity (not in systemchart.entities)")
+    print(f"  Unique proper_title → entity suggestions: {len(suggestions)}")
+    
+    return suggestions
+
+
+def match_dri_to_proper_titles(dri_df: pd.DataFrame, db_df: pd.DataFrame, 
+                               valid_entities: set, threshold: float = 0.8) -> list:
+    """
+    Match DRI records to proper_titles using fuzzy title matching.
+    Returns list of (proper_title, entity, confidence_score, match_details) tuples.
     """
     print(f"Matching DRI titles to database (threshold={threshold})...")
     
@@ -120,14 +204,15 @@ def match_dri_to_db(dri_df: pd.DataFrame, db_df: pd.DataFrame, threshold: float 
     db_data = []
     for _, row in db_df.iterrows():
         words = get_title_words(row["norm_title"])
-        db_data.append((row["symbol"], row["norm_title"], words))
+        db_data.append((row["proper_title"], row["norm_title"], words, row["symbol"]))
     
-    matches = {}
-    matched_count = 0
+    # Group by proper_title to track best match per proper_title
+    proper_title_matches = {}
     
     # Group DRI by normalized title and entity to avoid duplicate matching
     dri_grouped = dri_df.groupby("norm_title").agg({
-        "ENTITY": "first"
+        "ENTITY": "first",
+        "DOCUMENT TITLE": "first"
     }).reset_index()
     
     total = len(dri_grouped)
@@ -137,110 +222,147 @@ def match_dri_to_db(dri_df: pd.DataFrame, db_df: pd.DataFrame, threshold: float 
         
         dri_title = row["norm_title"]
         dri_entity = row["ENTITY"]
+        dri_original_title = row["DOCUMENT TITLE"]
         
         if not dri_title or not dri_entity:
+            continue
+        
+        # Validate entity
+        if dri_entity not in valid_entities:
             continue
         
         dri_words = get_title_words(dri_title)
         
         # Pre-filter: only consider candidates with at least 2 common significant words
-        candidates = [(s, t) for s, t, w in db_data if len(dri_words & w) >= 2]
+        candidates = [(pt, t, s) for pt, t, w, s in db_data if len(dri_words & w) >= 2]
         
         if not candidates:
             # Fallback: check first 50 for very short titles
-            candidates = [(s, t) for s, t, _ in db_data[:50]]
+            candidates = [(pt, t, s) for pt, t, _, s in db_data[:50]]
         
         # Find best match among candidates
         best_score = 0
+        best_proper_title = None
         best_symbol = None
+        best_db_title = None
         
-        for symbol, db_title in candidates:
+        for proper_title, db_title, symbol in candidates:
             score = fuzzy_match_score(dri_title, db_title)
             if score > best_score:
                 best_score = score
+                best_proper_title = proper_title
                 best_symbol = symbol
+                best_db_title = db_title
         
-        if best_score >= threshold and best_symbol:
-            # Only update if this entity is "better" (not empty) or not already set
-            if best_symbol not in matches or not matches[best_symbol]:
-                matches[best_symbol] = dri_entity
-                matched_count += 1
+        if best_score >= threshold and best_proper_title:
+            key = (best_proper_title, dri_entity)
+            
+            # Keep best match per (proper_title, entity) pair
+            if key not in proper_title_matches or proper_title_matches[key]["score"] < best_score:
+                proper_title_matches[key] = {
+                    "score": best_score,
+                    "dri_title": dri_original_title,
+                    "matched_symbol": best_symbol,
+                    "matched_db_title": best_db_title
+                }
     
-    print(f"  Matched {matched_count} DRI records to database symbols")
-    return matches
+    # Convert to suggestions list
+    suggestions = []
+    for (proper_title, entity), match_info in proper_title_matches.items():
+        suggestions.append((
+            proper_title,
+            entity,
+            round(match_info["score"], 3),
+            json.dumps({
+                "dri_title": match_info["dri_title"],
+                "matched_symbol": match_info["matched_symbol"],
+                "fuzzy_score": round(match_info["score"], 3)
+            })
+        ))
+    
+    print(f"  Matched {len(suggestions)} DRI records to proper_titles")
+    return suggestions
 
 
-def populate_table(conn, dgacm_df: pd.DataFrame, dri_matches: dict):
-    """Populate the reporting_entities table."""
-    print("Populating reporting_entities table...")
+def populate_suggestions_table(conn, dgacm_suggestions: list, dri_suggestions: list):
+    """Populate the report_entity_suggestions table."""
+    print("Populating report_entity_suggestions table...")
     
     cur = conn.cursor()
     
     # Clear existing data
-    cur.execute(f"TRUNCATE TABLE {DB_SCHEMA}.reporting_entities")
+    cur.execute(f"TRUNCATE TABLE {DB_SCHEMA}.report_entity_suggestions")
     print("  Cleared existing data")
     
-    # Collect all data
-    all_data = {}
+    # Insert DGACM suggestions (no confidence score - exact match)
+    if dgacm_suggestions:
+        dgacm_query = f"""
+            INSERT INTO {DB_SCHEMA}.report_entity_suggestions 
+                (proper_title, entity, source, confidence_score, match_details)
+            VALUES %s
+            ON CONFLICT (proper_title, entity, source) DO UPDATE SET
+                match_details = EXCLUDED.match_details
+        """
+        
+        dgacm_values = [
+            (pt, entity, 'dgacm', None, match_details)
+            for pt, entity, match_details in dgacm_suggestions
+        ]
+        
+        execute_values(cur, dgacm_query, dgacm_values)
+        print(f"  Inserted {len(dgacm_suggestions)} DGACM suggestions")
     
-    # Add DGACM list data (higher priority)
-    for _, row in dgacm_df.iterrows():
-        symbol = row["symbol"]
-        entity = row["entity"]
-        if symbol and entity:
-            if symbol not in all_data:
-                all_data[symbol] = {"entity_manual": None, "entity_dri": None}
-            all_data[symbol]["entity_manual"] = entity
-    
-    # Add DRI data
-    for symbol, entity in dri_matches.items():
-        if symbol not in all_data:
-            all_data[symbol] = {"entity_manual": None, "entity_dri": None}
-        all_data[symbol]["entity_dri"] = entity
-    
-    print(f"  Total unique symbols to insert: {len(all_data)}")
-    
-    # Prepare values for bulk insert
-    values = [
-        (symbol, data["entity_manual"], data["entity_dri"])
-        for symbol, data in all_data.items()
-    ]
-    
-    # Upsert using ON CONFLICT
-    insert_query = f"""
-        INSERT INTO {DB_SCHEMA}.reporting_entities (symbol, entity_manual, entity_dri, updated_at)
-        VALUES %s
-        ON CONFLICT (symbol) DO UPDATE SET
-            entity_manual = COALESCE(EXCLUDED.entity_manual, {DB_SCHEMA}.reporting_entities.entity_manual),
-            entity_dri = COALESCE(EXCLUDED.entity_dri, {DB_SCHEMA}.reporting_entities.entity_dri),
-            updated_at = NOW()
-    """
-    
-    execute_values(
-        cur,
-        insert_query,
-        values,
-        template="(%s, %s, %s, NOW())"
-    )
+    # Insert DRI suggestions (with confidence score)
+    if dri_suggestions:
+        dri_query = f"""
+            INSERT INTO {DB_SCHEMA}.report_entity_suggestions 
+                (proper_title, entity, source, confidence_score, match_details)
+            VALUES %s
+            ON CONFLICT (proper_title, entity, source) DO UPDATE SET
+                confidence_score = EXCLUDED.confidence_score,
+                match_details = EXCLUDED.match_details
+        """
+        
+        dri_values = [
+            (pt, entity, 'dri', score, match_details)
+            for pt, entity, score, match_details in dri_suggestions
+        ]
+        
+        execute_values(cur, dri_query, dri_values)
+        print(f"  Inserted {len(dri_suggestions)} DRI suggestions")
     
     conn.commit()
     
     # Get stats
     cur.execute(f"""
         SELECT 
-            COUNT(*) as total,
-            COUNT(entity_manual) as with_manual,
-            COUNT(entity_dri) as with_dri,
-            COUNT(CASE WHEN entity_manual IS NOT NULL AND entity_dri IS NOT NULL THEN 1 END) as with_both
-        FROM {DB_SCHEMA}.reporting_entities
+            source,
+            COUNT(*) as count,
+            COUNT(DISTINCT proper_title) as unique_reports,
+            COUNT(DISTINCT entity) as unique_entities,
+            AVG(confidence_score) as avg_confidence
+        FROM {DB_SCHEMA}.report_entity_suggestions
+        GROUP BY source
+        ORDER BY source
     """)
-    stats = cur.fetchone()
+    stats = cur.fetchall()
     
-    print(f"  Done! Stats:")
-    print(f"    Total records: {stats[0]}")
-    print(f"    With manual entity: {stats[1]}")
-    print(f"    With DRI entity: {stats[2]}")
-    print(f"    With both sources: {stats[3]}")
+    print(f"\n  Stats by source:")
+    for row in stats:
+        source, count, reports, entities, avg_conf = row
+        conf_str = f", avg confidence: {avg_conf:.3f}" if avg_conf else ""
+        print(f"    {source}: {count} suggestions, {reports} reports, {entities} entities{conf_str}")
+    
+    # Overall stats
+    cur.execute(f"""
+        SELECT 
+            COUNT(DISTINCT proper_title) as total_reports,
+            COUNT(DISTINCT entity) as total_entities,
+            COUNT(*) as total_suggestions
+        FROM {DB_SCHEMA}.report_entity_suggestions
+    """)
+    overall = cur.fetchone()
+    print(f"\n  Overall: {overall[2]} suggestions for {overall[0]} reports from {overall[1]} entities")
     
     cur.close()
 
@@ -248,7 +370,7 @@ def populate_table(conn, dgacm_df: pd.DataFrame, dri_matches: dict):
 def main():
     """Main entry point."""
     print("=" * 60)
-    print("Populating reporting_entities table")
+    print("Populating report_entity_suggestions table")
     print("=" * 60)
     
     # File paths
@@ -265,16 +387,22 @@ def main():
     conn = psycopg2.connect(DATABASE_URL)
     
     try:
+        # Load valid entities first
+        valid_entities = load_valid_entities(conn)
+        
         # Load data
         dgacm_df = load_dgacm_list(dgacm_path)
         dri_df = load_dri(dri_path)
         db_df = load_db_reports(conn)
         
-        # Match DRI to database
-        dri_matches = match_dri_to_db(dri_df, db_df, threshold=0.8)
+        # Map DGACM to proper_titles
+        dgacm_suggestions = map_dgacm_to_proper_titles(dgacm_df, db_df, valid_entities)
+        
+        # Match DRI to proper_titles
+        dri_suggestions = match_dri_to_proper_titles(dri_df, db_df, valid_entities, threshold=0.8)
         
         # Populate table
-        populate_table(conn, dgacm_df, dri_matches)
+        populate_suggestions_table(conn, dgacm_suggestions, dri_suggestions)
         
         print("\n" + "=" * 60)
         print("Done!")

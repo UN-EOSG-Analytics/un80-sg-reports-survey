@@ -1,6 +1,7 @@
 -- All views for SG Reports Survey
 -- Run: psql $DATABASE_URL -f sql/views.sql
 
+DROP VIEW IF EXISTS sg_reports_survey.report_entities;
 DROP VIEW IF EXISTS sg_reports_survey.sg_report_mandates;
 DROP VIEW IF EXISTS sg_reports_survey.resolutions;
 DROP VIEW IF EXISTS sg_reports_survey.latest_versions;
@@ -105,6 +106,67 @@ SELECT r.id, r.symbol, r.proper_title, r.title, r.date_year, r.publication_date,
 FROM ranked r
 JOIN version_counts vc ON r.proper_title = vc.proper_title
 WHERE r.rn = 1;
+
+--------------------------------------------------------------------------------
+-- REPORT_ENTITIES: Combined view of entity suggestions and confirmations
+-- Shows all suggested entities per report series with confirmation status
+--------------------------------------------------------------------------------
+CREATE VIEW sg_reports_survey.report_entities AS
+WITH suggestions_agg AS (
+  -- Aggregate all suggestions per proper_title
+  SELECT 
+    proper_title,
+    jsonb_agg(
+      jsonb_build_object(
+        'entity', entity,
+        'source', source,
+        'confidence_score', confidence_score,
+        'match_details', match_details,
+        'created_at', created_at
+      ) ORDER BY 
+        -- Prioritize: higher confidence, then dgacm > dri > ai
+        confidence_score DESC NULLS LAST,
+        CASE source WHEN 'dgacm' THEN 1 WHEN 'dri' THEN 2 WHEN 'ai' THEN 3 END
+    ) as suggestions,
+    array_agg(DISTINCT entity ORDER BY entity) as suggested_entities
+  FROM sg_reports_survey.report_entity_suggestions
+  GROUP BY proper_title
+),
+confirmations_agg AS (
+  -- Aggregate all confirmations per proper_title
+  SELECT 
+    c.proper_title,
+    jsonb_agg(
+      jsonb_build_object(
+        'entity', c.entity,
+        'confirmed_by_user_id', c.confirmed_by_user_id,
+        'confirmed_by_email', u.email,
+        'confirmed_at', c.confirmed_at,
+        'notes', c.notes
+      ) ORDER BY c.confirmed_at DESC
+    ) as confirmations,
+    array_agg(DISTINCT c.entity ORDER BY c.entity) as confirmed_entities
+  FROM sg_reports_survey.report_entity_confirmations c
+  LEFT JOIN sg_reports_survey.users u ON c.confirmed_by_user_id = u.id
+  GROUP BY c.proper_title
+)
+SELECT 
+  COALESCE(s.proper_title, c.proper_title) as proper_title,
+  s.suggestions,
+  s.suggested_entities,
+  c.confirmations,
+  c.confirmed_entities,
+  -- Primary entity: first confirmed, otherwise highest-confidence suggestion
+  COALESCE(
+    c.confirmed_entities[1],
+    s.suggested_entities[1]
+  ) as primary_entity,
+  -- Has any confirmation?
+  (c.proper_title IS NOT NULL) as has_confirmation
+FROM suggestions_agg s
+FULL OUTER JOIN confirmations_agg c ON s.proper_title = c.proper_title;
+
+COMMENT ON VIEW sg_reports_survey.report_entities IS 'Combined view of entity suggestions and confirmations per report series';
 
 \echo 'Views created. Stats:'
 SELECT * FROM sg_reports_survey.sg_reports_stats;

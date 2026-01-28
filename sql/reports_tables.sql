@@ -118,7 +118,7 @@ SELECT * FROM sg_reports_survey.documents
 WHERE document_category IN ('report', 'letter') OR document_category IS NULL;
 
 --------------------------------------------------------------------------------
--- REPORTING ENTITIES TABLE
+-- REPORTING ENTITIES TABLE (DEPRECATED - use report_entity_suggestions instead)
 --------------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS sg_reports_survey.reporting_entities (
@@ -151,7 +151,92 @@ CREATE INDEX IF NOT EXISTS idx_reporting_entities_entity_manual ON sg_reports_su
 CREATE INDEX IF NOT EXISTS idx_reporting_entities_entity_dri ON sg_reports_survey.reporting_entities (entity_dri);
 
 -- Comments
-COMMENT ON TABLE sg_reports_survey.reporting_entities IS 'Maps document symbols to reporting entities from manual_list.xlsx and dri.xlsx';
+COMMENT ON TABLE sg_reports_survey.reporting_entities IS 'DEPRECATED: Use report_entity_suggestions instead. Maps document symbols to reporting entities.';
 COMMENT ON COLUMN sg_reports_survey.reporting_entities.entity_manual IS 'Lead entity from manual_list.xlsx (preferred source)';
 COMMENT ON COLUMN sg_reports_survey.reporting_entities.entity_dri IS 'Entity from dri.xlsx (fallback source)';
 COMMENT ON COLUMN sg_reports_survey.reporting_entities.entity IS 'Computed preferred entity: manual first, then dri';
+
+--------------------------------------------------------------------------------
+-- REPORT ENTITY SUGGESTIONS TABLE (NEW)
+-- Stores multiple entity suggestions per report series from different sources
+--------------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS sg_reports_survey.report_entity_suggestions (
+  id SERIAL PRIMARY KEY,
+  
+  -- Report series identifier (matches documents.proper_title)
+  proper_title TEXT NOT NULL,
+  
+  -- Entity reference (FK to systemchart.entities master list)
+  entity TEXT NOT NULL REFERENCES systemchart.entities(entity),
+  
+  -- Source of this suggestion
+  source TEXT NOT NULL CHECK (source IN ('dgacm', 'dri', 'ai')),
+  
+  -- Confidence score for fuzzy/AI matches (0.000 to 1.000)
+  confidence_score NUMERIC(4,3) CHECK (confidence_score IS NULL OR (confidence_score >= 0 AND confidence_score <= 1)),
+  
+  -- Details about how the match was made (symbol matched, fuzzy score, AI reasoning, etc.)
+  match_details JSONB,
+  
+  -- Timestamps
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  
+  -- One suggestion per entity+source per report series
+  CONSTRAINT unique_suggestion_per_source UNIQUE (proper_title, entity, source)
+);
+
+-- Indexes for report_entity_suggestions
+CREATE INDEX IF NOT EXISTS idx_suggestions_proper_title ON sg_reports_survey.report_entity_suggestions (proper_title);
+CREATE INDEX IF NOT EXISTS idx_suggestions_entity ON sg_reports_survey.report_entity_suggestions (entity);
+CREATE INDEX IF NOT EXISTS idx_suggestions_source ON sg_reports_survey.report_entity_suggestions (source);
+CREATE INDEX IF NOT EXISTS idx_suggestions_confidence ON sg_reports_survey.report_entity_suggestions (confidence_score DESC NULLS LAST);
+
+-- Comments
+COMMENT ON TABLE sg_reports_survey.report_entity_suggestions IS 'Entity suggestions for report series from various sources (DGACM, DRI, AI)';
+COMMENT ON COLUMN sg_reports_survey.report_entity_suggestions.proper_title IS 'Report series identifier - matches documents.proper_title';
+COMMENT ON COLUMN sg_reports_survey.report_entity_suggestions.entity IS 'Suggested entity (FK to systemchart.entities)';
+COMMENT ON COLUMN sg_reports_survey.report_entity_suggestions.source IS 'Source of suggestion: dgacm, dri, or ai';
+COMMENT ON COLUMN sg_reports_survey.report_entity_suggestions.confidence_score IS 'Match confidence 0-1 (NULL for exact matches like DGACM)';
+COMMENT ON COLUMN sg_reports_survey.report_entity_suggestions.match_details IS 'JSON with match details: symbol_matched, fuzzy_score, ai_reasoning, etc.';
+
+--------------------------------------------------------------------------------
+-- REPORT ENTITY CONFIRMATIONS TABLE (NEW)
+-- Records when entity representatives confirm ownership of reports
+--------------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS sg_reports_survey.report_entity_confirmations (
+  id SERIAL PRIMARY KEY,
+  
+  -- Report series identifier (matches documents.proper_title)
+  proper_title TEXT NOT NULL,
+  
+  -- Entity that is confirmed as owner (FK to systemchart.entities)
+  entity TEXT NOT NULL REFERENCES systemchart.entities(entity),
+  
+  -- Who confirmed this (FK to users table)
+  confirmed_by_user_id UUID NOT NULL REFERENCES sg_reports_survey.users(id),
+  
+  -- When the confirmation was made
+  confirmed_at TIMESTAMPTZ DEFAULT NOW(),
+  
+  -- Optional notes about the confirmation
+  notes TEXT,
+  
+  -- One confirmation per entity per report series
+  CONSTRAINT unique_confirmation_per_entity UNIQUE (proper_title, entity)
+);
+
+-- Indexes for report_entity_confirmations
+CREATE INDEX IF NOT EXISTS idx_confirmations_proper_title ON sg_reports_survey.report_entity_confirmations (proper_title);
+CREATE INDEX IF NOT EXISTS idx_confirmations_entity ON sg_reports_survey.report_entity_confirmations (entity);
+CREATE INDEX IF NOT EXISTS idx_confirmations_user ON sg_reports_survey.report_entity_confirmations (confirmed_by_user_id);
+CREATE INDEX IF NOT EXISTS idx_confirmations_date ON sg_reports_survey.report_entity_confirmations (confirmed_at DESC);
+
+-- Comments
+COMMENT ON TABLE sg_reports_survey.report_entity_confirmations IS 'User confirmations that a report belongs to their entity';
+COMMENT ON COLUMN sg_reports_survey.report_entity_confirmations.proper_title IS 'Report series identifier - matches documents.proper_title';
+COMMENT ON COLUMN sg_reports_survey.report_entity_confirmations.entity IS 'Entity confirmed as owner (FK to systemchart.entities)';
+COMMENT ON COLUMN sg_reports_survey.report_entity_confirmations.confirmed_by_user_id IS 'User who made the confirmation';
+COMMENT ON COLUMN sg_reports_survey.report_entity_confirmations.confirmed_at IS 'Timestamp of confirmation';
+COMMENT ON COLUMN sg_reports_survey.report_entity_confirmations.notes IS 'Optional notes about the confirmation';

@@ -3,6 +3,18 @@ import { query } from "@/lib/db";
 
 const DB_SCHEMA = process.env.DB_SCHEMA || "sg_reports_survey";
 
+interface EntitySuggestion {
+  entity: string;
+  source: string;
+  confidence_score: number | null;
+}
+
+interface EntityConfirmation {
+  entity: string;
+  confirmed_by_email: string;
+  confirmed_at: string;
+}
+
 interface ReportRow {
   proper_title: string;
   symbols: string[];
@@ -12,9 +24,12 @@ interface ReportRow {
   record_numbers: (string | null)[];
   word_counts: (number | null)[];
   subject_terms_agg: (string[] | unknown)[];
-  entities: (string | null)[];
-  entities_manual: (string | null)[];
-  entities_dri: (string | null)[];
+  suggested_entities: string[] | null;
+  confirmed_entities: string[] | null;
+  suggestions: EntitySuggestion[] | null;
+  confirmations: EntityConfirmation[] | null;
+  primary_entity: string | null;
+  has_confirmation: boolean;
   count: number;
   latest_year: number | null;
 }
@@ -148,18 +163,22 @@ export async function GET(req: NextRequest) {
     paramIndex++;
   }
 
-  // Entity filter (supports multiple)
-  if (filterEntities.length > 0) {
-    whereClauses.push(`re.entity = ANY($${paramIndex})`);
-    params.push(filterEntities as unknown as string);
-    paramIndex++;
-  }
-
   // Year range filter (on effective_year, filter on MAX year of the series)
   // We'll add this as a HAVING clause for proper_title groups
   const havingClauses: string[] = [];
   const havingParams: (string | number)[] = [];
   let havingParamIndex = paramIndex;
+
+  // Entity filter (supports multiple) - filter on suggested or confirmed entities
+  // This needs to be in HAVING clause since we join with report_entities after grouping
+  if (filterEntities.length > 0) {
+    havingClauses.push(`(
+      MAX(re.suggested_entities) && $${havingParamIndex}::text[] 
+      OR MAX(re.confirmed_entities) && $${havingParamIndex}::text[]
+    )`);
+    havingParams.push(filterEntities as unknown as string);
+    havingParamIndex++;
+  }
 
   if (filterYearMin !== null) {
     havingClauses.push(`MAX(effective_year) >= $${havingParamIndex}`);
@@ -196,7 +215,7 @@ export async function GET(req: NextRequest) {
     query<ReportRow & { frequency: string }>(
       `WITH grouped AS (
         SELECT 
-          proper_title,
+          sub.proper_title,
           array_agg(symbol ORDER BY effective_year DESC NULLS LAST, symbol) as symbols,
           array_agg(effective_year ORDER BY effective_year DESC NULLS LAST, symbol) as years,
           array_agg(un_body ORDER BY effective_year DESC NULLS LAST, symbol) as bodies,
@@ -204,9 +223,13 @@ export async function GET(req: NextRequest) {
           array_agg(record_number ORDER BY effective_year DESC NULLS LAST, symbol) as record_numbers,
           array_agg(word_count ORDER BY effective_year DESC NULLS LAST, symbol) as word_counts,
           array_agg(to_json(COALESCE(subject_terms, ARRAY[]::text[])) ORDER BY effective_year DESC NULLS LAST, symbol) as subject_terms_agg,
-          array_agg(entity ORDER BY effective_year DESC NULLS LAST, symbol) as entities,
-          array_agg(entity_manual ORDER BY effective_year DESC NULLS LAST, symbol) as entities_manual,
-          array_agg(entity_dri ORDER BY effective_year DESC NULLS LAST, symbol) as entities_dri,
+          -- New entity fields from report_entities view
+          MAX(re.suggested_entities) as suggested_entities,
+          MAX(re.confirmed_entities) as confirmed_entities,
+          MAX(re.suggestions) as suggestions,
+          MAX(re.confirmations) as confirmations,
+          MAX(re.primary_entity) as primary_entity,
+          BOOL_OR(re.has_confirmation) as has_confirmation,
           COUNT(*)::int as count,
           MAX(effective_year) as latest_year
         FROM (
@@ -218,9 +241,6 @@ export async function GET(req: NextRequest) {
             r.record_number,
             r.word_count,
             r.subject_terms,
-            re.entity,
-            re.entity_manual,
-            re.entity_dri,
             COALESCE(
               r.date_year,
               CASE 
@@ -229,10 +249,10 @@ export async function GET(req: NextRequest) {
               END
             ) as effective_year
           FROM ${DB_SCHEMA}.sg_reports r
-          LEFT JOIN ${DB_SCHEMA}.reporting_entities re ON r.symbol = re.symbol
           WHERE ${whereClause}
         ) sub
-        GROUP BY proper_title
+        LEFT JOIN ${DB_SCHEMA}.report_entities re ON sub.proper_title = re.proper_title
+        GROUP BY sub.proper_title
         ${havingClause}
       ),
       with_frequency AS (
@@ -269,7 +289,7 @@ export async function GET(req: NextRequest) {
     query<{ total: number }>(
       `WITH grouped AS (
         SELECT 
-          proper_title,
+          sub.proper_title,
           array_agg(effective_year ORDER BY effective_year DESC NULLS LAST) as years,
           COUNT(*)::int as count,
           MAX(effective_year) as latest_year
@@ -284,10 +304,10 @@ export async function GET(req: NextRequest) {
               END
             ) as effective_year
           FROM ${DB_SCHEMA}.sg_reports r
-          LEFT JOIN ${DB_SCHEMA}.reporting_entities re ON r.symbol = re.symbol
           WHERE ${whereClause}
         ) sub
-        GROUP BY proper_title
+        LEFT JOIN ${DB_SCHEMA}.report_entities re ON sub.proper_title = re.proper_title
+        GROUP BY sub.proper_title
         ${havingClause}
       ),
       with_frequency AS (
@@ -339,12 +359,12 @@ export async function GET(req: NextRequest) {
        HAVING COUNT(*) > 1
        ORDER BY count DESC, subject`
     ),
-    // Entity counts (from latest_versions view)
+    // Entity counts (from report_entity_suggestions - all suggested entities)
     query<{ entity: string; count: number }>(
-      `SELECT entity, COUNT(*)::int as count 
-       FROM ${DB_SCHEMA}.latest_versions 
-       WHERE entity IS NOT NULL
-       GROUP BY entity ORDER BY count DESC`
+      `SELECT entity, COUNT(DISTINCT proper_title)::int as count 
+       FROM ${DB_SCHEMA}.report_entity_suggestions
+       GROUP BY entity 
+       ORDER BY count DESC`
     ),
   ]);
 
@@ -375,18 +395,19 @@ export async function GET(req: NextRequest) {
         });
       }
     });
-    // Get entity (prefer manual, then dri)
-    const entity = r.entities?.[0] || null;
-    const entityManual = r.entities_manual?.[0] || null;
-    const entityDri = r.entities_dri?.[0] || null;
+    
     return {
       title: r.proper_title?.replace(/\s*:\s*$/, "").trim(),
       symbol: r.symbols[0],
       body: parseBodyString(r.bodies[0]),
       year: r.years[0] || null,
-      entity,
-      entityManual,
-      entityDri,
+      // New entity structure
+      entity: r.primary_entity || null, // Primary entity (confirmed first, then best suggestion)
+      suggestedEntities: r.suggested_entities || [],
+      confirmedEntities: r.confirmed_entities || [],
+      suggestions: r.suggestions || [],
+      confirmations: r.confirmations || [],
+      hasConfirmation: r.has_confirmation || false,
       versions: r.symbols.map((s, i) => ({
         symbol: s,
         year: r.years[i],

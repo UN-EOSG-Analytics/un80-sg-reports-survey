@@ -33,6 +33,10 @@ interface ReportRow {
   has_confirmation: boolean;
   count: number;
   latest_year: number | null;
+  // Frequency fields
+  calculated_frequency: string | null;
+  confirmed_frequency: string | null;
+  gap_history: number[] | null;
 }
 
 interface SingleReportRow {
@@ -258,10 +262,10 @@ export async function GET(req: NextRequest) {
     havingParamIndex++;
   }
 
-  // Frequency filter - needs to be calculated and filtered in SQL
-  // We'll use a CTE to calculate frequency and then filter
+  // Frequency filter - now uses pre-computed values from report_frequencies table
+  // Filter on confirmed frequency first, fallback to calculated
   const frequencyFilterSQL = filterFrequencies.length > 0
-    ? `AND frequency = ANY($${havingParamIndex})`
+    ? `AND COALESCE(confirmed_frequency, calculated_frequency) = ANY($${havingParamIndex})`
     : "";
   if (filterFrequencies.length > 0) {
     havingParams.push(filterFrequencies as unknown as string);
@@ -279,7 +283,7 @@ export async function GET(req: NextRequest) {
   // Use COALESCE to fall back to publication_date year when date_year is null
   // Extract year from publication_date using substring (format: YYYY-MM-DD or similar)
   const [reports, countResult, bodyCounts, yearRange, subjectCounts, entityCounts, reportTypeCounts] = await Promise.all([
-    query<ReportRow & { frequency: string }>(
+    query<ReportRow>(
       `WITH grouped AS (
         SELECT 
           sub.proper_title,
@@ -298,6 +302,11 @@ export async function GET(req: NextRequest) {
           (SELECT re.confirmations FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as confirmations,
           (SELECT re.primary_entity FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as primary_entity,
           (SELECT COALESCE(re.has_confirmation, false) FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as has_confirmation,
+          -- Pre-computed frequency from report_frequencies table
+          (SELECT rf.calculated_frequency FROM ${DB_SCHEMA}.report_frequencies rf WHERE rf.proper_title = sub.proper_title) as calculated_frequency,
+          (SELECT rf.gap_history FROM ${DB_SCHEMA}.report_frequencies rf WHERE rf.proper_title = sub.proper_title) as gap_history,
+          -- User-confirmed frequency
+          (SELECT rfc.frequency FROM ${DB_SCHEMA}.report_frequency_confirmations rfc WHERE rfc.proper_title = sub.proper_title) as confirmed_frequency,
           COUNT(*)::int as count,
           MAX(effective_year) as latest_year
         FROM (
@@ -322,32 +331,8 @@ export async function GET(req: NextRequest) {
         ) sub
         GROUP BY sub.proper_title
         ${havingClause}
-      ),
-      with_frequency AS (
-        SELECT *,
-          CASE 
-            WHEN count = 1 THEN 'One-time'
-            WHEN (SELECT COUNT(DISTINCT y) FROM unnest(years) y WHERE y IS NOT NULL) < 2 THEN 'One-time'
-            ELSE (
-              SELECT CASE 
-                WHEN gap = 1 THEN 'Annual'
-                WHEN gap = 2 THEN 'Biennial'
-                WHEN gap = 3 THEN 'Triennial'
-                WHEN gap = 4 THEN 'Quadrennial'
-                WHEN gap = 5 THEN 'Quinquennial'
-                ELSE 'Every ' || gap || ' years'
-              END
-              FROM (
-                SELECT (sorted_years[1] - sorted_years[2]) as gap
-                FROM (
-                  SELECT ARRAY(SELECT DISTINCT y FROM unnest(years) y WHERE y IS NOT NULL ORDER BY y DESC LIMIT 2) as sorted_years
-                ) t
-              ) t2
-            )
-          END as frequency
-        FROM grouped
       )
-      SELECT * FROM with_frequency
+      SELECT * FROM grouped
       WHERE 1=1 ${frequencyFilterSQL}
       ORDER BY latest_year DESC NULLS LAST, proper_title
       LIMIT $${limitParamIndex} OFFSET $${limitParamIndex + 1}`,
@@ -358,7 +343,10 @@ export async function GET(req: NextRequest) {
       `WITH grouped AS (
         SELECT 
           sub.proper_title,
-          array_agg(effective_year ORDER BY effective_year DESC NULLS LAST) as years,
+          -- Pre-computed frequency from report_frequencies table
+          (SELECT rf.calculated_frequency FROM ${DB_SCHEMA}.report_frequencies rf WHERE rf.proper_title = sub.proper_title) as calculated_frequency,
+          -- User-confirmed frequency
+          (SELECT rfc.frequency FROM ${DB_SCHEMA}.report_frequency_confirmations rfc WHERE rfc.proper_title = sub.proper_title) as confirmed_frequency,
           COUNT(*)::int as count,
           MAX(effective_year) as latest_year
         FROM (
@@ -377,32 +365,8 @@ export async function GET(req: NextRequest) {
         LEFT JOIN ${DB_SCHEMA}.report_entities re ON sub.proper_title = re.proper_title
         GROUP BY sub.proper_title
         ${havingClause}
-      ),
-      with_frequency AS (
-        SELECT *,
-          CASE 
-            WHEN count = 1 THEN 'One-time'
-            WHEN (SELECT COUNT(DISTINCT y) FROM unnest(years) y WHERE y IS NOT NULL) < 2 THEN 'One-time'
-            ELSE (
-              SELECT CASE 
-                WHEN gap = 1 THEN 'Annual'
-                WHEN gap = 2 THEN 'Biennial'
-                WHEN gap = 3 THEN 'Triennial'
-                WHEN gap = 4 THEN 'Quadrennial'
-                WHEN gap = 5 THEN 'Quinquennial'
-                ELSE 'Every ' || gap || ' years'
-              END
-              FROM (
-                SELECT (sorted_years[1] - sorted_years[2]) as gap
-                FROM (
-                  SELECT ARRAY(SELECT DISTINCT y FROM unnest(years) y WHERE y IS NOT NULL ORDER BY y DESC LIMIT 2) as sorted_years
-                ) t
-              ) t2
-            )
-          END as frequency
-        FROM grouped
       )
-      SELECT COUNT(*)::int as total FROM with_frequency
+      SELECT COUNT(*)::int as total FROM grouped
       WHERE 1=1 ${frequencyFilterSQL}`,
       allParams
     ),
@@ -460,7 +424,24 @@ export async function GET(req: NextRequest) {
     return bodyStr;
   }
 
-  // Transform reports to response format (frequency is now calculated in SQL)
+  // Helper to format frequency for display (capitalize first letter)
+  function formatFrequency(freq: string | null): string | null {
+    if (!freq) return null;
+    // Map internal values to display values
+    const displayMap: Record<string, string> = {
+      'annual': 'Annual',
+      'biennial': 'Biennial',
+      'triennial': 'Triennial',
+      'quadrennial': 'Quadrennial',
+      'quinquennial': 'Quinquennial',
+      'one-time': 'One-time',
+      'other': 'Other',
+      'irregular': 'Irregular',
+    };
+    return displayMap[freq] || freq.charAt(0).toUpperCase() + freq.slice(1);
+  }
+
+  // Transform reports to response format
   const filteredReports = reports.map((r) => {
     // Collect unique subject terms from all versions (now stored as JSON)
     const allSubjects = new Set<string>();
@@ -471,6 +452,9 @@ export async function GET(req: NextRequest) {
         });
       }
     });
+    
+    // Effective frequency: confirmed takes precedence over calculated
+    const effectiveFrequency = r.confirmed_frequency || r.calculated_frequency;
     
     return {
       title: r.proper_title || null,  // Keep original proper_title for database matching
@@ -494,7 +478,11 @@ export async function GET(req: NextRequest) {
       })),
       count: r.count,
       latestYear: r.latest_year,
-      frequency: r.frequency, // Use frequency calculated in SQL
+      // Frequency fields - both calculated and confirmed
+      frequency: formatFrequency(effectiveFrequency), // Display frequency (confirmed or calculated)
+      calculatedFrequency: formatFrequency(r.calculated_frequency),
+      confirmedFrequency: formatFrequency(r.confirmed_frequency),
+      gapHistory: r.gap_history || null,
       subjectTerms: Array.from(allSubjects),
     };
   });

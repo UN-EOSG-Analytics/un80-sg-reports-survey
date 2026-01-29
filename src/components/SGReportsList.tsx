@@ -673,7 +673,7 @@ function ColumnHeaders({
         )}
       </div>
       <div className="flex items-center gap-1">
-        <span>Frequency</span>
+        <span>Estimated Frequency</span>
         {filterOptions?.frequencies && filterOptions.frequencies.length > 0 && (
           <FrequencyFilterPopover
             options={filterOptions.frequencies}
@@ -862,13 +862,20 @@ function ReportRow({
       {/* Frequency */}
       <div>
         {report.frequency ? (
-          <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${
-            report.frequency === "One-time"
-              ? "bg-gray-100 text-gray-500"
-              : "bg-blue-100 text-blue-700"
-          }`}>
-            {report.frequency}
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium cursor-default ${
+                report.frequency === "One-time"
+                  ? "bg-gray-100 text-gray-500"
+                  : "bg-blue-100 text-blue-700"
+              }`}>
+                {report.frequency}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              <p className="text-xs">Estimated based on previous publication dates. Indicative only.</p>
+            </TooltipContent>
+          </Tooltip>
         ) : (
           <span className="text-gray-300 text-xs">—</span>
         )}

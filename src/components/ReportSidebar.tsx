@@ -46,7 +46,11 @@ export interface ReportGroup {
   versions: Version[];
   count: number;
   latestYear: number | null;
-  frequency: string | null;
+  // Frequency fields
+  frequency: string | null; // Effective frequency (confirmed or calculated)
+  calculatedFrequency?: string | null; // From Python weighted-mode
+  confirmedFrequency?: string | null; // User confirmed
+  gapHistory?: number[] | null; // Year gaps for transparency
   subjectTerms: string[];
 }
 
@@ -92,8 +96,8 @@ export interface SimilarReport {
 
 // Feedback types (for survey responses)
 export type FeedbackStatus = "continue" | "continue_with_changes" | "merge" | "discontinue" | null;
-export type FrequencyFeedback = "annual" | "biennial" | "triennial" | "quadrennial" | "one-time" | null;
-export type FormatFeedback = "shorter" | "oral" | "dashboard" | "other" | null;
+export type FrequencyFeedback = "multiple" | "annual" | "biennial" | "triennial" | "quadrennial" | "one-time" | null;
+export type FormatFeedback = "shorter" | "oral" | "dashboard" | "other" | "no-change" | null;
 
 export interface Feedback {
   status: FeedbackStatus;
@@ -116,11 +120,12 @@ export type Recommendation = Feedback;
 // =============================================================================
 
 const FREQUENCY_OPTIONS = [
-  { value: "one-time", label: "One-time only" },
+  { value: "multiple", label: "Multiple times per year" },
   { value: "annual", label: "Annual" },
   { value: "biennial", label: "Biennial (every 2 years)" },
   { value: "triennial", label: "Triennial (every 3 years)" },
   { value: "quadrennial", label: "Quadrennial (every 4 years)" },
+  { value: "one-time", label: "One-time only" },
 ];
 
 const FORMAT_OPTIONS = [
@@ -128,6 +133,7 @@ const FORMAT_OPTIONS = [
   { value: "oral", label: "Oral update only" },
   { value: "dashboard", label: "Dashboard / data format" },
   { value: "other", label: "Other (specify)" },
+  { value: "no-change", label: "Do not change format" },
 ];
 
 // Abbreviations for common UN issuing bodies
@@ -207,6 +213,26 @@ function sortSubjectsByFrequency(
 // =============================================================================
 // Sub-components
 // =============================================================================
+
+// Step indicator with UN blue/green circle styling
+function StepIndicator({ 
+  step, 
+  active, 
+  complete 
+}: { 
+  step: number; 
+  active: boolean;
+  complete: boolean;
+}) {
+  return (
+    <span className={`
+      inline-flex items-center justify-center w-6 h-6 rounded-full text-sm font-bold flex-shrink-0
+      ${complete ? 'bg-green-500 text-white' : active ? 'bg-un-blue text-white' : 'bg-gray-300 text-gray-500'}
+    `}>
+      {complete ? <Check className="h-4 w-4" /> : step}
+    </span>
+  );
+}
 
 // Single subject pill component
 function SubjectPill({
@@ -411,8 +437,8 @@ function MergeTargetSearch({
 
   return (
     <div ref={containerRef} className="relative">
-      <div className="flex items-center gap-2 px-2 py-1.5 bg-gray-50 rounded border border-gray-200 focus-within:border-gray-300">
-        <Search className="h-3 w-3 text-gray-400 flex-shrink-0" />
+      <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-md border border-gray-200 focus-within:border-un-blue focus-within:ring-1 focus-within:ring-un-blue">
+        <Search className="h-4 w-4 text-gray-400 flex-shrink-0" />
         <input
           type="text"
           placeholder="Search reports..."
@@ -420,10 +446,10 @@ function MergeTargetSearch({
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => results.length > 0 && setShowResults(true)}
           onKeyDown={handleKeyDown}
-          className="flex-1 bg-transparent text-xs text-gray-600 placeholder:text-gray-400 outline-none min-w-0"
+          className="flex-1 bg-transparent text-sm text-gray-700 placeholder:text-gray-400 outline-none min-w-0"
         />
         {isSearching && (
-          <Loader2 className="h-3 w-3 animate-spin text-gray-400 flex-shrink-0" />
+          <Loader2 className="h-4 w-4 animate-spin text-gray-400 flex-shrink-0" />
         )}
       </div>
 
@@ -509,8 +535,8 @@ function CompactFeedbackForm({
 }) {
   const canEdit = userEntity && isConfirmedByUserEntity;
   
-  // Show frequency/format options for "continue_with_changes" and "merge"
-  const showFrequencyFormat = feedback.status === "continue_with_changes" || feedback.status === "merge";
+  // Show frequency/format options only for "continue_with_changes"
+  const showFrequencyFormat = feedback.status === "continue_with_changes";
   
   const isFormValid = useMemo(() => {
     if (!feedback.status) return false;
@@ -520,12 +546,15 @@ function CompactFeedbackForm({
       return true;
     }
     
-    if (feedback.status === "continue_with_changes" || feedback.status === "merge") {
-      if (!feedback.frequency) return false;
-      if (!feedback.format) return false;
-      if (feedback.format === "other" && !feedback.formatOther?.trim()) return false;
+    // "continue_with_changes" requires at least one change specified
+    if (feedback.status === "continue_with_changes") {
+      const hasFrequency = !!feedback.frequency;
+      const hasFormat = !!feedback.format && (feedback.format !== "other" || !!feedback.formatOther?.trim());
+      const hasComments = !!feedback.comments?.trim();
+      if (!hasFrequency && !hasFormat && !hasComments) return false;
     }
     
+    // "merge" only requires merge targets
     if (feedback.status === "merge") {
       if (mergeTargets.length === 0) return false;
     }
@@ -541,7 +570,7 @@ function CompactFeedbackForm({
     return (
       <div className="rounded-lg p-3 border border-gray-200 bg-gray-50 text-sm">
         <p className="text-gray-500">
-          Claim this report for your entity to submit feedback.
+          Confirm this is your entity&apos;s report above to provide feedback.
         </p>
       </div>
     );
@@ -560,7 +589,7 @@ function CompactFeedbackForm({
           value={feedback.status ?? undefined}
           onValueChange={(v) => onFeedbackChange("status", v as FeedbackStatus)}
         >
-          <SelectTrigger className="w-full">
+          <SelectTrigger className="w-full bg-white">
             <SelectValue placeholder="Select..." />
           </SelectTrigger>
           <SelectContent>
@@ -577,7 +606,7 @@ function CompactFeedbackForm({
           {feedback.status === "merge" && (
             <div className="space-y-2">
               <FieldLabel>Which report(s) to merge with?</FieldLabel>
-              {mergeTargets.length > 0 && (
+              {mergeTargets.length > 0 ? (
                 <div className="flex flex-wrap gap-1">
                   {mergeTargets.map((symbol) => (
                     <span
@@ -594,6 +623,8 @@ function CompactFeedbackForm({
                     </span>
                   ))}
                 </div>
+              ) : (
+                <p className="text-xs text-gray-500">Click &quot;Merge&quot; on reports below to select</p>
               )}
               <MergeTargetSearch
                 onAdd={(symbol) => {
@@ -603,7 +634,6 @@ function CompactFeedbackForm({
                 }}
                 existingTargets={mergeTargets}
               />
-              <p className="text-[11px] text-gray-400">Or select from similar reports below</p>
             </div>
           )}
 
@@ -614,7 +644,7 @@ function CompactFeedbackForm({
                 value={feedback.discontinueReason}
                 onChange={(e) => onFeedbackChange("discontinueReason", e.target.value)}
                 placeholder="Explain your reasoning..."
-                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-un-blue focus:ring-1 focus:ring-un-blue resize-none"
+                className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:border-un-blue focus:ring-1 focus:ring-un-blue resize-none"
                 rows={2}
               />
             </div>
@@ -628,7 +658,7 @@ function CompactFeedbackForm({
                   value={feedback.frequency ?? undefined}
                   onValueChange={(v) => onFeedbackChange("frequency", v as FrequencyFeedback)}
                 >
-                  <SelectTrigger className="w-full text-sm h-9">
+                  <SelectTrigger className="w-full text-sm h-9 bg-white">
                     <SelectValue placeholder="Select..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -644,7 +674,7 @@ function CompactFeedbackForm({
                   value={feedback.format ?? undefined}
                   onValueChange={(v) => onFeedbackChange("format", v as FormatFeedback)}
                 >
-                  <SelectTrigger className="w-full text-sm h-9">
+                  <SelectTrigger className="w-full text-sm h-9 bg-white">
                     <SelectValue placeholder="Select..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -664,7 +694,7 @@ function CompactFeedbackForm({
                 value={feedback.formatOther}
                 onChange={(e) => onFeedbackChange("formatOther", e.target.value)}
                 placeholder="e.g., interactive dashboard..."
-                className="h-9 text-sm"
+                className="h-9 text-sm bg-white"
               />
             </div>
           )}
@@ -675,7 +705,7 @@ function CompactFeedbackForm({
               value={feedback.comments}
               onChange={(e) => onFeedbackChange("comments", e.target.value)}
               placeholder="Optional..."
-              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-un-blue focus:ring-1 focus:ring-un-blue resize-none"
+              className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:border-un-blue focus:ring-1 focus:ring-un-blue resize-none"
               rows={2}
             />
           </div>
@@ -760,10 +790,10 @@ function SimilarReportsGrid({
         return (
           <div 
             key={r.symbol} 
-            className={`grid grid-cols-[1fr_auto] gap-2 p-2 rounded border transition-colors ${
+            className={`grid grid-cols-[1fr_auto] gap-2 p-2 rounded-md border transition-colors ${
               isInMerge 
                 ? "bg-blue-50 border-blue-200" 
-                : "bg-gray-50 border-transparent hover:border-gray-200"
+                : "bg-white border-gray-200 hover:border-gray-300"
             }`}
           >
             <div className="min-w-0">
@@ -771,9 +801,15 @@ function SimilarReportsGrid({
                 {r.title}
               </p>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[11px] text-gray-500 font-medium">
+                <a
+                  href={buildDLLink(r.symbol)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] text-un-blue font-medium hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   {r.symbol}
-                </span>
+                </a>
                 <span className="text-[11px] text-gray-400">
                   {r.year ?? "—"}
                 </span>
@@ -1149,6 +1185,18 @@ export function ReportSidebar({
   const [resolutions, setResolutions] = useState<ResolutionInfo[]>([]);
   const [resolutionsLoading, setResolutionsLoading] = useState(false);
   
+  // Track sidebar open/close to force refresh on reopen
+  const prevReportRef = useRef<ReportGroup | null>(null);
+  const [sidebarOpenCount, setSidebarOpenCount] = useState(0);
+  
+  // Detect sidebar opening (report transitions from null to non-null)
+  useEffect(() => {
+    if (report && !prevReportRef.current) {
+      setSidebarOpenCount(c => c + 1);
+    }
+    prevReportRef.current = report;
+  }, [report]);
+  
   // Form state (feedback instead of recommendation)
   const [feedback, setFeedback] = useState<Omit<Feedback, 'mergeTargets'>>({
     status: null,
@@ -1168,16 +1216,48 @@ export function ReportSidebar({
   const [localConfirmed, setLocalConfirmed] = useState(false);
   const [localRemoved, setLocalRemoved] = useState(false);
   
+  // Frequency confirmation state
+  const [frequencyConfirming, setFrequencyConfirming] = useState(false);
+  const [localFrequencyConfirmed, setLocalFrequencyConfirmed] = useState<string | null>(null);
+  const [localFrequencyRemoved, setLocalFrequencyRemoved] = useState(false);
+  
   // Check if user's entity has confirmed this report
   // localRemoved overrides server data, localConfirmed adds to it
   const isConfirmedByUserEntity = userEntity && !localRemoved && (
     localConfirmed || report?.confirmedEntities?.includes(userEntity)
   );
+  
+  // Effective confirmed frequency (local takes precedence)
+  const effectiveConfirmedFrequency = localFrequencyRemoved 
+    ? null 
+    : (localFrequencyConfirmed || report?.confirmedFrequency || null);
+  
+  // Is this effectively a one-time report?
+  const isOneTimeReport = effectiveConfirmedFrequency?.toLowerCase() === 'one-time';
+  
+  // Extract mandate frequency from resolutions (first available)
+  const mandateFrequency = useMemo(() => {
+    for (const res of resolutions) {
+      for (const mandate of res.mandates || []) {
+        if (mandate.explicit_frequency) return { frequency: mandate.explicit_frequency, reasoning: mandate.frequency_reasoning };
+        if (mandate.implicit_frequency) return { frequency: mandate.implicit_frequency, reasoning: mandate.frequency_reasoning };
+      }
+    }
+    return null;
+  }, [resolutions]);
+  
+  // Is frequency confirmed (Step 1 complete)?
+  const isFrequencyConfirmed = effectiveConfirmedFrequency !== null;
+  
+  // Is survey complete (Step 2 complete)?
+  const isSurveyComplete = feedback.status !== null && saveSuccess;
 
   // Reset local state when report changes
   useEffect(() => {
     setLocalConfirmed(false);
     setLocalRemoved(false);
+    setLocalFrequencyConfirmed(null);
+    setLocalFrequencyRemoved(false);
   }, [report?.title]);
 
   // Handle confirming entity ownership
@@ -1230,6 +1310,56 @@ export function ReportSidebar({
     }
   };
 
+  // Handle confirming frequency
+  const handleConfirmFrequency = async (frequency: string) => {
+    if (!report || frequencyConfirming) return;
+    
+    setFrequencyConfirming(true);
+    try {
+      const response = await fetch("/api/frequency-confirmations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          properTitle: report.title,
+          frequency: frequency.toLowerCase().replace('-', '-'),
+        }),
+      });
+      
+      if (response.ok) {
+        setLocalFrequencyConfirmed(frequency);
+        setLocalFrequencyRemoved(false);
+        onDataChanged?.();
+      }
+    } catch (error) {
+      console.error("Failed to confirm frequency:", error);
+    } finally {
+      setFrequencyConfirming(false);
+    }
+  };
+
+  // Handle removing frequency confirmation
+  const handleRemoveFrequency = async () => {
+    if (!report || frequencyConfirming) return;
+    
+    setFrequencyConfirming(true);
+    try {
+      const response = await fetch(
+        `/api/frequency-confirmations?properTitle=${encodeURIComponent(report.title)}`,
+        { method: "DELETE" }
+      );
+      
+      if (response.ok) {
+        setLocalFrequencyRemoved(true);
+        setLocalFrequencyConfirmed(null);
+        onDataChanged?.();
+      }
+    } catch (error) {
+      console.error("Failed to remove frequency confirmation:", error);
+    } finally {
+      setFrequencyConfirming(false);
+    }
+  };
+
   // Fetch similar reports and resolutions when report changes
   useEffect(() => {
     if (!report) return;
@@ -1263,7 +1393,7 @@ export function ReportSidebar({
       .finally(() => setResolutionsLoading(false));
   }, [report?.symbol]);
 
-  // Load existing response when report changes
+  // Load existing response when report changes or sidebar reopens
   useEffect(() => {
     if (!report) return;
     setLoadingExisting(true);
@@ -1287,6 +1417,7 @@ export function ReportSidebar({
             comments: data.response.comments || "",
           });
           setMergeTargets(data.response.mergeTargets || []);
+          setSaveSuccess(true); // Show as already saved if loaded from DB
           // Track who submitted
           if (data.response.submittedByEmail) {
             setSubmittedBy({
@@ -1308,7 +1439,7 @@ export function ReportSidebar({
       })
       .catch(() => {})
       .finally(() => setLoadingExisting(false));
-  }, [report?.title]);
+  }, [report?.title, sidebarOpenCount]);
 
   const updateFeedback = useCallback(<K extends keyof Omit<Feedback, 'mergeTargets'>>(
     key: K,
@@ -1320,16 +1451,18 @@ export function ReportSidebar({
 
   const toggleMergeTarget = useCallback((symbol: string) => {
     setMergeTargets((prev) => {
-      const newTargets = prev.includes(symbol) 
+      const isRemoving = prev.includes(symbol);
+      const newTargets = isRemoving 
         ? prev.filter((s) => s !== symbol) 
         : [...prev, symbol];
-      if (newTargets.length > 0 && !feedback.status) {
+      // Auto-set status to "merge" when adding targets
+      if (!isRemoving && newTargets.length > 0) {
         setFeedback((r) => ({ ...r, status: "merge" }));
       }
       return newTargets;
     });
     setSaveSuccess(false);
-  }, [feedback.status]);
+  }, []);
 
   const handleSave = async () => {
     if (!report) return;
@@ -1385,9 +1518,21 @@ export function ReportSidebar({
         {/* Header */}
         <div className="flex-shrink-0 border-b px-4 py-3">
           <div className="flex items-start justify-between gap-3">
-            <h2 className="flex-1 min-w-0 text-sm font-medium text-gray-900 leading-snug line-clamp-2" title={report.title?.replace(/\s*:\s*$/, "").trim() || undefined}>
-              {report.title?.replace(/\s*:\s*$/, "").trim() || "Untitled"}
-            </h2>
+            <div className="flex-1 min-w-0 space-y-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="inline-block rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-un-blue">
+                  {report.symbol}
+                </span>
+                {report.body && (
+                  <span className="inline-block rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                    {abbreviateBody(report.body)}
+                  </span>
+                )}
+              </div>
+              <h2 className="text-sm font-medium text-gray-900 leading-snug line-clamp-2" title={report.title?.replace(/\s*:\s*$/, "").trim() || undefined}>
+                {report.title?.replace(/\s*:\s*$/, "").trim() || "Untitled"}
+              </h2>
+            </div>
             <button
               onClick={onClose}
               className="p-1 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
@@ -1400,125 +1545,211 @@ export function ReportSidebar({
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto">
           <div className="p-4 space-y-5">
-            {/* Metadata pills */}
-            <div className="space-y-2">
-              <div className="flex flex-wrap gap-1.5">
-                <span className="inline-block rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-un-blue">
-                  {report.symbol}
-                </span>
-                {report.body && (
-                  <span className="inline-block rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-                    {abbreviateBody(report.body)}
-                  </span>
-                )}
-                {report.frequency && (
-                  <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${
-                    report.frequency === "One-time"
-                      ? "bg-gray-100 text-gray-600"
-                      : "bg-blue-100 text-blue-700"
-                  }`}>
-                    {report.frequency}
-                  </span>
+            {/* ============================================================= */}
+            {/* STEP 1: Confirm Current Frequency */}
+            {/* ============================================================= */}
+            <div className="bg-gray-50 rounded-lg p-3 border border-gray-100 space-y-3">
+              <div className="flex items-center gap-2">
+                <StepIndicator step={1} active={!isFrequencyConfirmed} complete={isFrequencyConfirmed} />
+                <h3 className="text-sm font-medium text-gray-700">Confirm Current Frequency</h3>
+              </div>
+
+              {/* Reporting Pattern visualization */}
+              <div className="border border-gray-200 rounded-md bg-white p-2 hover:border-gray-300 transition-colors cursor-pointer">
+                <InteractivePublicationPattern
+                  versions={report.versions}
+                  expanded={versionsExpanded}
+                  onToggle={() => setVersionsExpanded(!versionsExpanded)}
+                />
+                {!versionsExpanded && (
+                  <p className="text-[10px] text-gray-400 mt-2 text-center">
+                    Click to expand version history
+                  </p>
                 )}
               </div>
-              {/* Subjects */}
-              {report.subjectTerms && report.subjectTerms.length > 0 && (
-                <SortedSubjectPills
-                  subjects={report.subjectTerms}
-                  subjectCounts={subjectCounts}
-                  maxVisible={4}
-                  size="xs"
-                />
-              )}
-            </div>
 
-            {/* Mandating Resolutions */}
-            <ResolutionsSection 
-              resolutions={resolutions} 
-              loading={resolutionsLoading} 
-            />
-
-            {/* Publication Pattern */}
-            <div className="bg-gray-50 rounded-lg p-3">
-              <InteractivePublicationPattern
-                versions={report.versions}
-                expanded={versionsExpanded}
-                onToggle={() => setVersionsExpanded(!versionsExpanded)}
-              />
-            </div>
-
-            {/* Entity Confirmation */}
-            <div className="space-y-2">
-              <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Entity
-              </h3>
-              {isConfirmedByUserEntity ? (
-                <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm text-gray-600">
-                      {userEntity}
-                    </span>
+              {/* Mandating Paragraphs (if any resolutions with mandates) */}
+              {resolutions.length > 0 && resolutions.some(r => r.mandates && r.mandates.length > 0) && (
+                <div className="border border-gray-200 rounded-md bg-white p-2 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Mandating Paragraphs</span>
+                    <span className="text-[10px] text-gray-400">AI-extracted</span>
                   </div>
-                  <button
-                    onClick={handleRemoveEntity}
-                    disabled={confirming}
-                    className="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors disabled:opacity-50"
-                  >
-                    {confirming ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Minus className="h-3 w-3" />
+                  <div className="space-y-2">
+                    {resolutions.map((res) => 
+                      res.mandates?.map((mandate, idx) => (
+                        <div key={`${res.symbol}-${idx}`} className="text-xs text-gray-600">
+                          {mandate.verbatim_paragraph ? (
+                            <span>&quot;{mandate.verbatim_paragraph}&quot;</span>
+                          ) : mandate.summary ? (
+                            <span>{mandate.summary}</span>
+                          ) : null}
+                          <a
+                            href={buildDLLink(res.symbol)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-block rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-un-blue ml-1.5 hover:bg-blue-100 transition-colors"
+                          >
+                            {res.symbol}
+                          </a>
+                        </div>
+                      ))
                     )}
-                    Remove
-                  </button>
+                  </div>
                 </div>
-              ) : userEntity ? (
-                <button
-                  onClick={handleConfirmEntity}
-                  disabled={confirming}
-                  className="w-full flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-50"
+              )}
+
+              {/* Frequency selection */}
+              <div className="space-y-2">
+                {report.calculatedFrequency && !effectiveConfirmedFrequency && (
+                  <p className="text-xs text-gray-500">
+                    Calculated: <span className="font-medium">{report.calculatedFrequency}</span>
+                    {report.gapHistory && report.gapHistory.length > 0 && (
+                      <span className="text-gray-400 ml-1">(gaps: {report.gapHistory.slice(0, 4).join(', ')}{report.gapHistory.length > 4 ? '...' : ''} years)</span>
+                    )}
+                  </p>
+                )}
+                <Select
+                  value={effectiveConfirmedFrequency?.toLowerCase() || ""}
+                  onValueChange={(value) => handleConfirmFrequency(value)}
+                  disabled={frequencyConfirming}
                 >
-                  {confirming ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                  <SelectTrigger className="w-full bg-white">
+                    <SelectValue placeholder="Select current frequency..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FREQUENCY_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* ============================================================= */}
+            {/* STEP 2: Provide Feedback */}
+            {/* ============================================================= */}
+            <div className={`bg-gray-50 rounded-lg p-3 border border-gray-100 space-y-3 transition-opacity ${
+              !isFrequencyConfirmed ? 'opacity-50' : ''
+            }`}>
+              <div className="flex items-center gap-2">
+                <StepIndicator 
+                  step={2} 
+                  active={isFrequencyConfirmed && !isSurveyComplete} 
+                  complete={isSurveyComplete || (isFrequencyConfirmed && isOneTimeReport)} 
+                />
+                <h3 className="text-sm font-medium text-gray-700">Provide Feedback</h3>
+              </div>
+
+              {/* Not ready - Step 1 incomplete */}
+              {!isFrequencyConfirmed && (
+                <p className="text-xs text-gray-500">Complete Step 1 first to provide feedback.</p>
+              )}
+
+              {/* One-time report - done message */}
+              {isFrequencyConfirmed && isOneTimeReport && (
+                <div className="flex items-center gap-2 p-2 bg-green-50 border border-green-100 rounded-md">
+                  <Check className="h-4 w-4 text-green-600 flex-shrink-0" />
+                  <span className="text-sm text-green-700">One-time report. No further action needed.</span>
+                </div>
+              )}
+
+              {/* Recurring report - need entity confirmation first */}
+              {isFrequencyConfirmed && !isOneTimeReport && !isConfirmedByUserEntity && (
+                <div className="space-y-2">
+                  {userEntity ? (
+                    <>
+                      <p className="text-sm text-gray-600">
+                        Confirm this is {userEntity}&apos;s report to provide feedback.
+                      </p>
+                      <button
+                        onClick={handleConfirmEntity}
+                        disabled={confirming}
+                        className="w-full flex items-center justify-center gap-2 rounded-md border border-gray-300 bg-white p-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                      >
+                        {confirming ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Check className="h-4 w-4" />
+                        )}
+                        Confirm as {userEntity} report
+                      </button>
+                    </>
                   ) : (
-                    <Plus className="h-4 w-4" />
+                    <div className="rounded-md border border-amber-200 bg-amber-50 p-2.5 text-sm text-amber-700">
+                      <a href="/login" className="font-medium underline hover:text-amber-900">Log in</a> to confirm this report and provide feedback.
+                    </div>
                   )}
-                  Add to {userEntity} Reports
-                </button>
-              ) : (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
-                  <a href="/login" className="font-medium underline hover:text-amber-900">Log in</a> to claim reports for your entity.
+                </div>
+              )}
+
+              {/* Recurring report - entity confirmed, show survey */}
+              {isFrequencyConfirmed && !isOneTimeReport && isConfirmedByUserEntity && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-green-600 flex items-center gap-1">
+                      <Check className="h-3 w-3" />
+                      Confirmed: {userEntity}
+                    </span>
+                    <button
+                      onClick={handleRemoveEntity}
+                      disabled={confirming}
+                      className="text-gray-400 hover:text-gray-600 flex items-center gap-1"
+                    >
+                      {confirming ? <Loader2 className="h-3 w-3 animate-spin" /> : <Minus className="h-3 w-3" />}
+                      Undo
+                    </button>
+                  </div>
+                  <CompactFeedbackForm
+                    report={{
+                      ...report,
+                      frequency: effectiveConfirmedFrequency || report.frequency,
+                    }}
+                    mergeTargets={mergeTargets}
+                    onMergeTargetsChange={setMergeTargets}
+                    userEntity={userEntity}
+                    isConfirmedByUserEntity={true}
+                    loadingExisting={loadingExisting}
+                    feedback={feedback}
+                    onFeedbackChange={updateFeedback}
+                    saving={saving}
+                    saveSuccess={saveSuccess}
+                    submittedBy={submittedBy}
+                    onSaveClick={handleSave}
+                  />
                 </div>
               )}
             </div>
 
-            {/* Feedback Form */}
-            <div className="space-y-2">
-              <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Your Feedback
-              </h3>
-              <CompactFeedbackForm
-                report={report}
-                mergeTargets={mergeTargets}
-                onMergeTargetsChange={setMergeTargets}
-                userEntity={userEntity}
-                isConfirmedByUserEntity={!!isConfirmedByUserEntity}
-                loadingExisting={loadingExisting}
-                feedback={feedback}
-                onFeedbackChange={updateFeedback}
-                saving={saving}
-                saveSuccess={saveSuccess}
-                submittedBy={submittedBy}
-                onSaveClick={handleSave}
-              />
-            </div>
-
-            {/* Similar Reports */}
-            <div className="space-y-2">
+            {/* Similar Reports - for merge context */}
+            <div className="bg-gray-50 rounded-lg p-3 border border-gray-100 space-y-2">
               <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Similar Reports {!similarLoading && similar.length > 0 && `(${similar.length})`}
               </h3>
+              {/* Show selected merge targets */}
+              {mergeTargets.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-md p-2">
+                  <p className="text-[11px] text-gray-500 mb-1.5">Selected for merge:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {mergeTargets.map((symbol) => (
+                      <span
+                        key={symbol}
+                        className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs"
+                      >
+                        {symbol}
+                        <button
+                          onClick={() => toggleMergeTarget(symbol)}
+                          className="hover:text-blue-900"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
               <SimilarReportsGrid
                 similar={similar}
                 loading={similarLoading}

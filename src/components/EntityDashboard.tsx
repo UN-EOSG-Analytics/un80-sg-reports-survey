@@ -27,10 +27,10 @@ export function EntityDashboard({ entity, userName }: Props) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">
-            SG Reports by {entity}
+            My Survey
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            Manage your entity&apos;s Secretary-General reports and complete surveys
+            Manage {entity}&apos;s SG reports and provide feedback
           </p>
         </div>
         <Link
@@ -42,10 +42,10 @@ export function EntityDashboard({ entity, userName }: Props) {
         </Link>
       </div>
 
-      {/* Entity Reports Section */}
+      {/* My Reports Section */}
       <section className="transition-all duration-300 ease-in-out">
         <h2 className="mb-4 text-lg font-semibold text-gray-900">
-          {entity} Reports
+          My Reports
         </h2>
         <ReportsTable
           mode="my"

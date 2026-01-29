@@ -1135,17 +1135,17 @@ export function ReportSidebar({
                 Entity
               </h3>
               {isConfirmedByUserEntity ? (
-                <div className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 p-3">
+                <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
                   <div className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-green-600" />
-                    <span className="text-sm text-green-800">
-                      Confirmed for <span className="font-medium">{userEntity}</span>
+                    <Check className="h-4 w-4 text-gray-400" />
+                    <span className="text-sm text-gray-600">
+                      {userEntity}
                     </span>
                   </div>
                   <button
                     onClick={handleRemoveEntity}
                     disabled={confirming}
-                    className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-gray-500 hover:bg-green-100 hover:text-gray-700 transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors disabled:opacity-50"
                   >
                     {confirming ? (
                       <Loader2 className="h-3 w-3 animate-spin" />

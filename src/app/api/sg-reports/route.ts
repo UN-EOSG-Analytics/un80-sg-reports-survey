@@ -51,10 +51,19 @@ interface SingleReportRow {
   updated_at: Date;
 }
 
+interface MandateInfo {
+  summary: string | null;
+  explicit_frequency: string | null;
+  implicit_frequency: string | null;
+  frequency_reasoning: string | null;
+  verbatim_paragraph: string | null;
+}
+
 interface ResolutionInfo {
   symbol: string;
   title: string | null;
   date_year: number | null;
+  mandates: MandateInfo[];
 }
 
 interface CountItem {
@@ -106,15 +115,41 @@ export async function GET(req: NextRequest) {
 
     const report = reports[0];
     
-    // Fetch resolution details if report has mandating resolutions
+    // Fetch resolution details with mandate info if report has mandating resolutions
     let resolutions: ResolutionInfo[] = [];
     if (report.based_on_resolution_symbols && report.based_on_resolution_symbols.length > 0) {
-      resolutions = await query<ResolutionInfo>(
-        `SELECT symbol, proper_title as title, date_year
-         FROM ${DB_SCHEMA}.documents
-         WHERE symbol = ANY($1)`,
+      const resolutionRows = await query<{
+        symbol: string;
+        title: string | null;
+        date_year: number | null;
+        mandates: MandateInfo[] | null;
+      }>(
+        `SELECT 
+           d.symbol, 
+           d.proper_title as title, 
+           d.date_year,
+           COALESCE(
+             (SELECT json_agg(
+               json_build_object(
+                 'summary', rm.summary,
+                 'explicit_frequency', rm.explicit_frequency,
+                 'implicit_frequency', rm.implicit_frequency,
+                 'frequency_reasoning', rm.frequency_reasoning,
+                 'verbatim_paragraph', rm.verbatim_paragraph
+               )
+             )
+             FROM ${DB_SCHEMA}.resolution_mandates rm 
+             WHERE rm.resolution_symbol = d.symbol),
+             '[]'::json
+           ) as mandates
+         FROM ${DB_SCHEMA}.documents d
+         WHERE d.symbol = ANY($1)`,
         [report.based_on_resolution_symbols]
       );
+      resolutions = resolutionRows.map(r => ({
+        ...r,
+        mandates: r.mandates || [],
+      }));
     }
 
     return NextResponse.json({

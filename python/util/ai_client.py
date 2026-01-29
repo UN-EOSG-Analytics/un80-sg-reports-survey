@@ -9,7 +9,7 @@ from openai import AsyncAzureOpenAI, AzureOpenAI
 
 load_dotenv(override=True)
 
-DEFAULT_MODEL = "gpt-5-mini"
+DEFAULT_MODEL = "gpt-5"
 
 # Chat completions API version (embeddings use different version in 03_generate_embeddings.py)
 AZURE_OPENAI_API_VERSION = "2024-08-01-preview"

@@ -67,10 +67,19 @@ export interface SubjectCount {
   count: number;
 }
 
+export interface MandateInfo {
+  summary: string | null;
+  explicit_frequency: string | null;
+  implicit_frequency: string | null;
+  frequency_reasoning: string | null;
+  verbatim_paragraph: string | null;
+}
+
 export interface ResolutionInfo {
   symbol: string;
   title: string | null;
   date_year: number | null;
+  mandates: MandateInfo[];
 }
 
 export interface SimilarReport {
@@ -546,7 +555,7 @@ function CompactFeedbackForm({
   return (
     <div className="space-y-3">
       <div>
-        <FieldLabel>Status</FieldLabel>
+        <FieldLabel>What action do you recommend?</FieldLabel>
         <Select
           value={feedback.status ?? undefined}
           onValueChange={(v) => onFeedbackChange("status", v as FeedbackStatus)}
@@ -567,7 +576,7 @@ function CompactFeedbackForm({
         <div className="space-y-3 pt-1">
           {feedback.status === "merge" && (
             <div className="space-y-2">
-              <FieldLabel>Merge with</FieldLabel>
+              <FieldLabel>Which report(s) to merge with?</FieldLabel>
               {mergeTargets.length > 0 && (
                 <div className="flex flex-wrap gap-1">
                   {mergeTargets.map((symbol) => (
@@ -600,11 +609,11 @@ function CompactFeedbackForm({
 
           {feedback.status === "discontinue" && (
             <div>
-              <FieldLabel>Reason</FieldLabel>
+              <FieldLabel>Why discontinue this report?</FieldLabel>
               <textarea
                 value={feedback.discontinueReason}
                 onChange={(e) => onFeedbackChange("discontinueReason", e.target.value)}
-                placeholder="Why should this report be discontinued?"
+                placeholder="Explain your reasoning..."
                 className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-un-blue focus:ring-1 focus:ring-un-blue resize-none"
                 rows={2}
               />
@@ -614,7 +623,7 @@ function CompactFeedbackForm({
           {showFrequencyFormat && (
             <div className="space-y-3">
               <div>
-                <FieldLabel>Frequency</FieldLabel>
+                <FieldLabel>What frequency do you recommend?</FieldLabel>
                 <Select
                   value={feedback.frequency ?? undefined}
                   onValueChange={(v) => onFeedbackChange("frequency", v as FrequencyFeedback)}
@@ -630,7 +639,7 @@ function CompactFeedbackForm({
                 </Select>
               </div>
               <div>
-                <FieldLabel>Format</FieldLabel>
+                <FieldLabel>What format do you recommend?</FieldLabel>
                 <Select
                   value={feedback.format ?? undefined}
                   onValueChange={(v) => onFeedbackChange("format", v as FormatFeedback)}
@@ -650,22 +659,22 @@ function CompactFeedbackForm({
           
           {feedback.format === "other" && showFrequencyFormat && (
             <div>
-              <FieldLabel>Other format</FieldLabel>
+              <FieldLabel>Describe the format</FieldLabel>
               <Input
                 value={feedback.formatOther}
                 onChange={(e) => onFeedbackChange("formatOther", e.target.value)}
-                placeholder="Describe..."
+                placeholder="e.g., interactive dashboard..."
                 className="h-9 text-sm"
               />
             </div>
           )}
 
           <div>
-            <FieldLabel>Comments (optional)</FieldLabel>
+            <FieldLabel>Any additional comments?</FieldLabel>
             <textarea
               value={feedback.comments}
               onChange={(e) => onFeedbackChange("comments", e.target.value)}
-              placeholder="Any additional context..."
+              placeholder="Optional..."
               className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-un-blue focus:ring-1 focus:ring-un-blue resize-none"
               rows={2}
             />
@@ -957,6 +966,154 @@ function InteractivePublicationPattern({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// Resolutions Section - concise list with expandable mandate details
+function ResolutionsSection({
+  resolutions,
+  loading,
+}: {
+  resolutions: ResolutionInfo[];
+  loading: boolean;
+}) {
+  const [expandedMandates, setExpandedMandates] = useState<Set<string>>(new Set());
+
+  const toggleMandateDetails = (symbol: string) => {
+    setExpandedMandates(prev => {
+      const next = new Set(prev);
+      if (next.has(symbol)) next.delete(symbol);
+      else next.add(symbol);
+      return next;
+    });
+  };
+
+  // Get frequency from mandate (prefer explicit over implicit)
+  const getFrequency = (res: ResolutionInfo): string | null => {
+    if (!res.mandates || res.mandates.length === 0) return null;
+    const mandate = res.mandates[0];
+    return mandate.explicit_frequency || mandate.implicit_frequency || null;
+  };
+
+  // Frequency badge color
+  const getFrequencyColor = (freq: string | null) => {
+    if (!freq) return "bg-gray-100 text-gray-500";
+    switch (freq.toLowerCase()) {
+      case "annual": return "bg-blue-100 text-blue-700";
+      case "biennial": return "bg-green-100 text-green-700";
+      case "triennial": return "bg-purple-100 text-purple-700";
+      case "quadrennial": return "bg-amber-100 text-amber-700";
+      case "one-time": return "bg-gray-100 text-gray-500";
+      default: return "bg-gray-100 text-gray-600";
+    }
+  };
+
+  // Capitalize first letter
+  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-xs text-gray-400">
+        <Loader2 className="h-3 w-3 animate-spin" />
+        Loading resolutions...
+      </div>
+    );
+  }
+
+  if (resolutions.length === 0) return null;
+
+  return (
+    <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+      <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+        Based on Resolution{resolutions.length !== 1 ? "s" : ""}
+      </h3>
+      
+      <div className="space-y-1">
+        {resolutions.map((res) => {
+          const freq = getFrequency(res);
+          const hasMandates = res.mandates && res.mandates.length > 0;
+          const isExpanded = expandedMandates.has(res.symbol);
+          const mandate = hasMandates ? res.mandates[0] : null;
+          const hasExpandableContent = mandate?.verbatim_paragraph || freq;
+
+          return (
+            <div key={res.symbol}>
+              {/* Resolution row */}
+              <div className="py-1.5">
+                <div className="flex items-start gap-2">
+                  <a
+                    href={buildDLLink(res.symbol)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-un-blue hover:bg-blue-100 transition-colors flex-shrink-0"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {res.symbol}
+                  </a>
+                  <span className="text-sm text-gray-700 leading-snug flex-1">
+                    {res.title?.replace(/\s*:\s*$/, "").trim() || <span className="text-gray-400 italic">No title</span>}
+                  </span>
+                </div>
+                {hasExpandableContent && (
+                  <button
+                    onClick={() => toggleMandateDetails(res.symbol)}
+                    className="mt-1 flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                  >
+                    {isExpanded ? (
+                      <>
+                        <ChevronUp className="h-3 w-3" />
+                        <span>Hide mandate details</span>
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-3 w-3" />
+                        <span>Show mandate details</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+
+              {/* Expanded mandate details */}
+              {isExpanded && (
+                <div className="ml-2 pl-3 border-l-2 border-gray-200 py-2 space-y-2">
+                  {/* AI disclaimer */}
+                  <p className="text-[10px] text-gray-400 italic">
+                    AI-extracted from source document, not validated
+                  </p>
+                  
+                  {/* Mandating paragraphs (verbatim) - primary content */}
+                  {mandate?.verbatim_paragraph && (
+                    <div>
+                      <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1">
+                        Mandating paragraph
+                      </p>
+                      <p className="text-xs text-gray-600 italic leading-relaxed">
+                        &ldquo;{mandate.verbatim_paragraph}&rdquo;
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Frequency with reasoning */}
+                  {freq && (
+                    <div className="flex items-start gap-2">
+                      <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium flex-shrink-0 ${getFrequencyColor(freq)}`}>
+                        {capitalize(freq)}
+                      </span>
+                      {mandate?.frequency_reasoning && (
+                        <span className="text-xs text-gray-500">
+                          {mandate.frequency_reasoning}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1275,41 +1432,11 @@ export function ReportSidebar({
               )}
             </div>
 
-            {/* Mandating Resolutions - only show when data exists (no loading state to avoid layout shift) */}
-            {resolutions.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Based on Resolution{resolutions.length !== 1 ? "s" : ""}
-                </h3>
-                <div className="space-y-1.5">
-                  {resolutions.map((res) => (
-                    <a
-                      key={res.symbol}
-                      href={buildDLLink(res.symbol)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block p-2 rounded border border-gray-100 bg-gray-50 hover:border-blue-200 hover:bg-blue-50 transition-colors group"
-                    >
-                      <div className="flex items-start gap-2">
-                        <span className="inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 flex-shrink-0">
-                          {res.symbol}
-                        </span>
-                        {res.date_year && (
-                          <span className="text-xs text-gray-400 flex-shrink-0">
-                            {res.date_year}
-                          </span>
-                        )}
-                      </div>
-                      {res.title && (
-                        <p className="mt-1 text-sm text-gray-600 line-clamp-2 group-hover:text-gray-800">
-                          {res.title}
-                        </p>
-                      )}
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Mandating Resolutions */}
+            <ResolutionsSection 
+              resolutions={resolutions} 
+              loading={resolutionsLoading} 
+            />
 
             {/* Publication Pattern */}
             <div className="bg-gray-50 rounded-lg p-3">

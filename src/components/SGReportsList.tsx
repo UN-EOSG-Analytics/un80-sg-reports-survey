@@ -89,11 +89,11 @@ type SortColumn = "symbol" | "title" | "subjects" | "entity" | "body" | "year" |
 type SortDirection = "asc" | "desc";
 
 // Grid columns vary by mode:
-// All: Symbol, Title, Entity, Body, Year, Subjects, Frequency, Feedback (no actions)
-// My: Actions(36px), Symbol, Title, Entity, Body, Year, Subjects, Frequency, Feedback
-// Suggested: Actions(36px), Symbol, Title, Entity, Body, Year, Subjects, Frequency (no feedback)
-const GRID_COLS_ALL = "grid-cols-[120px_1fr_100px_75px_65px_120px_90px_85px]";
-const GRID_COLS_MY = "grid-cols-[36px_120px_1fr_100px_75px_65px_100px_80px_150px]";
+// All: Symbol, Title, Entity, Body, Year, Subjects, Frequency, Survey (no actions)
+// My: Actions(36px), Symbol, Title, Body, Year, Subjects, Frequency, Survey (no entity - it's the user's)
+// Suggested: Actions(36px), Symbol, Title, Entity, Body, Year, Subjects, Frequency (no survey)
+const GRID_COLS_ALL = "grid-cols-[120px_1fr_100px_75px_65px_120px_90px_150px]";
+const GRID_COLS_MY = "grid-cols-[36px_120px_1fr_75px_65px_100px_80px_150px]";
 const GRID_COLS_SUGGESTED = "grid-cols-[36px_120px_1fr_100px_75px_65px_120px_100px]";
 
 // Convert string to Title Case
@@ -602,6 +602,7 @@ function ColumnHeaders({
 }) {
   const showFeedbackColumn = mode === "all" || mode === "my";
   const showActions = mode === "my" || mode === "suggested";
+  const showEntityColumn = mode !== "my";  // Hide entity column in "my" mode
   const gridCols = mode === "all" ? GRID_COLS_ALL : mode === "my" ? GRID_COLS_MY : GRID_COLS_SUGGESTED;
   
   return (
@@ -618,18 +619,20 @@ function ColumnHeaders({
         <span>Title</span>
         <SortArrow column="title" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
       </div>
-      <div className="flex items-center gap-1">
-        <span>Entity</span>
-        {filterOptions?.entities && filterOptions.entities.length > 0 && (
-          <CountFilterPopover
-            options={filterOptions.entities}
-            selected={filters.entities}
-            onChange={(v) => onFilterChange({ ...filters, entities: v })}
-            label="entities"
-          />
-        )}
-        <SortArrow column="entity" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
-      </div>
+      {showEntityColumn && (
+        <div className="flex items-center gap-1">
+          <span>Entity</span>
+          {filterOptions?.entities && filterOptions.entities.length > 0 && (
+            <CountFilterPopover
+              options={filterOptions.entities}
+              selected={filters.entities}
+              onChange={(v) => onFilterChange({ ...filters, entities: v })}
+              label="entities"
+            />
+          )}
+          <SortArrow column="entity" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
+        </div>
+      )}
       <div className="flex items-center gap-1">
         <span>Body</span>
         {filterOptions?.bodies && filterOptions.bodies.length > 0 && (
@@ -682,7 +685,7 @@ function ColumnHeaders({
       </div>
       {showFeedbackColumn && (
         <div className="flex items-center gap-1 justify-end">
-          <span>{mode === "my" ? "Survey" : "Feedback"}</span>
+          <span>Survey</span>
         </div>
       )}
     </div>
@@ -733,6 +736,7 @@ function ReportRow({
   isConfirmedByEntity?: boolean;
 }) {
   const showActions = mode === "my" || mode === "suggested";
+  const showEntityColumn = mode !== "my";  // Hide entity column in "my" mode
   const gridCols = mode === "all" ? GRID_COLS_ALL : mode === "my" ? GRID_COLS_MY : GRID_COLS_SUGGESTED;
   
   // Gray out confirmed reports in suggested mode
@@ -825,15 +829,17 @@ function ReportRow({
         {displayTitle || <span className="text-gray-400 italic">No title</span>}
       </div>
 
-      {/* Entity */}
-      <div className="overflow-hidden">
-        <EntityBadges
-          suggestions={report.suggestions}
-          confirmedEntities={report.confirmedEntities}
-          maxVisible={2}
-          size="xs"
-        />
-      </div>
+      {/* Entity - hidden in "my" mode */}
+      {showEntityColumn && (
+        <div className="overflow-hidden">
+          <EntityBadges
+            suggestions={report.confirmedEntities && report.confirmedEntities.length > 0 ? [] : report.suggestions}
+            confirmedEntities={report.confirmedEntities}
+            maxVisible={2}
+            size="xs"
+          />
+        </div>
+      )}
 
       {/* Body */}
       <div className="text-xs text-gray-500" title={report.body ?? undefined}>
@@ -868,8 +874,8 @@ function ReportRow({
         )}
       </div>
 
-      {/* Survey button - for mode="my" */}
-      {mode === "my" && (
+      {/* Survey column - for mode="my" and mode="all" */}
+      {(mode === "my" || mode === "all") && (
         <div className="flex items-center justify-end">
           {surveyResponse ? (
             <div className="inline-flex h-7 w-[148px]">
@@ -910,57 +916,15 @@ function ReportRow({
                 </TooltipContent>
               </Tooltip>
             </div>
-          ) : (
+          ) : isConfirmedByEntity ? (
             <span className="inline-flex items-center justify-center gap-1.5 h-7 w-[148px] rounded border border-blue-200 bg-blue-50 px-3 text-xs font-medium text-un-blue whitespace-nowrap hover:bg-blue-100 transition-colors">
               Go to survey
               <ArrowRight className="h-3 w-3 flex-shrink-0" />
             </span>
-          )}
-        </div>
-      )}
-
-      {/* Feedback - only shown for mode="all" */}
-      {mode === "all" && (
-        <div className="flex items-center gap-1">
-          {surveyResponse ? (
-            <>
-              <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${
-                surveyResponse.status === "continue"
-                  ? "bg-green-100 text-green-700"
-                  : surveyResponse.status === "merge"
-                  ? "bg-amber-100 text-amber-700"
-                  : "bg-red-100 text-red-700"
-              }`}>
-                {surveyResponse.status === "continue" ? "Continue" : 
-                 surveyResponse.status === "merge" ? "Merge" : "Disc."}
-              </span>
-              {surveyResponse.frequency && surveyResponse.frequency !== "keep" && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-100 text-blue-600 cursor-default">
-                      <Clock className="h-3 w-3" />
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    Frequency: {surveyResponse.frequency}
-                  </TooltipContent>
-                </Tooltip>
-              )}
-              {surveyResponse.format && surveyResponse.format !== "keep" && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-purple-100 text-purple-600 cursor-default">
-                      <Layers className="h-3 w-3" />
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    Format: {surveyResponse.format}
-                  </TooltipContent>
-                </Tooltip>
-              )}
-            </>
           ) : (
-            <span className="text-gray-300 text-xs">—</span>
+            <span className="inline-flex items-center justify-center h-7 w-[148px] rounded border border-gray-200 bg-gray-50 px-3 text-xs text-gray-400 whitespace-nowrap">
+              Not completed
+            </span>
           )}
         </div>
       )}

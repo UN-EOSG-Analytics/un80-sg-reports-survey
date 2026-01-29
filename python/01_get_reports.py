@@ -99,15 +99,34 @@ def get_fulltext_or_none(symbol):
 def lookup_resolution(symbol: str) -> dict | None:
     """
     Look up a resolution in the UN Digital Library by exact symbol match.
+    Falls back to base symbol if part letter (A, B, C) isn't found.
     """
-    try:
-        results = _search_document_symbols(query=f"'{symbol}'", tag=191, limit=5)
+    import re
+    
+    def search_for_symbol(s: str) -> dict | None:
+        results = _search_document_symbols(query=f"'{s}'", tag=191, limit=5)
         if results:
             for r in results:
                 symbols = r.get("191__a") or []
-                if symbol in symbols:
+                if s in symbols:
                     return r
             return results[0]
+        return None
+    
+    try:
+        # Try exact match first
+        result = search_for_symbol(symbol)
+        if result:
+            return result
+        
+        # If symbol has trailing part letter (e.g., "A/RES/68/268 A"), try base
+        base_match = re.match(r"(.+?)\s+[A-Z]$", symbol)
+        if base_match:
+            base_symbol = base_match.group(1)
+            result = search_for_symbol(base_symbol)
+            if result:
+                return result
+        
         return None
     except Exception as e:
         print(f"Error looking up resolution {symbol}: {e}")

@@ -17,12 +17,15 @@ def extract_resolution_refs_from_note(note: str) -> list[dict]:
     results = []
     
     # Pattern 1: "General Assembly resolution(s) 78/70" or "78/70 B" (with optional suffix)
-    ga_match = re.search(r"General Assembly resolution[s]?\s+([\d/\s\w,and]+?)(?:\.|;|$)", note, re.IGNORECASE)
+    # Stop at ECOSOC/Economic/Council to avoid over-capturing
+    ga_match = re.search(r"General Assembly resolution[s]?\s+([\d/\s\w,and]+?)(?:\.|;|$|(?=Economic)|(?=ECOSOC)|(?=Council))", note, re.IGNORECASE)
     if ga_match:
         res_text = ga_match.group(1)
-        for m in re.finditer(r"(\d+/\d+)(?:\s*([A-Z]))?", res_text, re.IGNORECASE):
+        # Only match session/resolution format (session 1-99, not year 2000+)
+        # Suffix must be uppercase A-Z followed by non-letter or end (not case-insensitive)
+        for m in re.finditer(r"(\d{1,2}/\d+)(?:\s+([A-Z])(?![a-zA-Z]))?", res_text):
             num = m.group(1)
-            suffix = f" {m.group(2).upper()}" if m.group(2) else ""
+            suffix = f" {m.group(2)}" if m.group(2) else ""
             results.append({
                 "body": "General Assembly",
                 "resolution_num": f"{num}{suffix}".strip(),

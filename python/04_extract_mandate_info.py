@@ -38,7 +38,7 @@ SYSTEM_PROMPT = """You are an expert at analyzing UN resolutions to extract info
 Given a UN resolution text, extract information about any reports that are mandated/requested from the Secretary-General.
 
 Guidelines:
-- Look for operative paragraphs that "request", "invite", or "decide" that the Secretary-General submit a report
+- Look for operative paragraphs that "request", "invite", or "decide", etc. that the Secretary-General submit a report
 - If multiple reports are mandated, include each as a separate mandate
 - For implicit frequency: look at session numbers (e.g., "79th and 81st sessions" = biennial), date patterns, or references to previous resolutions
 - If no report is mandated, return an empty mandates list
@@ -71,7 +71,7 @@ async def extract_mandate_info_async(resolution: tuple) -> dict:
 def get_resolutions_to_process(year_min: int = 2024) -> list[tuple[str, str, str]]:
     """Get resolutions that need mandate extraction.
     
-    Note: Identifies resolutions by resource_type_level3 array containing 'Resolution'.
+    Note: Identifies resolutions by resource_type_level3 array containing 'Resolutions'.
     """
     conn = psycopg2.connect(DATABASE_URL)
     try:
@@ -79,7 +79,7 @@ def get_resolutions_to_process(year_min: int = 2024) -> list[tuple[str, str, str
             cur.execute(f"""
                 SELECT symbol, proper_title, text
                 FROM {DB_SCHEMA}.documents
-                WHERE 'Resolution' = ANY(resource_type_level3)
+                WHERE 'Resolutions' = ANY(resource_type_level3)
                   AND date_year >= %s
                   AND text IS NOT NULL
                   AND LENGTH(text) > 100

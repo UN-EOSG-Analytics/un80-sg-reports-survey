@@ -54,9 +54,11 @@ export function Header({ user, children, entities = [], maxWidth = "7xl", hideAb
               {user.entity} Reports
             </Link>
           )}
-          <Link href="/reports" className="text-sm font-medium text-gray-700 transition-colors hover:text-un-blue">
-            All Reports
-          </Link>
+          {isLoggedIn && (
+            <Link href="/reports" className="text-sm font-medium text-gray-700 transition-colors hover:text-un-blue">
+              All Reports
+            </Link>
+          )}
           {!hideAbout && (
             <Link href="/about" className="text-sm font-medium text-gray-700 transition-colors hover:text-un-blue">
               About

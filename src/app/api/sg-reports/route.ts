@@ -440,7 +440,7 @@ export async function GET(req: NextRequest) {
     });
     
     return {
-      title: r.proper_title?.replace(/\s*:\s*$/, "").trim(),
+      title: r.proper_title || null,  // Keep original proper_title for database matching
       symbol: r.symbols[0],
       body: parseBodyString(r.bodies[0]),
       reportType: r.report_types?.[0] || 'Other', // Report type (Report/Note/Other)

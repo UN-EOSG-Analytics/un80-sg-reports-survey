@@ -7,23 +7,18 @@ import Link from "next/link";
 
 interface Props {
   entity: string;
-  userName?: string | null;
+  userName?: string | null;  // Actually the user's email
 }
 
 export function EntityDashboard({ entity, userName }: Props) {
-  const [myReportsKey, setMyReportsKey] = useState(0);
-  const [suggestedReportsKey, setSuggestedReportsKey] = useState(0);
+  const userEmail = userName;  // userName is actually the email
+  
+  // Single version counter - any data change triggers refetch of both tables
+  const [dataVersion, setDataVersion] = useState(0);
 
-  // When a report is added from suggestions, refresh both sections
-  const handleReportAdded = useCallback(() => {
-    setMyReportsKey((prev) => prev + 1);
-    setSuggestedReportsKey((prev) => prev + 1);
-  }, []);
-
-  // When a report is removed from my reports, refresh both sections
-  const handleReportRemoved = useCallback(() => {
-    setMyReportsKey((prev) => prev + 1);
-    setSuggestedReportsKey((prev) => prev + 1);
+  // Called when any report is added or removed from either table
+  const handleDataChanged = useCallback(() => {
+    setDataVersion((v) => v + 1);
   }, []);
 
   return (
@@ -47,23 +42,24 @@ export function EntityDashboard({ entity, userName }: Props) {
         </Link>
       </div>
 
-      {/* My Reports Section */}
-      <section>
+      {/* Entity Reports Section */}
+      <section className="transition-all duration-300 ease-in-out">
         <h2 className="mb-4 text-lg font-semibold text-gray-900">
-          My Reports
+          {entity} Reports
         </h2>
         <ReportsTable
-          key={`my-${myReportsKey}`}
           mode="my"
           entity={entity}
           userEntity={entity}
+          userEmail={userEmail}
           showAddSearch={true}
-          onReportRemoved={handleReportRemoved}
+          onDataChanged={handleDataChanged}
+          refetchTrigger={dataVersion}
         />
       </section>
 
       {/* Suggested Reports Section */}
-      <section>
+      <section className="transition-all duration-300 ease-in-out">
         <h2 className="mb-4 text-lg font-semibold text-gray-900">
           Suggested Reports
           <span className="ml-2 text-sm font-normal text-gray-500">
@@ -71,11 +67,12 @@ export function EntityDashboard({ entity, userName }: Props) {
           </span>
         </h2>
         <ReportsTable
-          key={`suggested-${suggestedReportsKey}`}
           mode="suggested"
           entity={entity}
           userEntity={entity}
-          onReportAdded={handleReportAdded}
+          userEmail={userEmail}
+          onDataChanged={handleDataChanged}
+          refetchTrigger={dataVersion}
         />
       </section>
     </div>

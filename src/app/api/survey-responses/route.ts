@@ -72,6 +72,8 @@ export async function GET(req: NextRequest) {
         mergeTargets: row.merge_targets || [],
         discontinueReason: row.discontinue_reason,
         comments: row.comments,
+        submittedByEmail: row.user_email,
+        submittedByEntity: row.user_entity,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       },

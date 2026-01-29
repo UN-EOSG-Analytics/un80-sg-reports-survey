@@ -17,7 +17,7 @@ export default async function ReportsPage() {
             <h2 className="mb-6 text-2xl font-bold text-foreground">
               All Secretary-General&apos;s Reports
             </h2>
-            <ReportsTable mode="all" userEntity={user?.entity} />
+            <ReportsTable mode="all" userEntity={user?.entity} userEmail={user?.email} />
           </section>
         </div>
       </main>

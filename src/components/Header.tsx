@@ -12,7 +12,16 @@ interface Props {
 }
 
 export const SITE_TITLE = "SG Reports Survey";
-export const SITE_SUBTITLE = "Streamlining reports of the UN Secretary-General";
+export const SITE_SUBTITLE = "Initial feedback collection from entities authoring SG reports";
+
+// Beta badge component
+function BetaBadge() {
+  return (
+    <span className="ml-2 inline-flex items-center rounded-full border border-gray-300 bg-gray-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+      Beta
+    </span>
+  );
+}
 
 export function Header({ user, children, entities = [], maxWidth = "7xl", hideAbout = false }: Props) {
   const isLoggedIn = !!user;
@@ -32,14 +41,17 @@ export function Header({ user, children, entities = [], maxWidth = "7xl", hideAb
             draggable={false}
           />
           <div>
-            <h1 className="text-xl font-bold text-gray-900">{SITE_TITLE}</h1>
+            <div className="flex items-center">
+              <h1 className="text-xl font-bold text-gray-900">{SITE_TITLE}</h1>
+              <BetaBadge />
+            </div>
             <p className="text-xs text-gray-500">{SITE_SUBTITLE}</p>
           </div>
         </Link>
         <div className="flex items-center gap-4">
           {isLoggedIn && user?.entity && (
             <Link href="/" className="text-sm font-medium text-gray-700 transition-colors hover:text-un-blue">
-              My Reports
+              {user.entity} Reports
             </Link>
           )}
           <Link href="/reports" className="text-sm font-medium text-gray-700 transition-colors hover:text-un-blue">

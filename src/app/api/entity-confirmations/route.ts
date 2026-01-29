@@ -196,22 +196,36 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
-    // Users can only delete their own confirmations
-    const result = await query<{ id: number }>(
-      `DELETE FROM ${DB_SCHEMA}.report_entity_confirmations 
-       WHERE proper_title = $1 AND entity = $2 AND confirmed_by_user_id = $3
-       RETURNING id`,
-      [properTitle, entity, user.id]
-    );
-
-    if (result.length === 0) {
-      return NextResponse.json(
-        { error: "Confirmation not found or you don't have permission to delete it" },
-        { status: 404 }
+    // Users can delete confirmations for their own entity
+    // (either they created it, or they belong to the same entity)
+    const userEntity = user.entity;
+    
+    let result: { id: number }[];
+    
+    if (userEntity && userEntity === entity) {
+      // User belongs to this entity - allow deletion
+      result = await query<{ id: number }>(
+        `DELETE FROM ${DB_SCHEMA}.report_entity_confirmations 
+         WHERE proper_title = $1 AND entity = $2
+         RETURNING id`,
+        [properTitle, entity]
+      );
+    } else {
+      // User doesn't belong to this entity - only allow deleting their own confirmations
+      result = await query<{ id: number }>(
+        `DELETE FROM ${DB_SCHEMA}.report_entity_confirmations 
+         WHERE proper_title = $1 AND entity = $2 AND confirmed_by_user_id = $3
+         RETURNING id`,
+        [properTitle, entity, user.id]
       );
     }
 
-    return NextResponse.json({ success: true });
+    // Idempotent delete - if nothing was deleted, that's still success
+    // (the goal of "remove confirmation" is achieved either way)
+    return NextResponse.json({ 
+      success: true, 
+      deleted: result.length > 0 
+    });
   } catch (error) {
     console.error("Error deleting confirmation:", error);
     return NextResponse.json(

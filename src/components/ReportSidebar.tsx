@@ -81,20 +81,26 @@ export interface SimilarReport {
   entity: string | null;
 }
 
-// Recommendation types
-export type RecommendationStatus = "continue" | "merge" | "discontinue" | null;
-export type FrequencyRecommendation = "annual" | "biennial" | "triennial" | "quadrennial" | "one-time" | null;
-export type FormatRecommendation = "shorter" | "oral" | "dashboard" | "other" | null;
+// Feedback types (for survey responses)
+export type FeedbackStatus = "continue" | "continue_with_changes" | "merge" | "discontinue" | null;
+export type FrequencyFeedback = "annual" | "biennial" | "triennial" | "quadrennial" | "one-time" | null;
+export type FormatFeedback = "shorter" | "oral" | "dashboard" | "other" | null;
 
-export interface Recommendation {
-  status: RecommendationStatus;
+export interface Feedback {
+  status: FeedbackStatus;
   mergeTargets: string[];
   discontinueReason: string;
-  frequency: FrequencyRecommendation;
-  format: FormatRecommendation;
+  frequency: FrequencyFeedback;
+  format: FormatFeedback;
   formatOther: string;
   comments: string;
 }
+
+// Keep legacy type aliases for API compatibility
+export type RecommendationStatus = FeedbackStatus;
+export type FrequencyRecommendation = FrequencyFeedback;
+export type FormatRecommendation = FormatFeedback;
+export type Recommendation = Feedback;
 
 // =============================================================================
 // Constants
@@ -276,26 +282,25 @@ function SortedSubjectPills({
 function SelectItemWithCurrent({ value, label, currentValue }: { value: string; label: string; currentValue?: string | null }) {
   const isCurrent = currentValue?.toLowerCase() === value;
   return (
-    <SelectItem value={value}>
-      <span className="flex justify-between w-full">
-        <span>{label}</span>
-        {isCurrent && <span className="text-gray-400">current</span>}
-      </span>
+    <SelectItem value={value} className="flex justify-between">
+      <span>{label}</span>
+      {isCurrent && <span className="ml-auto text-gray-400 text-xs">current</span>}
     </SelectItem>
   );
 }
 
-// Compact recommendation form
-function CompactRecommendationForm({
+// Compact feedback form
+function CompactFeedbackForm({
   report,
   mergeTargets,
   onMergeTargetsChange,
   userEntity,
   loadingExisting,
-  recommendation,
-  onRecommendationChange,
+  feedback,
+  onFeedbackChange,
   saving,
   saveSuccess,
+  submittedBy,
   onSaveClick,
 }: {
   report: ReportGroup;
@@ -303,40 +308,49 @@ function CompactRecommendationForm({
   onMergeTargetsChange: (targets: string[]) => void;
   userEntity?: string | null;
   loadingExisting: boolean;
-  recommendation: Omit<Recommendation, 'mergeTargets'>;
-  onRecommendationChange: <K extends keyof Omit<Recommendation, 'mergeTargets'>>(key: K, value: Omit<Recommendation, 'mergeTargets'>[K]) => void;
+  feedback: Omit<Feedback, 'mergeTargets'>;
+  onFeedbackChange: <K extends keyof Omit<Feedback, 'mergeTargets'>>(key: K, value: Omit<Feedback, 'mergeTargets'>[K]) => void;
   saving: boolean;
   saveSuccess: boolean;
+  submittedBy: { email: string; entity: string | null } | null;
   onSaveClick: () => void;
 }) {
   const canEdit = userEntity && report.entity === userEntity;
   
+  // Show frequency/format options for "continue_with_changes" and "merge"
+  const showFrequencyFormat = feedback.status === "continue_with_changes" || feedback.status === "merge";
+  
   const isFormValid = useMemo(() => {
-    if (!recommendation.status) return false;
+    if (!feedback.status) return false;
     
-    if (recommendation.status === "continue" || recommendation.status === "merge") {
-      if (!recommendation.frequency) return false;
-      if (!recommendation.format) return false;
-      if (recommendation.format === "other" && !recommendation.formatOther?.trim()) return false;
+    // "continue" (without changes) doesn't require additional fields
+    if (feedback.status === "continue") {
+      return true;
     }
     
-    if (recommendation.status === "merge") {
+    if (feedback.status === "continue_with_changes" || feedback.status === "merge") {
+      if (!feedback.frequency) return false;
+      if (!feedback.format) return false;
+      if (feedback.format === "other" && !feedback.formatOther?.trim()) return false;
+    }
+    
+    if (feedback.status === "merge") {
       if (mergeTargets.length === 0) return false;
     }
     
-    if (recommendation.status === "discontinue") {
-      if (!recommendation.discontinueReason?.trim()) return false;
+    if (feedback.status === "discontinue") {
+      if (!feedback.discontinueReason?.trim()) return false;
     }
     
     return true;
-  }, [recommendation, mergeTargets]);
+  }, [feedback, mergeTargets]);
 
   if (!canEdit) {
     return (
       <div className={`rounded-lg p-3 text-center border text-sm ${!userEntity ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-200"}`}>
         {!userEntity ? (
           <p className="text-amber-700">
-            <a href="/login" className="font-medium underline hover:text-amber-900">Log in</a> to submit a recommendation.
+            <a href="/login" className="font-medium underline hover:text-amber-900">Log in</a> to submit feedback.
           </p>
         ) : (
           <p className="text-gray-500">
@@ -351,123 +365,162 @@ function CompactRecommendationForm({
     );
   }
 
+  // Small label component for form fields
+  const FieldLabel = ({ children }: { children: React.ReactNode }) => (
+    <label className="block text-xs font-medium text-gray-500 mb-1">{children}</label>
+  );
+
   return (
     <div className="space-y-3">
-      <Select
-        value={recommendation.status ?? undefined}
-        onValueChange={(v) => onRecommendationChange("status", v as RecommendationStatus)}
-      >
-        <SelectTrigger className="w-full">
-          <SelectValue placeholder="What should happen to this report?" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="continue">Continue reporting</SelectItem>
-          <SelectItem value="merge">Merge with another report</SelectItem>
-          <SelectItem value="discontinue">Discontinue</SelectItem>
-        </SelectContent>
-      </Select>
+      <div>
+        <FieldLabel>Status</FieldLabel>
+        <Select
+          value={feedback.status ?? undefined}
+          onValueChange={(v) => onFeedbackChange("status", v as FeedbackStatus)}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="continue">Continue</SelectItem>
+            <SelectItem value="continue_with_changes">Continue with changes</SelectItem>
+            <SelectItem value="merge">Merge with another report</SelectItem>
+            <SelectItem value="discontinue">Discontinue</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-      {recommendation.status && (
+      {feedback.status && (
         <div className="space-y-3 pt-1">
-          {recommendation.status === "merge" && mergeTargets.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {mergeTargets.map((symbol) => (
-                <span
-                  key={symbol}
-                  className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs"
-                >
-                  {symbol}
-                  <button
-                    onClick={() => onMergeTargetsChange(mergeTargets.filter((s) => s !== symbol))}
-                    className="hover:text-blue-900"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              ))}
+          {feedback.status === "merge" && (
+            <div>
+              <FieldLabel>Merge with</FieldLabel>
+              {mergeTargets.length > 0 ? (
+                <div className="flex flex-wrap gap-1">
+                  {mergeTargets.map((symbol) => (
+                    <span
+                      key={symbol}
+                      className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs"
+                    >
+                      {symbol}
+                      <button
+                        onClick={() => onMergeTargetsChange(mergeTargets.filter((s) => s !== symbol))}
+                        className="hover:text-blue-900"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400 italic">Select from similar reports below</p>
+              )}
             </div>
           )}
 
-          {recommendation.status === "discontinue" && (
-            <textarea
-              value={recommendation.discontinueReason}
-              onChange={(e) => onRecommendationChange("discontinueReason", e.target.value)}
-              placeholder="Reason for discontinuation..."
-              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-un-blue focus:ring-1 focus:ring-un-blue resize-none"
-              rows={2}
-            />
+          {feedback.status === "discontinue" && (
+            <div>
+              <FieldLabel>Reason</FieldLabel>
+              <textarea
+                value={feedback.discontinueReason}
+                onChange={(e) => onFeedbackChange("discontinueReason", e.target.value)}
+                placeholder="Why should this report be discontinued?"
+                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-un-blue focus:ring-1 focus:ring-un-blue resize-none"
+                rows={2}
+              />
+            </div>
           )}
 
-          {(recommendation.status === "continue" || recommendation.status === "merge") && (
-            <div className="grid grid-cols-2 gap-2">
-              <Select
-                value={recommendation.frequency ?? undefined}
-                onValueChange={(v) => onRecommendationChange("frequency", v as FrequencyRecommendation)}
-              >
-                <SelectTrigger className="w-full text-sm h-9">
-                  <SelectValue placeholder="Frequency..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {FREQUENCY_OPTIONS.map((opt) => (
-                    <SelectItemWithCurrent key={opt.value} value={opt.value} label={opt.label} currentValue={report.frequency} />
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select
-                value={recommendation.format ?? undefined}
-                onValueChange={(v) => onRecommendationChange("format", v as FormatRecommendation)}
-              >
-                <SelectTrigger className="w-full text-sm h-9">
-                  <SelectValue placeholder="Format..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {FORMAT_OPTIONS.map((opt) => (
-                    <SelectItemWithCurrent key={opt.value} value={opt.value} label={opt.label} />
-                  ))}
-                </SelectContent>
-              </Select>
+          {showFrequencyFormat && (
+            <div className="space-y-3">
+              <div>
+                <FieldLabel>Frequency</FieldLabel>
+                <Select
+                  value={feedback.frequency ?? undefined}
+                  onValueChange={(v) => onFeedbackChange("frequency", v as FrequencyFeedback)}
+                >
+                  <SelectTrigger className="w-full text-sm h-9">
+                    <SelectValue placeholder="Select..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FREQUENCY_OPTIONS.map((opt) => (
+                      <SelectItemWithCurrent key={opt.value} value={opt.value} label={opt.label} currentValue={report.frequency} />
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <FieldLabel>Format</FieldLabel>
+                <Select
+                  value={feedback.format ?? undefined}
+                  onValueChange={(v) => onFeedbackChange("format", v as FormatFeedback)}
+                >
+                  <SelectTrigger className="w-full text-sm h-9">
+                    <SelectValue placeholder="Select..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FORMAT_OPTIONS.map((opt) => (
+                      <SelectItemWithCurrent key={opt.value} value={opt.value} label={opt.label} />
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           )}
           
-          {recommendation.format === "other" && (
-            <Input
-              value={recommendation.formatOther}
-              onChange={(e) => onRecommendationChange("formatOther", e.target.value)}
-              placeholder="Describe the format..."
-              className="h-9 text-sm"
-            />
+          {feedback.format === "other" && showFrequencyFormat && (
+            <div>
+              <FieldLabel>Other format</FieldLabel>
+              <Input
+                value={feedback.formatOther}
+                onChange={(e) => onFeedbackChange("formatOther", e.target.value)}
+                placeholder="Describe..."
+                className="h-9 text-sm"
+              />
+            </div>
           )}
 
-          <textarea
-            value={recommendation.comments}
-            onChange={(e) => onRecommendationChange("comments", e.target.value)}
-            placeholder="Additional comments (optional)..."
-            className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-un-blue focus:ring-1 focus:ring-un-blue resize-none"
-            rows={2}
-          />
+          <div>
+            <FieldLabel>Comments (optional)</FieldLabel>
+            <textarea
+              value={feedback.comments}
+              onChange={(e) => onFeedbackChange("comments", e.target.value)}
+              placeholder="Any additional context..."
+              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-un-blue focus:ring-1 focus:ring-un-blue resize-none"
+              rows={2}
+            />
+          </div>
         </div>
       )}
 
-      {recommendation.status && (
-        <Button 
-          className="w-full h-9" 
-          disabled={!isFormValid || saving || loadingExisting}
-          onClick={onSaveClick}
-        >
-          {saving ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              Saving...
-            </>
-          ) : saveSuccess ? (
-            <>
-              <Check className="h-4 w-4 mr-2" />
-              Saved
-            </>
-          ) : (
-            "Save Recommendation"
+      {feedback.status && (
+        <>
+          <Button 
+            className="h-9" 
+            disabled={!isFormValid || saving || loadingExisting}
+            onClick={onSaveClick}
+          >
+            {saving ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Saving...
+              </>
+            ) : saveSuccess ? (
+              <>
+                <Check className="h-4 w-4 mr-2" />
+                Saved
+              </>
+            ) : (
+              "Save Feedback"
+            )}
+          </Button>
+          {submittedBy && (
+            <div className="text-xs text-gray-500 pt-1">
+              Submitted by <span className="font-medium">{submittedBy.entity || "Unknown"}</span>
+              <span className="text-gray-400 ml-1">({submittedBy.email})</span>
+            </div>
           )}
-        </Button>
+        </>
       )}
     </div>
   );
@@ -495,7 +548,7 @@ function SimilarReportsGrid({
   
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-xs text-gray-400 py-2">
+      <div className="flex items-center gap-2 text-xs text-gray-400 h-10">
         <Loader2 className="h-3 w-3 animate-spin" />
         Finding similar...
       </div>
@@ -504,7 +557,7 @@ function SimilarReportsGrid({
 
   if (error || similar.length === 0) {
     return (
-      <p className="text-xs text-gray-400 py-2">
+      <p className="text-xs text-gray-400 h-10 flex items-center">
         {error || "No similar reports found"}
       </p>
     );
@@ -733,6 +786,7 @@ export interface ReportSidebarProps {
   subjectCounts: SubjectCount[];
   onSave?: () => void;
   userEntity?: string | null;
+  userEmail?: string | null;
 }
 
 export function ReportSidebar({
@@ -741,6 +795,7 @@ export function ReportSidebar({
   subjectCounts,
   onSave,
   userEntity,
+  userEmail,
 }: ReportSidebarProps) {
   const [similar, setSimilar] = useState<SimilarReport[]>([]);
   const [similarLoading, setSimilarLoading] = useState(false);
@@ -750,8 +805,8 @@ export function ReportSidebar({
   const [resolutions, setResolutions] = useState<ResolutionInfo[]>([]);
   const [resolutionsLoading, setResolutionsLoading] = useState(false);
   
-  // Form state
-  const [recommendation, setRecommendation] = useState<Omit<Recommendation, 'mergeTargets'>>({
+  // Form state (feedback instead of recommendation)
+  const [feedback, setFeedback] = useState<Omit<Feedback, 'mergeTargets'>>({
     status: null,
     discontinueReason: "",
     frequency: null,
@@ -762,6 +817,7 @@ export function ReportSidebar({
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [loadingExisting, setLoadingExisting] = useState(true);
+  const [submittedBy, setSubmittedBy] = useState<{ email: string; entity: string | null } | null>(null);
 
   // Fetch similar reports and resolutions when report changes
   useEffect(() => {
@@ -801,21 +857,34 @@ export function ReportSidebar({
     if (!report) return;
     setLoadingExisting(true);
     setSaveSuccess(false);
+    setSubmittedBy(null);
     fetch(`/api/survey-responses?properTitle=${encodeURIComponent(report.title)}`)
       .then((r) => r.json())
       .then((data) => {
         if (data.response) {
-          setRecommendation({
-            status: data.response.status as RecommendationStatus,
+          // Map old "continue" with frequency/format to "continue_with_changes"
+          let status = data.response.status as FeedbackStatus;
+          if (status === "continue" && (data.response.frequency || data.response.format)) {
+            status = "continue_with_changes";
+          }
+          setFeedback({
+            status,
             discontinueReason: data.response.discontinueReason || "",
-            frequency: data.response.frequency as FrequencyRecommendation,
-            format: data.response.format as FormatRecommendation,
+            frequency: data.response.frequency as FrequencyFeedback,
+            format: data.response.format as FormatFeedback,
             formatOther: data.response.formatOther || "",
             comments: data.response.comments || "",
           });
           setMergeTargets(data.response.mergeTargets || []);
+          // Track who submitted
+          if (data.response.submittedByEmail) {
+            setSubmittedBy({
+              email: data.response.submittedByEmail,
+              entity: data.response.submittedByEntity || null,
+            });
+          }
         } else {
-          setRecommendation({
+          setFeedback({
             status: null,
             discontinueReason: "",
             frequency: null,
@@ -830,11 +899,11 @@ export function ReportSidebar({
       .finally(() => setLoadingExisting(false));
   }, [report?.title]);
 
-  const updateRecommendation = useCallback(<K extends keyof Omit<Recommendation, 'mergeTargets'>>(
+  const updateFeedback = useCallback(<K extends keyof Omit<Feedback, 'mergeTargets'>>(
     key: K,
-    value: Omit<Recommendation, 'mergeTargets'>[K]
+    value: Omit<Feedback, 'mergeTargets'>[K]
   ) => {
-    setRecommendation((prev) => ({ ...prev, [key]: value }));
+    setFeedback((prev) => ({ ...prev, [key]: value }));
     setSaveSuccess(false);
   }, []);
 
@@ -843,18 +912,21 @@ export function ReportSidebar({
       const newTargets = prev.includes(symbol) 
         ? prev.filter((s) => s !== symbol) 
         : [...prev, symbol];
-      if (newTargets.length > 0 && !recommendation.status) {
-        setRecommendation((r) => ({ ...r, status: "merge" }));
+      if (newTargets.length > 0 && !feedback.status) {
+        setFeedback((r) => ({ ...r, status: "merge" }));
       }
       return newTargets;
     });
     setSaveSuccess(false);
-  }, [recommendation.status]);
+  }, [feedback.status]);
 
   const handleSave = async () => {
     if (!report) return;
     setSaving(true);
     setSaveSuccess(false);
+    
+    // Map "continue_with_changes" back to "continue" for API (with frequency/format)
+    const apiStatus = feedback.status === "continue_with_changes" ? "continue" : feedback.status;
     
     try {
       const response = await fetch("/api/survey-responses", {
@@ -863,18 +935,22 @@ export function ReportSidebar({
         body: JSON.stringify({
           properTitle: report.title,
           latestSymbol: report.symbol,
-          status: recommendation.status,
-          frequency: recommendation.frequency,
-          format: recommendation.format,
-          formatOther: recommendation.formatOther,
+          status: apiStatus,
+          frequency: feedback.status === "continue_with_changes" || feedback.status === "merge" ? feedback.frequency : null,
+          format: feedback.status === "continue_with_changes" || feedback.status === "merge" ? feedback.format : null,
+          formatOther: feedback.formatOther,
           mergeTargets: mergeTargets,
-          discontinueReason: recommendation.discontinueReason,
-          comments: recommendation.comments,
+          discontinueReason: feedback.discontinueReason,
+          comments: feedback.comments,
         }),
       });
       
       if (response.ok) {
         setSaveSuccess(true);
+        // Update submittedBy with current user info
+        if (userEntity && userEmail) {
+          setSubmittedBy({ email: userEmail, entity: userEntity });
+        }
         onSave?.();
       }
     } catch (error) {
@@ -886,7 +962,7 @@ export function ReportSidebar({
 
   if (!report) return null;
 
-  const showMergeActions = recommendation.status === "merge" || mergeTargets.length > 0;
+  const showMergeActions = feedback.status === "merge" || mergeTargets.length > 0;
 
   return (
     <>
@@ -900,8 +976,8 @@ export function ReportSidebar({
         {/* Header */}
         <div className="flex-shrink-0 border-b px-4 py-3">
           <div className="flex items-start justify-between gap-3">
-            <h2 className="flex-1 min-w-0 text-sm font-medium text-gray-900 leading-snug line-clamp-2" title={report.title}>
-              {report.title}
+            <h2 className="flex-1 min-w-0 text-sm font-medium text-gray-900 leading-snug line-clamp-2" title={report.title?.replace(/\s*:\s*$/, "").trim() || undefined}>
+              {report.title?.replace(/\s*:\s*$/, "").trim() || "Untitled"}
             </h2>
             <button
               onClick={onClose}
@@ -961,46 +1037,39 @@ export function ReportSidebar({
               )}
             </div>
 
-            {/* Mandating Resolutions */}
-            {(resolutions.length > 0 || resolutionsLoading) && (
+            {/* Mandating Resolutions - only show when data exists (no loading state to avoid layout shift) */}
+            {resolutions.length > 0 && (
               <div className="space-y-2">
                 <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Based on Resolution{resolutions.length !== 1 ? "s" : ""}
                 </h3>
-                {resolutionsLoading ? (
-                  <div className="flex items-center gap-2 text-xs text-gray-400">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Loading...
-                  </div>
-                ) : (
-                  <div className="space-y-1.5">
-                    {resolutions.map((res) => (
-                      <a
-                        key={res.symbol}
-                        href={buildDLLink(res.symbol)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block p-2 rounded border border-gray-100 bg-gray-50 hover:border-blue-200 hover:bg-blue-50 transition-colors group"
-                      >
-                        <div className="flex items-start gap-2">
-                          <span className="inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 flex-shrink-0">
-                            {res.symbol}
+                <div className="space-y-1.5">
+                  {resolutions.map((res) => (
+                    <a
+                      key={res.symbol}
+                      href={buildDLLink(res.symbol)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block p-2 rounded border border-gray-100 bg-gray-50 hover:border-blue-200 hover:bg-blue-50 transition-colors group"
+                    >
+                      <div className="flex items-start gap-2">
+                        <span className="inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 flex-shrink-0">
+                          {res.symbol}
+                        </span>
+                        {res.date_year && (
+                          <span className="text-xs text-gray-400 flex-shrink-0">
+                            {res.date_year}
                           </span>
-                          {res.date_year && (
-                            <span className="text-xs text-gray-400 flex-shrink-0">
-                              {res.date_year}
-                            </span>
-                          )}
-                        </div>
-                        {res.title && (
-                          <p className="mt-1 text-sm text-gray-600 line-clamp-2 group-hover:text-gray-800">
-                            {res.title}
-                          </p>
                         )}
-                      </a>
-                    ))}
-                  </div>
-                )}
+                      </div>
+                      {res.title && (
+                        <p className="mt-1 text-sm text-gray-600 line-clamp-2 group-hover:text-gray-800">
+                          {res.title}
+                        </p>
+                      )}
+                    </a>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -1013,21 +1082,22 @@ export function ReportSidebar({
               />
             </div>
 
-            {/* Decision Form */}
+            {/* Feedback Form */}
             <div className="space-y-2">
               <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Your Recommendation
+                Your Feedback
               </h3>
-              <CompactRecommendationForm
+              <CompactFeedbackForm
                 report={report}
                 mergeTargets={mergeTargets}
                 onMergeTargetsChange={setMergeTargets}
                 userEntity={userEntity}
                 loadingExisting={loadingExisting}
-                recommendation={recommendation}
-                onRecommendationChange={updateRecommendation}
+                feedback={feedback}
+                onFeedbackChange={updateFeedback}
                 saving={saving}
                 saveSuccess={saveSuccess}
+                submittedBy={submittedBy}
                 onSaveClick={handleSave}
               />
             </div>

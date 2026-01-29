@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Loader2, ChevronUp, ChevronDown, Filter, X, Search, ChevronRight, Clock, Layers, Plus, Check, Minus } from "lucide-react";
+import { Loader2, ChevronUp, ChevronDown, Filter, X, Search, ChevronRight, Clock, Layers, Plus, Check, Minus, ArrowRight, Play, GitMerge, XCircle, Pencil } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -92,8 +92,8 @@ type SortDirection = "asc" | "desc";
 // All: Symbol, Title, Entity, Body, Year, Subjects, Frequency, Feedback (no actions)
 // My: Actions(36px), Symbol, Title, Entity, Body, Year, Subjects, Frequency, Feedback
 // Suggested: Actions(36px), Symbol, Title, Entity, Body, Year, Subjects, Frequency (no feedback)
-const GRID_COLS_ALL = "grid-cols-[120px_1fr_100px_75px_65px_120px_100px_85px]";
-const GRID_COLS_MY = "grid-cols-[36px_120px_1fr_100px_75px_65px_120px_100px_85px]";
+const GRID_COLS_ALL = "grid-cols-[120px_1fr_100px_75px_65px_120px_90px_85px]";
+const GRID_COLS_MY = "grid-cols-[36px_120px_1fr_100px_75px_65px_100px_80px_150px]";
 const GRID_COLS_SUGGESTED = "grid-cols-[36px_120px_1fr_100px_75px_65px_120px_100px]";
 
 // Convert string to Title Case
@@ -600,7 +600,7 @@ function ColumnHeaders({
   subjectCounts: SubjectCount[];
   mode?: ReportsTableMode;
 }) {
-  const showFeedback = mode === "all" || mode === "my";
+  const showFeedbackColumn = mode === "all" || mode === "my";
   const showActions = mode === "my" || mode === "suggested";
   const gridCols = mode === "all" ? GRID_COLS_ALL : mode === "my" ? GRID_COLS_MY : GRID_COLS_SUGGESTED;
   
@@ -680,9 +680,9 @@ function ColumnHeaders({
         )}
         <SortArrow column="frequency" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
       </div>
-      {showFeedback && (
-        <div className="flex items-center gap-1">
-          <span>Feedback</span>
+      {showFeedbackColumn && (
+        <div className="flex items-center gap-1 justify-end">
+          <span>{mode === "my" ? "Survey" : "Feedback"}</span>
         </div>
       )}
     </div>
@@ -732,16 +732,21 @@ function ReportRow({
   onRemove?: (report: ReportGroup) => void;
   isConfirmedByEntity?: boolean;
 }) {
-  const showFeedback = mode === "all" || mode === "my";
   const showActions = mode === "my" || mode === "suggested";
   const gridCols = mode === "all" ? GRID_COLS_ALL : mode === "my" ? GRID_COLS_MY : GRID_COLS_SUGGESTED;
   
+  // Gray out confirmed reports in suggested mode
+  const isGrayedOut = mode === "suggested" && isConfirmedByEntity;
+  
+  // Format title for display (remove trailing colons and trim)
+  const displayTitle = report.title?.replace(/\s*:\s*$/, "").trim() || null;
+  
   return (
     <div
-      className={`grid ${gridCols} items-center gap-x-4 px-4 py-3 text-sm border-b transition-colors cursor-pointer ${
-        isSelected ? "bg-blue-50 border-l-2 border-l-un-blue" : "hover:bg-gray-50"
+      className={`grid ${gridCols} items-center gap-x-4 px-4 py-3 text-sm border-b transition-all duration-200 ${
+        isSelected ? "bg-blue-50 border-l-2 border-l-un-blue cursor-pointer" : isGrayedOut ? "bg-gray-50/80 opacity-50" : "hover:bg-gray-50 cursor-pointer"
       }`}
-      onClick={onSelect}
+      onClick={isGrayedOut ? undefined : onSelect}
     >
       {/* Actions - first column, only for my/suggested modes */}
       {showActions && (
@@ -767,12 +772,18 @@ function ReportRow({
           {mode === "suggested" && isConfirmedByEntity && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <span className="inline-flex items-center justify-center w-6 h-6 text-green-600 bg-green-50 rounded-full">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemove?.(report);
+                  }}
+                  className="inline-flex items-center justify-center w-6 h-6 text-green-600 bg-green-50 hover:bg-red-50 hover:text-red-500 rounded-full transition-colors cursor-pointer"
+                >
                   <Check className="h-3.5 w-3.5" />
-                </span>
+                </button>
               </TooltipTrigger>
               <TooltipContent>
-                <span className="text-xs">Already in {entity}&apos;s reports</span>
+                <span className="text-xs">Remove from {entity}&apos;s reports</span>
               </TooltipContent>
             </Tooltip>
           )}
@@ -810,8 +821,8 @@ function ReportRow({
       </div>
 
       {/* Title */}
-      <div className="truncate text-gray-700" title={report.title}>
-        {report.title || <span className="text-gray-400 italic">No title</span>}
+      <div className="truncate text-gray-700" title={displayTitle || undefined}>
+        {displayTitle || <span className="text-gray-400 italic">No title</span>}
       </div>
 
       {/* Entity */}
@@ -857,8 +868,59 @@ function ReportRow({
         )}
       </div>
 
-      {/* Feedback - only shown for mode="all" or mode="my" */}
-      {showFeedback && (
+      {/* Survey button - for mode="my" */}
+      {mode === "my" && (
+        <div className="flex items-center justify-end">
+          {surveyResponse ? (
+            <div className="inline-flex h-7 w-[148px]">
+              <span className="inline-flex items-center gap-1.5 rounded-l border border-r-0 border-gray-200 bg-gray-50 px-2.5 text-xs font-medium text-gray-500 flex-1">
+                <Check className="h-3 w-3 flex-shrink-0" />
+                <span className="truncate">Completed</span>
+              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className={`inline-flex items-center justify-center w-7 h-7 rounded-r border flex-shrink-0 ${
+                    surveyResponse.status === "continue" && !surveyResponse.frequency && !surveyResponse.format
+                      ? "bg-green-50 border-green-200 text-green-600"
+                      : surveyResponse.status === "continue"
+                      ? "bg-blue-50 border-blue-200 text-blue-600"
+                      : surveyResponse.status === "merge"
+                      ? "bg-amber-50 border-amber-200 text-amber-600"
+                      : "bg-red-50 border-red-200 text-red-600"
+                  }`}>
+                    {surveyResponse.status === "continue" && !surveyResponse.frequency && !surveyResponse.format ? (
+                      <Play className="h-3.5 w-3.5" />
+                    ) : surveyResponse.status === "continue" ? (
+                      <Pencil className="h-3.5 w-3.5" />
+                    ) : surveyResponse.status === "merge" ? (
+                      <GitMerge className="h-3.5 w-3.5" />
+                    ) : (
+                      <XCircle className="h-3.5 w-3.5" />
+                    )}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {surveyResponse.status === "continue" && !surveyResponse.frequency && !surveyResponse.format
+                    ? "Continue as-is"
+                    : surveyResponse.status === "continue"
+                    ? "Continue with changes"
+                    : surveyResponse.status === "merge"
+                    ? "Merge with another report"
+                    : "Discontinue"}
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          ) : (
+            <span className="inline-flex items-center justify-center gap-1.5 h-7 w-[148px] rounded border border-blue-200 bg-blue-50 px-3 text-xs font-medium text-un-blue whitespace-nowrap hover:bg-blue-100 transition-colors">
+              Go to survey
+              <ArrowRight className="h-3 w-3 flex-shrink-0" />
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Feedback - only shown for mode="all" */}
+      {mode === "all" && (
         <div className="flex items-center gap-1">
           {surveyResponse ? (
             <>
@@ -1144,9 +1206,10 @@ interface ReportsTableProps {
   mode?: ReportsTableMode;
   entity?: string;  // Required for mode=my and mode=suggested
   userEntity?: string | null;  // The logged-in user's entity (for permissions)
+  userEmail?: string | null;  // The logged-in user's email (for feedback display)
   showAddSearch?: boolean;  // Show inline search row at bottom (for mode=my)
-  onReportAdded?: (report: ReportGroup) => void;  // Callback when report added (for mode=suggested)
-  onReportRemoved?: (report: ReportGroup) => void;  // Callback when report removed (for mode=my)
+  onDataChanged?: () => void;  // Callback when data changes (report added/removed)
+  refetchTrigger?: number;  // Increment to trigger a refetch without remounting
   className?: string;
 }
 
@@ -1157,9 +1220,10 @@ export function ReportsTable({
   mode = "all", 
   entity, 
   userEntity, 
+  userEmail,
   showAddSearch,
-  onReportAdded,
-  onReportRemoved,
+  onDataChanged,
+  refetchTrigger,
   className,
 }: ReportsTableProps) {
   const [data, setData] = useState<APIResponse | null>(null);
@@ -1237,7 +1301,11 @@ export function ReportsTable({
 
     fetch(`/api/sg-reports?${params.toString()}`)
       .then((r) => r.json())
-      .then(setData)
+      .then((data) => {
+        setData(data);
+        // Clear optimistic state when fresh data arrives
+        setLocallyConfirmed(new Set());
+      })
       .finally(() => setLoading(false));
   }, [page, filters, effectiveEntityFilters, mode, entity]);
 
@@ -1246,7 +1314,11 @@ export function ReportsTable({
 
   // Add report to user's confirmed reports
   const handleAddReport = useCallback(async (report: ReportGroup) => {
-    if (!effectiveEntity || addingReport) return;
+    if (!effectiveEntity) {
+      console.error("Cannot add report: no entity selected");
+      return;
+    }
+    if (addingReport) return;
     
     setAddingReport(report.title);
     // Optimistic update
@@ -1263,10 +1335,12 @@ export function ReportsTable({
       });
       
       if (response.ok) {
-        onReportAdded?.(report);
+        onDataChanged?.();
         // Refetch to get updated data
         fetchData();
       } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Failed to add report:", errorData.error || response.statusText);
         // Revert optimistic update on error
         setLocallyConfirmed((prev) => {
           const next = new Set(prev);
@@ -1285,11 +1359,15 @@ export function ReportsTable({
     } finally {
       setAddingReport(null);
     }
-  }, [effectiveEntity, addingReport, fetchData, onReportAdded]);
+  }, [effectiveEntity, addingReport, fetchData, onDataChanged]);
 
   // Remove report from user's confirmed reports
   const handleRemoveReport = useCallback(async (report: ReportGroup) => {
-    if (!effectiveEntity || removingReport) return;
+    if (!effectiveEntity) {
+      console.error("Cannot remove report: no entity selected");
+      return;
+    }
+    if (removingReport) return;
     
     setRemovingReport(report.title);
     
@@ -1299,20 +1377,32 @@ export function ReportsTable({
       });
       
       if (response.ok) {
-        onReportRemoved?.(report);
+        onDataChanged?.();
         // Refetch to get updated data
         fetchData();
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Failed to remove report:", errorData.error || response.statusText);
       }
     } catch (error) {
       console.error("Failed to remove report:", error);
     } finally {
       setRemovingReport(null);
     }
-  }, [effectiveEntity, removingReport, fetchData, onReportRemoved]);
+  }, [effectiveEntity, removingReport, fetchData, onDataChanged]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Refetch when external trigger changes (but not on initial mount)
+  const refetchTriggerRef = useRef(refetchTrigger);
+  useEffect(() => {
+    if (refetchTrigger !== refetchTriggerRef.current) {
+      refetchTriggerRef.current = refetchTrigger;
+      fetchData();
+    }
+  }, [refetchTrigger, fetchData]);
 
   // Debounce text filters
   useEffect(() => {
@@ -1434,7 +1524,6 @@ export function ReportsTable({
           )}
         </div>
 
-        {loading && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
         
         {hasActiveFilters && (
           <Button
@@ -1512,7 +1601,7 @@ export function ReportsTable({
         )}
       </div>
 
-      {/* Add Report Search - for My Reports mode */}
+      {/* Add Report Search - for entity reports mode */}
       {mode === "my" && showAddSearch && effectiveEntity && (
         <AddReportSearch 
           entity={effectiveEntity} 
@@ -1552,6 +1641,7 @@ export function ReportsTable({
         onClose={() => setSelectedReport(null)}
         subjectCounts={data?.subjectCounts || []}
         userEntity={userEntity}
+        userEmail={userEmail}
         onSave={() => {
           // Refetch survey responses after save
           fetch("/api/survey-responses/my-responses")

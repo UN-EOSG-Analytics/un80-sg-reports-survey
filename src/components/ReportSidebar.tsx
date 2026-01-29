@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Loader2, ChevronUp, ChevronDown, X, FileText, Search, Check, Plus, Minus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -289,6 +289,187 @@ function SelectItemWithCurrent({ value, label, currentValue }: { value: string; 
   );
 }
 
+// Merge target search component
+interface MergeSearchResult {
+  symbol: string;
+  title: string | null;
+  year: number | null;
+}
+
+function MergeTargetSearch({
+  onAdd,
+  existingTargets,
+}: {
+  onAdd: (symbol: string) => void;
+  existingTargets: string[];
+}) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<MergeSearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  // Debounced search
+  useEffect(() => {
+    if (query.length < 2) {
+      setResults([]);
+      setHighlightedIndex(-1);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const response = await fetch(`/api/documents/search?q=${encodeURIComponent(query)}`);
+        if (response.ok) {
+          const data = await response.json();
+          setResults(data);
+          setShowResults(true);
+          setHighlightedIndex(-1);
+        }
+      } catch (error) {
+        console.error("Search failed:", error);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  // Close results when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setShowResults(false);
+        setHighlightedIndex(-1);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (highlightedIndex >= 0 && resultsRef.current) {
+      const item = resultsRef.current.children[highlightedIndex] as HTMLElement;
+      if (item) {
+        item.scrollIntoView({ block: "nearest" });
+      }
+    }
+  }, [highlightedIndex]);
+
+  const handleSelect = (result: MergeSearchResult) => {
+    if (existingTargets.includes(result.symbol)) return;
+    onAdd(result.symbol);
+    setQuery("");
+    setResults([]);
+    setShowResults(false);
+    setHighlightedIndex(-1);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!showResults || results.length === 0) return;
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        setHighlightedIndex((prev) => 
+          prev < results.length - 1 ? prev + 1 : 0
+        );
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        setHighlightedIndex((prev) => 
+          prev > 0 ? prev - 1 : results.length - 1
+        );
+        break;
+      case "Enter":
+        e.preventDefault();
+        if (highlightedIndex >= 0 && highlightedIndex < results.length) {
+          handleSelect(results[highlightedIndex]);
+        }
+        break;
+      case "Escape":
+        e.preventDefault();
+        setShowResults(false);
+        setHighlightedIndex(-1);
+        break;
+    }
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="flex items-center gap-2 px-2 py-1.5 bg-gray-50 rounded border border-gray-200 focus-within:border-gray-300">
+        <Search className="h-3 w-3 text-gray-400 flex-shrink-0" />
+        <input
+          type="text"
+          placeholder="Search reports..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => results.length > 0 && setShowResults(true)}
+          onKeyDown={handleKeyDown}
+          className="flex-1 bg-transparent text-xs text-gray-600 placeholder:text-gray-400 outline-none min-w-0"
+        />
+        {isSearching && (
+          <Loader2 className="h-3 w-3 animate-spin text-gray-400 flex-shrink-0" />
+        )}
+      </div>
+
+      {/* Search Results Dropdown */}
+      {showResults && results.length > 0 && (
+        <div ref={resultsRef} className="absolute left-0 right-0 mt-1 bg-white border rounded shadow-lg z-50 max-h-48 overflow-y-auto">
+          {results.map((result, index) => {
+            const isAlreadyAdded = existingTargets.includes(result.symbol);
+            const isHighlighted = index === highlightedIndex;
+            return (
+              <div
+                key={result.symbol}
+                className={`flex items-center gap-2 px-2 py-1.5 border-b last:border-b-0 ${
+                  isAlreadyAdded 
+                    ? "bg-gray-50 opacity-60" 
+                    : isHighlighted 
+                    ? "bg-blue-50" 
+                    : "hover:bg-blue-50 cursor-pointer"
+                }`}
+                onClick={() => !isAlreadyAdded && handleSelect(result)}
+                onMouseEnter={() => !isAlreadyAdded && setHighlightedIndex(index)}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-medium text-un-blue">
+                      {result.symbol}
+                    </span>
+                    {result.year && (
+                      <span className="text-[10px] text-gray-400">{result.year}</span>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-gray-600 truncate">
+                    {result.title || <span className="italic text-gray-400">No title</span>}
+                  </div>
+                </div>
+                {isAlreadyAdded ? (
+                  <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
+                ) : (
+                  <Plus className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {showResults && query.length >= 2 && results.length === 0 && !isSearching && (
+        <div className="absolute left-0 right-0 mt-1 bg-white border rounded shadow-lg z-50 p-2 text-xs text-gray-500">
+          No reports found
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Compact feedback form
 function CompactFeedbackForm({
   report,
@@ -385,9 +566,9 @@ function CompactFeedbackForm({
       {feedback.status && (
         <div className="space-y-3 pt-1">
           {feedback.status === "merge" && (
-            <div>
+            <div className="space-y-2">
               <FieldLabel>Merge with</FieldLabel>
-              {mergeTargets.length > 0 ? (
+              {mergeTargets.length > 0 && (
                 <div className="flex flex-wrap gap-1">
                   {mergeTargets.map((symbol) => (
                     <span
@@ -404,9 +585,16 @@ function CompactFeedbackForm({
                     </span>
                   ))}
                 </div>
-              ) : (
-                <p className="text-xs text-gray-400 italic">Select from similar reports below</p>
               )}
+              <MergeTargetSearch
+                onAdd={(symbol) => {
+                  if (!mergeTargets.includes(symbol)) {
+                    onMergeTargetsChange([...mergeTargets, symbol]);
+                  }
+                }}
+                existingTargets={mergeTargets}
+              />
+              <p className="text-[11px] text-gray-400">Or select from similar reports below</p>
             </div>
           )}
 
@@ -486,7 +674,7 @@ function CompactFeedbackForm({
       )}
 
       {feedback.status && (
-        <>
+        <div className="flex items-center justify-between gap-3">
           <Button 
             className="h-9" 
             disabled={!isFormValid || saving || loadingExisting}
@@ -507,12 +695,12 @@ function CompactFeedbackForm({
             )}
           </Button>
           {submittedBy && (
-            <div className="text-xs text-gray-500 pt-1">
-              Submitted by <span className="font-medium">{submittedBy.entity || "Unknown"}</span>
+            <div className="text-xs text-gray-500 text-right">
+              <span className="font-medium">{submittedBy.entity || "Unknown"}</span>
               <span className="text-gray-400 ml-1">({submittedBy.email})</span>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );
@@ -525,7 +713,6 @@ function SimilarReportsGrid({
   error,
   onMerge,
   mergeTargets,
-  showMergeActions,
   defaultVisible = 4,
 }: {
   similar: SimilarReport[];
@@ -533,7 +720,6 @@ function SimilarReportsGrid({
   error: string | null;
   onMerge?: (symbol: string) => void;
   mergeTargets?: string[];
-  showMergeActions?: boolean;
   defaultVisible?: number;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -589,17 +775,24 @@ function SimilarReportsGrid({
                 )}
               </div>
             </div>
-            {showMergeActions && onMerge && (
+            {onMerge && (
               <button
                 onClick={() => onMerge(r.symbol)}
-                className={`self-center flex-shrink-0 w-7 h-7 flex items-center justify-center rounded transition-colors ${
+                className={`self-center flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
                   isInMerge
                     ? "bg-un-blue text-white"
-                    : "bg-white border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300"
+                    : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
                 }`}
-                title={isInMerge ? "Remove from merge" : "Add to merge"}
+                title={isInMerge ? "Remove from merge" : "Merge with this report"}
               >
-                {isInMerge ? <Check className="h-3.5 w-3.5" /> : <span className="text-lg leading-none">+</span>}
+                {isInMerge ? (
+                  <>
+                    <Check className="h-3 w-3" />
+                    Merge
+                  </>
+                ) : (
+                  "Merge"
+                )}
               </button>
             )}
           </div>
@@ -1023,8 +1216,6 @@ export function ReportSidebar({
 
   if (!report) return null;
 
-  const showMergeActions = feedback.status === "merge" || mergeTargets.length > 0;
-
   return (
     <>
       {/* Backdrop */}
@@ -1207,7 +1398,6 @@ export function ReportSidebar({
                 error={similarError}
                 onMerge={toggleMergeTarget}
                 mergeTargets={mergeTargets}
-                showMergeActions={showMergeActions}
                 defaultVisible={4}
               />
             </div>

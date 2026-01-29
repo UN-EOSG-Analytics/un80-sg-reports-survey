@@ -101,7 +101,7 @@ export function EntityDashboard({ entity, userName }: Props) {
             >
               UN Digital Library
             </a>
-            . Entity assignments are based on official metadata and/or AI identification. Report details (body, year, subjects) come from official data; reporting frequency is estimated by AI.
+            . Entity assignments are based on official metadata and/or AI identification. Report details (body, year, subjects) come from official data; reporting frequency is estimated from past publication dates.
           </p>
         </div>
         <ReportsTable

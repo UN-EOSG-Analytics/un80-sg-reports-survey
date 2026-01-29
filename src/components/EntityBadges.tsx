@@ -170,10 +170,7 @@ function EntityBadge({
       case "dri":
         return `DRI data indicates ${entity} report`;
       case "ai":
-        const confidenceText = confidence != null 
-          ? ` (${Math.round(confidence * 100)}% confidence)` 
-          : "";
-        return `AI analysis indicates ${entity} report${confidenceText}`;
+        return `AI suggests ${entity} report`;
       default:
         return `${entity} report`;
     }

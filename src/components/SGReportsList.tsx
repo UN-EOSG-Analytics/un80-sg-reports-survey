@@ -1190,7 +1190,7 @@ function AddReportSearch({
       )}
 
       {showResults && searchQuery.length >= 2 && results.length === 0 && !isSearching && (
-        <div className="absolute left-4 right-4 mt-1 bg-white border rounded-lg shadow-lg z-50 p-3 text-center text-sm text-gray-500">
+        <div className="absolute left-4 right-4 mt-1 bg-white border rounded-lg shadow-lg z-50 p-3 text-sm text-gray-500">
           No reports found
         </div>
       )}
@@ -1595,7 +1595,7 @@ export function ReportsTable({
         </div>
 
         {sortedReports.length === 0 && (
-          <div className="px-4 py-8 text-center text-gray-400">
+          <div className="px-4 py-8 text-gray-400">
             No reports found
           </div>
         )}

@@ -349,7 +349,7 @@ function CompactFeedbackForm({
 
   if (!canEdit) {
     return (
-      <div className="rounded-lg p-3 text-center border border-gray-200 bg-gray-50 text-sm">
+      <div className="rounded-lg p-3 border border-gray-200 bg-gray-50 text-sm">
         <p className="text-gray-500">
           Claim this report for your entity to submit feedback.
         </p>
@@ -1159,7 +1159,7 @@ export function ReportSidebar({
                 <button
                   onClick={handleConfirmEntity}
                   disabled={confirming}
-                  className="w-full flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-50"
+                  className="w-full flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-50"
                 >
                   {confirming ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -1169,7 +1169,7 @@ export function ReportSidebar({
                   Add to {userEntity} Reports
                 </button>
               ) : (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center text-sm text-amber-700">
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
                   <a href="/login" className="font-medium underline hover:text-amber-900">Log in</a> to claim reports for your entity.
                 </div>
               )}

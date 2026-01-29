@@ -82,6 +82,8 @@ def get_fulltext(symbol):
     res.raise_for_status()
     doc = pymupdf.open(stream=res.content, filetype="pdf")
     text = "\n\n---\n\n".join([p.get_text() for p in doc])
+    # Strip NUL characters (0x00) which PostgreSQL rejects in text fields
+    text = text.replace("\x00", "")
     return text
 
 
@@ -162,6 +164,9 @@ def store_documents_in_db(df: pd.DataFrame) -> int:
             return None
         if hasattr(val, "item"):
             return val.item()
+        # Strip NUL characters from strings (PostgreSQL rejects 0x00 in text)
+        if isinstance(val, str):
+            val = val.replace("\x00", "")
         return val
     
     rows = []
@@ -331,8 +336,8 @@ def fetch_resolutions_for_stored_reports() -> int:
 SOURCES = [
     # Approach 1: Classified as SG Reports
     ("Secretary-General's Reports", "989__c"),
-    # Approach 2: General reports (will be filtered by title in SQL view)
-    ("Reports", "989__b"),
+    # # Approach 2: General reports (will be filtered by title in SQL view)
+    # ("Reports", "989__b"),
     # Approach 3: Letters/notes (will be filtered by title in SQL view)
     ("Letters and Notes Verbales", "989__b"),
 ]

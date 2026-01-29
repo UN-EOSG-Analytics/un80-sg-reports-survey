@@ -41,8 +41,9 @@ WHERE (d.resource_type_level3 @> ARRAY['Secretary-General''s Reports']
   -- Exclude corrections and revisions
   AND d.symbol NOT LIKE '%/CORR.%'
   AND d.symbol NOT LIKE '%/REV.%'
-  -- Exclude credentials reports
-  AND NOT (d.subject_terms @> ARRAY['Representative''s credentials']);
+  -- Exclude credentials reports (subject term is uppercase plural)
+  AND NOT (d.subject_terms @> ARRAY['REPRESENTATIVES'' CREDENTIALS'])
+  AND NOT (d.proper_title ILIKE '%credential%');
 
 --------------------------------------------------------------------------------
 -- RESOLUTIONS: All resolution documents

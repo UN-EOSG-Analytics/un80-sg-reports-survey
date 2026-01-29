@@ -639,7 +639,7 @@ function ColumnHeaders({
         )}
       </div>
       <div className="flex items-center gap-1">
-        <span>Estimated Frequency</span>
+        <span>Frequency</span>
         {filterOptions?.frequencies && filterOptions.frequencies.length > 0 && (
           <FrequencyFilterPopover
             options={filterOptions.frequencies}

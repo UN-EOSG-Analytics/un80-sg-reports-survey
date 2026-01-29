@@ -513,7 +513,6 @@ function CompactFeedbackForm({
   onFeedbackChange,
   saving,
   saveSuccess,
-  submittedBy,
   onSaveClick,
 }: {
   report: ReportGroup;
@@ -526,13 +525,12 @@ function CompactFeedbackForm({
   onFeedbackChange: <K extends keyof Omit<Feedback, 'mergeTargets'>>(key: K, value: Omit<Feedback, 'mergeTargets'>[K]) => void;
   saving: boolean;
   saveSuccess: boolean;
-  submittedBy: { email: string; entity: string | null } | null;
   onSaveClick: () => void;
 }) {
   const canEdit = userEntity && isConfirmedByUserEntity;
   
-  // Show frequency/format options only for "continue_with_changes"
-  const showFrequencyFormat = feedback.status === "continue_with_changes";
+  // Show frequency/format options for "continue_with_changes" and "merge"
+  const showFrequencyFormat = feedback.status === "continue_with_changes" || feedback.status === "merge";
   
   const isFormValid = useMemo(() => {
     if (!feedback.status) return false;
@@ -709,33 +707,25 @@ function CompactFeedbackForm({
       )}
 
       {feedback.status && (
-        <div className="flex items-center justify-between gap-3">
-          <Button 
-            className="h-9" 
-            disabled={!isFormValid || saving || loadingExisting}
-            onClick={onSaveClick}
-          >
-            {saving ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Saving...
-              </>
-            ) : saveSuccess ? (
-              <>
-                <Check className="h-4 w-4 mr-2" />
-                Saved
-              </>
-            ) : (
-              "Save Feedback"
-            )}
-          </Button>
-          {submittedBy && (
-            <div className="text-xs text-gray-500 text-right">
-              <span className="font-medium">{submittedBy.entity || "Unknown"}</span>
-              <span className="text-gray-400 ml-1">({submittedBy.email})</span>
-            </div>
+        <Button 
+          className="h-9" 
+          disabled={!isFormValid || saving || loadingExisting}
+          onClick={onSaveClick}
+        >
+          {saving ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              Saving...
+            </>
+          ) : saveSuccess ? (
+            <>
+              <Check className="h-4 w-4 mr-2" />
+              Saved
+            </>
+          ) : (
+            "Save Feedback"
           )}
-        </div>
+        </Button>
       )}
     </div>
   );
@@ -1203,7 +1193,6 @@ export function ReportSidebar({
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [loadingExisting, setLoadingExisting] = useState(true);
-  const [submittedBy, setSubmittedBy] = useState<{ email: string; entity: string | null } | null>(null);
   
   // Entity confirmation state (optimistic updates)
   const [confirming, setConfirming] = useState(false);
@@ -1392,7 +1381,6 @@ export function ReportSidebar({
     if (!report) return;
     setLoadingExisting(true);
     setSaveSuccess(false);
-    setSubmittedBy(null);
     fetch(`/api/survey-responses?properTitle=${encodeURIComponent(report.title)}`)
       .then((r) => r.json())
       .then((data) => {
@@ -1412,13 +1400,6 @@ export function ReportSidebar({
           });
           setMergeTargets(data.response.mergeTargets || []);
           setSaveSuccess(true); // Show as already saved if loaded from DB
-          // Track who submitted
-          if (data.response.submittedByEmail) {
-            setSubmittedBy({
-              email: data.response.submittedByEmail,
-              entity: data.response.submittedByEntity || null,
-            });
-          }
         } else {
           setFeedback({
             status: null,
@@ -1485,10 +1466,6 @@ export function ReportSidebar({
       
       if (response.ok) {
         setSaveSuccess(true);
-        // Update submittedBy with current user info
-        if (userEntity && userEmail) {
-          setSubmittedBy({ email: userEmail, entity: userEntity });
-        }
         onSave?.();
       }
     } catch (error) {
@@ -1713,7 +1690,6 @@ export function ReportSidebar({
                     onFeedbackChange={updateFeedback}
                     saving={saving}
                     saveSuccess={saveSuccess}
-                    submittedBy={submittedBy}
                     onSaveClick={handleSave}
                   />
                 </div>

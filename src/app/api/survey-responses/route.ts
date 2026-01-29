@@ -20,8 +20,7 @@ interface SurveyResponseRow {
   id: number;
   proper_title: string;
   latest_symbol: string;
-  user_email: string;
-  user_entity: string | null;
+  user_entity: string;
   status: string;
   frequency: string | null;
   format: string | null;
@@ -33,11 +32,19 @@ interface SurveyResponseRow {
   updated_at: string;
 }
 
-// GET - Fetch user's response for a specific report
+// GET - Fetch entity's response for a specific report
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Entity is required for survey operations
+  if (!user.entity) {
+    return NextResponse.json(
+      { error: "Entity required to view survey responses" },
+      { status: 400 }
+    );
   }
 
   const properTitle = req.nextUrl.searchParams.get("properTitle");
@@ -49,10 +56,11 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // Fetch response for the user's entity (not by email)
     const rows = await query<SurveyResponseRow>(
       `SELECT * FROM ${DB_SCHEMA}.survey_responses 
-       WHERE proper_title = $1 AND user_email = $2`,
-      [properTitle, user.email]
+       WHERE proper_title = $1 AND user_entity = $2`,
+      [properTitle, user.entity]
     );
 
     if (rows.length === 0) {
@@ -60,6 +68,7 @@ export async function GET(req: NextRequest) {
     }
 
     const row = rows[0];
+    // Return response without user attribution (confidential)
     return NextResponse.json({
       response: {
         id: row.id,
@@ -72,8 +81,6 @@ export async function GET(req: NextRequest) {
         mergeTargets: row.merge_targets || [],
         discontinueReason: row.discontinue_reason,
         comments: row.comments,
-        submittedByEmail: row.user_email,
-        submittedByEntity: row.user_entity,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
       },
@@ -87,11 +94,19 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST - Create or update a survey response
+// POST - Create or update a survey response (one per entity per report)
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Entity is required for survey operations
+  if (!user.entity) {
+    return NextResponse.json(
+      { error: "Entity required to submit survey responses" },
+      { status: 400 }
+    );
   }
 
   try {
@@ -113,16 +128,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Get user's entity from the user record
-    const userEntity = user.entity || null;
-
-    // Upsert the response
+    // Upsert the response by entity (any user from the entity can edit)
     const result = await query<SurveyResponseRow>(
       `INSERT INTO ${DB_SCHEMA}.survey_responses (
         proper_title,
         latest_symbol,
-        user_email,
         user_entity,
+        created_by_email,
+        updated_by_email,
         status,
         frequency,
         format,
@@ -130,11 +143,11 @@ export async function POST(req: NextRequest) {
         merge_targets,
         discontinue_reason,
         comments
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-      ON CONFLICT (proper_title, user_email) 
+      ) VALUES ($1, $2, $3, $4, $4, $5, $6, $7, $8, $9, $10, $11)
+      ON CONFLICT (proper_title, user_entity) 
       DO UPDATE SET
         latest_symbol = EXCLUDED.latest_symbol,
-        user_entity = EXCLUDED.user_entity,
+        updated_by_email = EXCLUDED.updated_by_email,
         status = EXCLUDED.status,
         frequency = EXCLUDED.frequency,
         format = EXCLUDED.format,
@@ -147,8 +160,8 @@ export async function POST(req: NextRequest) {
       [
         body.properTitle,
         body.latestSymbol,
-        user.email,
-        userEntity,
+        user.entity,
+        user.email, // For audit: created_by_email on insert, updated_by_email on update
         body.status,
         body.status !== "discontinue" ? body.frequency : null,
         body.status !== "discontinue" ? body.format : null,
@@ -160,6 +173,7 @@ export async function POST(req: NextRequest) {
     );
 
     const row = result[0];
+    // Return response without user attribution (confidential)
     return NextResponse.json({
       success: true,
       response: {
@@ -186,11 +200,19 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// DELETE - Remove a survey response
+// DELETE - Remove an entity's survey response
 export async function DELETE(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Entity is required for survey operations
+  if (!user.entity) {
+    return NextResponse.json(
+      { error: "Entity required to delete survey responses" },
+      { status: 400 }
+    );
   }
 
   const properTitle = req.nextUrl.searchParams.get("properTitle");
@@ -202,10 +224,11 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
+    // Delete by entity (any user from the entity can delete)
     await query(
       `DELETE FROM ${DB_SCHEMA}.survey_responses 
-       WHERE proper_title = $1 AND user_email = $2`,
-      [properTitle, user.email]
+       WHERE proper_title = $1 AND user_entity = $2`,
+      [properTitle, user.entity]
     );
 
     return NextResponse.json({ success: true });

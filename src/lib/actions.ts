@@ -9,7 +9,6 @@ import {
   upsertUser,
   createSession,
   clearSession,
-  getCurrentUser,
   recentTokenExists,
 } from "./auth";
 import { sendMagicLink } from "./mail";
@@ -69,24 +68,28 @@ export async function verifyMagicTokenAction(token: string, entity?: string): Pr
   if (!email) {
     return { success: false, error: "Invalid or expired link" };
   }
-  const userId = await upsertUser(email);
-  if (entity && typeof entity === "string" && entity.trim()) {
-    await query(`UPDATE ${tables.users} SET entity = $1 WHERE id = $2`, [entity.trim(), userId]);
-  }
-  await createSession(userId);
-  revalidatePath("/", "layout");
-  return { success: true };
-}
-
-export async function updateEntityAction(entity: string): Promise<ActionResult> {
-  const user = await getCurrentUser();
-  if (!user) {
-    return { success: false, error: "Unauthorized" };
-  }
-  if (!entity || typeof entity !== "string" || !entity.trim()) {
+  
+  // Check if user already exists and has an entity
+  const existingUser = await query<{ id: string; entity: string | null }>(
+    `SELECT id, entity FROM ${tables.users} WHERE email = $1`,
+    [email.toLowerCase()]
+  );
+  
+  const hasExistingEntity = !!existingUser[0]?.entity;
+  
+  // For new users without entity, entity is required
+  if (!hasExistingEntity && (!entity || typeof entity !== "string" || !entity.trim())) {
     return { success: false, error: "Entity is required" };
   }
-  await query(`UPDATE ${tables.users} SET entity = $1 WHERE id = $2`, [entity.trim(), user.id]);
+  
+  const userId = await upsertUser(email);
+  
+  // Only set entity for users without one (entity is locked after first set)
+  if (!hasExistingEntity && entity && typeof entity === "string" && entity.trim()) {
+    await query(`UPDATE ${tables.users} SET entity = $1 WHERE id = $2`, [entity.trim(), userId]);
+  }
+  
+  await createSession(userId);
   revalidatePath("/", "layout");
   return { success: true };
 }

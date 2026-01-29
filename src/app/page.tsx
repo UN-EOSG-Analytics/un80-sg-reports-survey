@@ -1,7 +1,6 @@
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { getCurrentUser } from "@/lib/auth";
-import { fetchEntities } from "@/lib/entities";
 import { EntityDashboard } from "@/components/EntityDashboard";
 import Link from "next/link";
 import { FileText, LogIn } from "lucide-react";
@@ -9,11 +8,11 @@ import { FileText, LogIn } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const [user, entities] = await Promise.all([getCurrentUser(), fetchEntities()]);
+  const user = await getCurrentUser();
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header user={user} entities={entities} />
+      <Header user={user} />
       <main className="flex-1 bg-background px-6 py-8">
         <div className="mx-auto max-w-7xl">
           {user?.entity ? (

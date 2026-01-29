@@ -11,19 +11,21 @@ interface SurveyResponseRow {
   format: string | null;
 }
 
-// GET - Fetch all responses for the current user (for display in table)
+// GET - Fetch all responses for the current user's entity (for display in table)
 export async function GET() {
   const user = await getCurrentUser();
-  if (!user) {
+  if (!user || !user.entity) {
+    // No user or no entity - return empty responses
     return NextResponse.json({ responses: {} });
   }
 
   try {
+    // Query by entity, not by email (one response per entity per report)
     const rows = await query<SurveyResponseRow>(
       `SELECT proper_title, status, frequency, format
        FROM ${DB_SCHEMA}.survey_responses 
-       WHERE user_email = $1`,
-      [user.email]
+       WHERE user_entity = $1`,
+      [user.entity]
     );
 
     // Convert to a map keyed by proper_title for easy lookup
@@ -38,7 +40,7 @@ export async function GET() {
 
     return NextResponse.json({ responses });
   } catch (error) {
-    console.error("Error fetching user responses:", error);
+    console.error("Error fetching entity responses:", error);
     return NextResponse.json({ responses: {} });
   }
 }

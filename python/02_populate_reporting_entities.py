@@ -88,7 +88,11 @@ def load_dri(filepath: str) -> pd.DataFrame:
 
 
 def load_db_reports(conn) -> pd.DataFrame:
-    """Load reports from database with symbols and proper_titles."""
+    """Load reports from database with symbols and proper_titles.
+    
+    Uses sg_reports view which handles: type filtering, proper_title required,
+    CORR/REV exclusion, credentials exclusion.
+    """
     print("Loading reports from database...")
     
     query = f"""
@@ -104,7 +108,6 @@ def load_db_reports(conn) -> pd.DataFrame:
                 proper_title
             ) as full_title
         FROM {DB_SCHEMA}.sg_reports
-        WHERE proper_title IS NOT NULL
     """
     
     df = pd.read_sql(query, conn)

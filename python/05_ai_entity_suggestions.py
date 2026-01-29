@@ -105,7 +105,11 @@ async def classify_report_entity(report: dict) -> dict:
 
 
 def get_reports_to_classify(limit: int | None = None, skip_existing: bool = True) -> list[dict]:
-    """Get SG reports needing classification."""
+    """Get SG reports needing classification.
+    
+    Uses sg_reports view which handles: type filtering, proper_title required,
+    CORR/REV exclusion, credentials exclusion.
+    """
     conn = psycopg2.connect(DATABASE_URL)
     try:
         with conn.cursor() as cur:
@@ -114,10 +118,9 @@ def get_reports_to_classify(limit: int | None = None, skip_existing: bool = True
                        r.subject_terms, LEFT(r.text, 10000) as text
                 FROM {DB_SCHEMA}.sg_reports r
             """
+            # Only filter for text content (needed for AI classification)
             where = """
-                WHERE r.proper_title IS NOT NULL AND r.text IS NOT NULL
-                  AND LENGTH(r.text) >= 100
-                  AND r.symbol NOT LIKE '%%/CORR.%%' AND r.symbol NOT LIKE '%%/REV.%%'
+                WHERE r.text IS NOT NULL AND LENGTH(r.text) >= 100
             """
             if skip_existing:
                 base += f"LEFT JOIN {DB_SCHEMA}.report_entity_suggestions s ON r.proper_title = s.proper_title AND s.source = 'ai'"

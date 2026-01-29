@@ -10,6 +10,7 @@ DROP VIEW IF EXISTS sg_reports_survey.sg_reports;
 
 --------------------------------------------------------------------------------
 -- SG_REPORTS: Defines what counts as a Secretary-General report
+-- Stage 1 filtering: type-based, excludes CORR/REV, credentials, requires proper_title
 --------------------------------------------------------------------------------
 CREATE VIEW sg_reports_survey.sg_reports AS
 SELECT d.*,
@@ -29,11 +30,18 @@ SELECT d.*,
     ELSE 'Other'
   END as report_type
 FROM sg_reports_survey.documents d
-WHERE d.resource_type_level3 @> ARRAY['Secretary-General''s Reports']
+WHERE (d.resource_type_level3 @> ARRAY['Secretary-General''s Reports']
    OR ((d.resource_type_level2 @> ARRAY['Reports'] 
         OR d.resource_type_level2 @> ARRAY['Letters and Notes Verbales'])
        AND (d.title ILIKE '%Secretary-General%' 
-            OR array_to_string(d.subtitle, ' ') ILIKE '%Secretary-General%'));
+            OR array_to_string(d.subtitle, ' ') ILIKE '%Secretary-General%')))
+  -- Require proper_title for grouping
+  AND d.proper_title IS NOT NULL
+  -- Exclude corrections and revisions
+  AND d.symbol NOT LIKE '%/CORR.%'
+  AND d.symbol NOT LIKE '%/REV.%'
+  -- Exclude credentials reports
+  AND NOT (d.subject_terms @> ARRAY['Representative''s credentials']);
 
 --------------------------------------------------------------------------------
 -- RESOLUTIONS: All resolution documents
@@ -68,24 +76,22 @@ LEFT JOIN sg_reports_survey.documents res ON res.symbol = res_symbol;
 
 --------------------------------------------------------------------------------
 -- SG_REPORTS_STATS: Counts by source
+-- No additional filters needed - sg_reports already handles all filtering
 --------------------------------------------------------------------------------
 CREATE VIEW sg_reports_survey.sg_reports_stats AS
 SELECT source, COUNT(*) as count, COUNT(DISTINCT proper_title) as unique_series
 FROM sg_reports_survey.sg_reports
-WHERE proper_title IS NOT NULL
-  AND symbol NOT LIKE '%/CORR.%'
-  AND symbol NOT LIKE '%/REV.%'
 GROUP BY source;
 
 --------------------------------------------------------------------------------
 -- LATEST_VERSIONS: Most recent version of each report series
+-- Stage 2 deduplication: picks latest version per proper_title
+-- No additional filters needed - sg_reports already handles all filtering
 --------------------------------------------------------------------------------
 CREATE VIEW sg_reports_survey.latest_versions AS
 WITH version_counts AS (
   SELECT proper_title, COUNT(*)::int as version_count
   FROM sg_reports_survey.sg_reports
-  WHERE proper_title IS NOT NULL
-    AND symbol NOT LIKE '%/CORR.%' AND symbol NOT LIKE '%/REV.%'
   GROUP BY proper_title
 ),
 ranked AS (
@@ -103,14 +109,16 @@ ranked AS (
              r.publication_date DESC NULLS LAST, r.symbol DESC
          ) as rn
   FROM sg_reports_survey.sg_reports r
-  WHERE r.proper_title IS NOT NULL
-    AND r.symbol NOT LIKE '%/CORR.%' AND r.symbol NOT LIKE '%/REV.%'
 )
 SELECT r.id, r.symbol, r.proper_title, r.title, r.date_year, r.publication_date,
        r.un_body, r.subject_terms, r.effective_year, r.source, r.report_type,
-       r.based_on_resolution_symbols, vc.version_count
+       r.based_on_resolution_symbols, vc.version_count,
+       d.embedding,
+       re.primary_entity as entity
 FROM ranked r
 JOIN version_counts vc ON r.proper_title = vc.proper_title
+JOIN sg_reports_survey.documents d ON r.id = d.id
+LEFT JOIN sg_reports_survey.report_entities re ON r.proper_title = re.proper_title
 WHERE r.rn = 1;
 
 --------------------------------------------------------------------------------

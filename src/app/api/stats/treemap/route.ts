@@ -22,12 +22,12 @@ export async function GET(req: NextRequest) {
   const subject = req.nextUrl.searchParams.get("subject");
 
   // If filters provided, return list of reports
+  // Uses sg_reports view which handles all filtering
   if (level2 && level3 && subject) {
     const reports = await query<ReportRow>(`
       SELECT symbol, COALESCE(proper_title, title) as title, date_year
-      FROM ${DB_SCHEMA}.reports
-      WHERE symbol NOT LIKE '%/CORR.%' AND symbol NOT LIKE '%/REV.%'
-        AND COALESCE(resource_type_level2[1], 'Unknown') = $1
+      FROM ${DB_SCHEMA}.sg_reports
+      WHERE COALESCE(resource_type_level2[1], 'Unknown') = $1
         AND COALESCE(resource_type_level3[1], 'Unknown') = $2
         AND $3 = ANY(subject_terms)
       ORDER BY date_year DESC NULLS LAST, symbol
@@ -37,14 +37,14 @@ export async function GET(req: NextRequest) {
   }
   // Get hierarchical counts: level2 -> level3 -> subject
   // For each report, only use the subject tag that is globally most frequent
+  // Uses sg_reports view which handles all filtering (CORR/REV, credentials, etc.)
   const rows = await query<TreemapRow>(`
     WITH 
     -- Global frequency of each subject tag
     subject_freq AS (
       SELECT unnest(subject_terms) as subject, COUNT(*) as freq
-      FROM ${DB_SCHEMA}.reports
-      WHERE symbol NOT LIKE '%/CORR.%' AND symbol NOT LIKE '%/REV.%'
-        AND subject_terms IS NOT NULL
+      FROM ${DB_SCHEMA}.sg_reports
+      WHERE subject_terms IS NOT NULL
       GROUP BY 1
     ),
     -- For each report, pick the subject with highest global frequency
@@ -54,11 +54,9 @@ export async function GET(req: NextRequest) {
         COALESCE(resource_type_level2[1], 'Unknown') as level2,
         COALESCE(resource_type_level3[1], 'Unknown') as level3,
         COALESCE(s.subject, 'No subject') as subject
-      FROM ${DB_SCHEMA}.reports r
+      FROM ${DB_SCHEMA}.sg_reports r
       LEFT JOIN LATERAL unnest(r.subject_terms) as s(subject) ON true
       LEFT JOIN subject_freq sf ON sf.subject = s.subject
-      WHERE r.symbol NOT LIKE '%/CORR.%' AND r.symbol NOT LIKE '%/REV.%'
-        AND s.subject != 'Representative''s credentials'
       ORDER BY r.symbol, sf.freq DESC NULLS LAST
     )
     SELECT level2, level3, subject, COUNT(*)::int as count

@@ -129,14 +129,12 @@ export async function GET(req: NextRequest) {
   }
 
   // Build WHERE clauses for filters
-  // Uses sg_reports view (SG reports from multiple sources)
-  // Exclude corrigenda, revisions, and credentials
-  const whereClauses: string[] = [
-    "r.proper_title IS NOT NULL",
-    "r.symbol NOT LIKE '%/CORR.%'",
-    "r.symbol NOT LIKE '%/REV.%'",
-    "NOT (r.subject_terms @> ARRAY['Representative''s credentials'])",
-  ];
+  // Uses sg_reports view which already handles:
+  // - Type filtering (resource_type_level3 or title match)
+  // - proper_title IS NOT NULL
+  // - CORR/REV exclusion
+  // - Credentials exclusion
+  const whereClauses: string[] = [];
   const params: (string | number)[] = [];
   let paramIndex = 1;
 
@@ -235,7 +233,7 @@ export async function GET(req: NextRequest) {
     havingParamIndex++;
   }
 
-  const whereClause = whereClauses.join(" AND ");
+  const whereClause = whereClauses.length > 0 ? whereClauses.join(" AND ") : "TRUE";
   const havingClause = havingClauses.length > 0 ? `HAVING ${havingClauses.join(" AND ")}` : "";
 
   // Build the main query with CTE to calculate frequency
@@ -385,11 +383,11 @@ export async function GET(req: NextRequest) {
       `SELECT MIN(effective_year)::int as min_year, MAX(effective_year)::int as max_year
        FROM ${DB_SCHEMA}.latest_versions`
     ),
-    // Subject term counts (from latest_versions - one per series, excluding credentials)
+    // Subject term counts (from latest_versions - one per series)
+    // Credentials already excluded by sg_reports view
     query<SubjectCount>(
       `SELECT subject, COUNT(*)::int as count
        FROM ${DB_SCHEMA}.latest_versions, unnest(subject_terms) as subject
-       WHERE subject != 'Representative''s credentials'
        GROUP BY subject
        HAVING COUNT(*) > 1
        ORDER BY count DESC, subject`

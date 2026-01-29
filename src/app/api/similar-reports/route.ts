@@ -24,13 +24,13 @@ export async function GET(req: NextRequest) {
 
   try {
     // Find similar reports using vector similarity search
-    // Source from reports table (any version), results from latest_versions only
+    // Source from documents table, results from latest_versions only
     const similar = await query<SimilarReport>(
       `WITH source AS (
-        SELECT embedding, proper_title
-        FROM ${DB_SCHEMA}.reports
-        WHERE symbol = $1
-        AND embedding IS NOT NULL
+        SELECT d.embedding, d.proper_title
+        FROM ${DB_SCHEMA}.documents d
+        WHERE d.symbol = $1
+        AND d.embedding IS NOT NULL
       )
       SELECT 
         lv.symbol,
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
     if (similar.length === 0) {
       const hasEmbedding = await query<{ has_embedding: boolean }>(
         `SELECT embedding IS NOT NULL as has_embedding 
-         FROM ${DB_SCHEMA}.reports 
+         FROM ${DB_SCHEMA}.documents 
          WHERE symbol = $1`,
         [symbol]
       );

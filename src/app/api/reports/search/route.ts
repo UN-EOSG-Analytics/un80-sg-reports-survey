@@ -30,7 +30,8 @@ export async function GET(req: NextRequest) {
   if (!q || q.length < 2) return NextResponse.json({ results: [] });
 
   try {
-    // Search sg_reports view - this already filters to SG reports only
+    // Search sg_reports view - handles all filtering:
+    // - Type filtering, proper_title required, CORR/REV excluded, credentials excluded
     // Group by proper_title to get unique report series
     // Return the latest version's metadata
     const rows = await query<ReportRow>(
@@ -45,10 +46,7 @@ export async function GET(req: NextRequest) {
             ORDER BY date_year DESC NULLS LAST, publication_date DESC NULLS LAST
           ) as rn
         FROM ${DB_SCHEMA}.sg_reports
-        WHERE proper_title IS NOT NULL
-          AND (symbol ILIKE $1 || '%' OR proper_title ILIKE '%' || $1 || '%')
-          AND symbol NOT LIKE '%/CORR.%' 
-          AND symbol NOT LIKE '%/REV.%'
+        WHERE symbol ILIKE $1 || '%' OR proper_title ILIKE '%' || $1 || '%'
       )
       SELECT proper_title, symbol, un_body, date_year
       FROM ranked

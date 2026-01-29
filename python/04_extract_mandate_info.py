@@ -14,7 +14,7 @@ from tqdm.asyncio import tqdm_asyncio
 
 from util.ai_client import DEFAULT_MODEL, async_client, rate_limit
 
-load_dotenv()
+load_dotenv(override=True)
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 DB_SCHEMA = os.getenv("DB_SCHEMA", "sg_reports_survey")

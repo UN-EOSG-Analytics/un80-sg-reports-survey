@@ -1,10 +1,11 @@
 -- All views for SG Reports Survey
 -- Run: psql $DATABASE_URL -f sql/views.sql
 
+-- Drop in reverse dependency order
+DROP VIEW IF EXISTS sg_reports_survey.latest_versions;
 DROP VIEW IF EXISTS sg_reports_survey.report_entities;
 DROP VIEW IF EXISTS sg_reports_survey.sg_report_mandates;
 DROP VIEW IF EXISTS sg_reports_survey.resolutions;
-DROP VIEW IF EXISTS sg_reports_survey.latest_versions;
 DROP VIEW IF EXISTS sg_reports_survey.sg_reports_stats;
 DROP VIEW IF EXISTS sg_reports_survey.sg_reports;
 
@@ -84,46 +85,9 @@ FROM sg_reports_survey.sg_reports
 GROUP BY source;
 
 --------------------------------------------------------------------------------
--- LATEST_VERSIONS: Most recent version of each report series
--- Stage 2 deduplication: picks latest version per proper_title
--- No additional filters needed - sg_reports already handles all filtering
---------------------------------------------------------------------------------
-CREATE VIEW sg_reports_survey.latest_versions AS
-WITH version_counts AS (
-  SELECT proper_title, COUNT(*)::int as version_count
-  FROM sg_reports_survey.sg_reports
-  GROUP BY proper_title
-),
-ranked AS (
-  SELECT r.id, r.symbol, r.proper_title, r.title, r.date_year, r.publication_date,
-         r.un_body, r.subject_terms, r.source, r.report_type, r.based_on_resolution_symbols,
-         COALESCE(r.date_year, 
-           CASE WHEN r.publication_date ~ '^\d{4}' 
-           THEN SUBSTRING(r.publication_date FROM 1 FOR 4)::int END
-         ) as effective_year,
-         ROW_NUMBER() OVER (
-           PARTITION BY r.proper_title 
-           ORDER BY COALESCE(r.date_year, 
-             CASE WHEN r.publication_date ~ '^\d{4}' 
-             THEN SUBSTRING(r.publication_date FROM 1 FOR 4)::int END) DESC NULLS LAST,
-             r.publication_date DESC NULLS LAST, r.symbol DESC
-         ) as rn
-  FROM sg_reports_survey.sg_reports r
-)
-SELECT r.id, r.symbol, r.proper_title, r.title, r.date_year, r.publication_date,
-       r.un_body, r.subject_terms, r.effective_year, r.source, r.report_type,
-       r.based_on_resolution_symbols, vc.version_count,
-       d.embedding,
-       re.primary_entity as entity
-FROM ranked r
-JOIN version_counts vc ON r.proper_title = vc.proper_title
-JOIN sg_reports_survey.documents d ON r.id = d.id
-LEFT JOIN sg_reports_survey.report_entities re ON r.proper_title = re.proper_title
-WHERE r.rn = 1;
-
---------------------------------------------------------------------------------
 -- REPORT_ENTITIES: Combined view of entity suggestions and confirmations
 -- Shows all suggested entities per report series with confirmation status
+-- (Must be created before latest_versions which depends on it)
 --------------------------------------------------------------------------------
 CREATE VIEW sg_reports_survey.report_entities AS
 WITH suggestions_agg AS (
@@ -181,6 +145,44 @@ FROM suggestions_agg s
 FULL OUTER JOIN confirmations_agg c ON s.proper_title = c.proper_title;
 
 COMMENT ON VIEW sg_reports_survey.report_entities IS 'Combined view of entity suggestions and confirmations per report series';
+
+--------------------------------------------------------------------------------
+-- LATEST_VERSIONS: Most recent version of each report series
+-- Stage 2 deduplication: picks latest version per proper_title
+-- No additional filters needed - sg_reports already handles all filtering
+--------------------------------------------------------------------------------
+CREATE VIEW sg_reports_survey.latest_versions AS
+WITH version_counts AS (
+  SELECT proper_title, COUNT(*)::int as version_count
+  FROM sg_reports_survey.sg_reports
+  GROUP BY proper_title
+),
+ranked AS (
+  SELECT r.id, r.symbol, r.proper_title, r.title, r.date_year, r.publication_date,
+         r.un_body, r.subject_terms, r.source, r.report_type, r.based_on_resolution_symbols,
+         COALESCE(r.date_year, 
+           CASE WHEN r.publication_date ~ '^\d{4}' 
+           THEN SUBSTRING(r.publication_date FROM 1 FOR 4)::int END
+         ) as effective_year,
+         ROW_NUMBER() OVER (
+           PARTITION BY r.proper_title 
+           ORDER BY COALESCE(r.date_year, 
+             CASE WHEN r.publication_date ~ '^\d{4}' 
+             THEN SUBSTRING(r.publication_date FROM 1 FOR 4)::int END) DESC NULLS LAST,
+             r.publication_date DESC NULLS LAST, r.symbol DESC
+         ) as rn
+  FROM sg_reports_survey.sg_reports r
+)
+SELECT r.id, r.symbol, r.proper_title, r.title, r.date_year, r.publication_date,
+       r.un_body, r.subject_terms, r.effective_year, r.source, r.report_type,
+       r.based_on_resolution_symbols, vc.version_count,
+       d.embedding,
+       re.primary_entity as entity
+FROM ranked r
+JOIN version_counts vc ON r.proper_title = vc.proper_title
+JOIN sg_reports_survey.documents d ON r.id = d.id
+LEFT JOIN sg_reports_survey.report_entities re ON r.proper_title = re.proper_title
+WHERE r.rn = 1;
 
 \echo 'Views created. Stats:'
 SELECT * FROM sg_reports_survey.sg_reports_stats;

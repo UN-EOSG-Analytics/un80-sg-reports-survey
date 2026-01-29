@@ -19,7 +19,7 @@ from difflib import SequenceMatcher
 from dotenv import load_dotenv
 
 # Load environment variables
-load_dotenv()
+load_dotenv(override=True)
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:

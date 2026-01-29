@@ -24,7 +24,7 @@ from tqdm.asyncio import tqdm_asyncio
 import aiolimiter
 
 # Load environment variables
-load_dotenv()
+load_dotenv(override=True)
 
 # Joblib cache
 memory = Memory(location=".cache/embeddings", verbose=0)
@@ -39,7 +39,8 @@ DB_SCHEMA = os.environ.get("DB_SCHEMA", "sg_reports_survey")
 # Azure OpenAI config
 AZURE_OPENAI_ENDPOINT = os.environ.get("AZURE_OPENAI_ENDPOINT")
 AZURE_OPENAI_API_KEY = os.environ.get("AZURE_OPENAI_API_KEY")
-AZURE_OPENAI_API_VERSION = os.environ.get("AZURE_OPENAI_API_VERSION", "2025-03-01-preview")
+# Embeddings API requires older version - newer versions return 404
+AZURE_OPENAI_API_VERSION = "2024-02-15-preview"
 
 if not AZURE_OPENAI_ENDPOINT or not AZURE_OPENAI_API_KEY:
     raise ValueError("AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY are required")

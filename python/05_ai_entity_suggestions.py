@@ -21,7 +21,7 @@ from util.ai_client import (
     rate_limit,
 )
 
-load_dotenv()
+load_dotenv(override=True)
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 DB_SCHEMA = os.getenv("DB_SCHEMA", "sg_reports_survey")

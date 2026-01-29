@@ -5,7 +5,6 @@ import asyncio
 import json
 import os
 from enum import Enum
-from pathlib import Path
 from typing import Literal
 
 import psycopg2
@@ -26,7 +25,7 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 DB_SCHEMA = os.getenv("DB_SCHEMA", "sg_reports_survey")
-cache = Memory(location=".cache/entity_suggestions", verbose=0)
+memory = Memory(location=".cache/entity_suggestions", verbose=0)
 SECRETARIAT_ENTITIES = load_secretariat_entities()
 
 # Dynamic enum from loaded entities - enforces valid values in structured output
@@ -79,18 +78,11 @@ def build_user_prompt(report: dict) -> str:
     return "\n".join(parts)
 
 
+@memory.cache
 async def classify_report_entity(report: dict) -> dict:
-    """Classify a report using structured output."""
+    """Classify a report using structured output (cached)."""
     proper_title = report.get("proper_title", "")
     symbol = report.get("symbol", "")
-
-    cache_file = Path(cache.location) / f"{hash(f'{proper_title}:{symbol}') % 10000:04d}.json"
-    if cache_file.exists():
-        try:
-            return json.load(open(cache_file))
-        except Exception:
-            pass
-
     try:
         async with rate_limit:
             response = await async_client.beta.chat.completions.parse(
@@ -101,26 +93,15 @@ async def classify_report_entity(report: dict) -> dict:
                 ],
                 response_format=ClassificationResponse,
             )
-
         parsed = response.choices[0].message.parsed
         suggestions = [
             {"entity": s.entity.value, "confidence": s.confidence, "reasoning": s.reasoning}
             for s in (parsed.suggestions if parsed else [])
         ]
-        result = {"proper_title": proper_title, "symbol": symbol, "success": True, "suggestions": suggestions}
-
+        return {"proper_title": proper_title, "symbol": symbol, "success": True, "suggestions": suggestions}
     except Exception as e:
         print(f"Error classifying {symbol}: {e}")
-        result = {"proper_title": proper_title, "symbol": symbol, "success": False, "error": str(e), "suggestions": []}
-
-    # Cache
-    try:
-        cache_file.parent.mkdir(parents=True, exist_ok=True)
-        json.dump(result, open(cache_file, "w"))
-    except Exception:
-        pass
-
-    return result
+        return {"proper_title": proper_title, "symbol": symbol, "success": False, "error": str(e), "suggestions": []}
 
 
 def get_reports_to_classify(limit: int | None = None, skip_existing: bool = True) -> list[dict]:

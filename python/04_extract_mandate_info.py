@@ -18,7 +18,7 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 DB_SCHEMA = os.getenv("DB_SCHEMA", "sg_reports_survey")
-cache = Memory(location=".cache/mandate_extraction", verbose=0)
+memory = Memory(location=".cache/mandate_extraction", verbose=0)
 
 
 class Mandate(BaseModel):
@@ -46,17 +46,10 @@ Guidelines:
 - Include the FULL verbatim paragraph, not just a snippet"""
 
 
+@memory.cache
 async def extract_mandate_info_async(resolution: tuple) -> dict:
-    """Extract mandate info from resolution text using structured output."""
+    """Extract mandate info from resolution text using structured output (cached)."""
     symbol, title, text = resolution
-
-    cache_file = cache.location / f"{hash(symbol) % 10000:04d}_{symbol.replace('/', '_')}.json"
-    if cache_file.exists():
-        try:
-            return json.load(open(cache_file))
-        except Exception:
-            pass
-
     try:
         async with rate_limit:
             response = await async_client.beta.chat.completions.parse(
@@ -69,18 +62,10 @@ async def extract_mandate_info_async(resolution: tuple) -> dict:
             )
         parsed = response.choices[0].message.parsed
         mandates = [m.model_dump() for m in parsed.mandates] if parsed else []
-        result = {"symbol": symbol, "success": True, "mandates": mandates}
+        return {"symbol": symbol, "success": True, "mandates": mandates}
     except Exception as e:
         print(f"Error processing {symbol}: {e}")
-        result = {"symbol": symbol, "success": False, "error": str(e), "mandates": []}
-
-    try:
-        cache_file.parent.mkdir(parents=True, exist_ok=True)
-        json.dump(result, open(cache_file, "w"))
-    except Exception:
-        pass
-
-    return result
+        return {"symbol": symbol, "success": False, "error": str(e), "mandates": []}
 
 
 def get_resolutions_to_process(year_min: int = 2024) -> list[tuple[str, str, str]]:

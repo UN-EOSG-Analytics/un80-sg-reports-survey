@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Generate vector embeddings for reports using Azure OpenAI.
+Generate vector embeddings for SG reports using Azure OpenAI.
 
 This script:
-1. Fetches reports that don't have embeddings yet
+1. Fetches latest versions of each SG report series (from latest_versions view)
 2. Generates embeddings using text-embedding-3-large (1024 dimensions)
-3. Stores embeddings in the reports table for similarity search
+3. Stores embeddings in the documents table for similarity search
 
 Usage:
-    uv run python python/generate_embeddings.py
+    uv run python python/03_generate_embeddings.py
 """
 
 import os
@@ -18,13 +18,16 @@ import numpy as np
 import psycopg2
 from psycopg2.extras import execute_values
 from dotenv import load_dotenv
+from joblib import Memory
 from openai import AsyncAzureOpenAI, RateLimitError, APITimeoutError
 from tqdm.asyncio import tqdm_asyncio
-from typing import Literal
 import aiolimiter
 
 # Load environment variables
 load_dotenv()
+
+# Joblib cache
+memory = Memory(location=".cache/embeddings", verbose=0)
 
 # Database config
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -57,6 +60,7 @@ EMBEDDING_DIMENSIONS = 1024
 BATCH_SIZE = 64  # Process 64 texts per API call
 
 
+@memory.cache
 @backoff.on_exception(
     backoff.expo,
     (RateLimitError, APITimeoutError),
@@ -64,51 +68,23 @@ BATCH_SIZE = 64  # Process 64 texts per API call
     max_time=300,
     jitter=backoff.random_jitter,
 )
-async def embeddings_async(
-    input_text: list[str],
-    model: str = EMBEDDING_MODEL,
-    encoding_format: Literal["float", "base64"] = "float",
-    dimensions: int = EMBEDDING_DIMENSIONS,
-):
-    """
-    Create embeddings using Azure OpenAI with async client.
-
-    Args:
-        input_text: List of texts to embed
-        model: Embedding model to use
-        encoding_format: Format for embeddings
-        dimensions: Number of dimensions for the embedding
-
-    Returns:
-        tuple: (embeddings_data, usage)
-    """
+async def get_batch_embeddings(texts: tuple[str, ...]) -> list[list[float]]:
+    """Get embeddings for a batch of texts (cached)."""
     async with rate_limiter:
         response = await async_client.embeddings.create(
-            input=input_text,
-            model=model,
-            encoding_format=encoding_format,
-            dimensions=dimensions,
-        )
-    return [item.embedding for item in response.data], response.usage
-
-
-async def get_embeddings(texts: list[str]) -> np.ndarray:
-    """Get embeddings for texts, batching for API."""
-    batches = [texts[i : i + BATCH_SIZE] for i in range(0, len(texts), BATCH_SIZE)]
-    tasks = [
-        embeddings_async(
-            input_text=batch,
+            input=list(texts),
             model=EMBEDDING_MODEL,
             encoding_format="float",
             dimensions=EMBEDDING_DIMENSIONS,
         )
-        for batch in batches
-    ]
-    results = await tqdm_asyncio.gather(*tasks, desc="Getting embeddings")
-    all_embeddings = []
-    for embeddings_data, usage in results:
-        all_embeddings.extend(embeddings_data)
-    return np.array(all_embeddings)
+    return [item.embedding for item in response.data]
+
+
+async def get_embeddings(texts: list[str]) -> np.ndarray:
+    """Get embeddings for texts, batching for API."""
+    batches = [tuple(texts[i : i + BATCH_SIZE]) for i in range(0, len(texts), BATCH_SIZE)]
+    results = await tqdm_asyncio.gather(*[get_batch_embeddings(b) for b in batches], desc="Getting embeddings")
+    return np.array([emb for batch in results for emb in batch])
 
 
 def prepare_text_for_embedding(row: dict) -> str:
@@ -141,17 +117,18 @@ def prepare_text_for_embedding(row: dict) -> str:
 
 
 def fetch_reports_without_embeddings(conn, limit: int = None) -> list[dict]:
-    """Fetch reports that don't have embeddings yet."""
-    print("Fetching reports without embeddings...")
+    """Fetch latest version of each SG report series that doesn't have embeddings yet."""
+    print("Fetching latest report versions without embeddings...")
     
     cur = conn.cursor()
     
     query = f"""
-        SELECT id, symbol, proper_title, subject_terms, text
-        FROM {DB_SCHEMA}.documents
-        WHERE embedding IS NULL
-        AND (proper_title IS NOT NULL OR text IS NOT NULL)
-        ORDER BY id
+        SELECT lv.id, lv.symbol, lv.proper_title, lv.subject_terms, d.text
+        FROM {DB_SCHEMA}.latest_versions lv
+        JOIN {DB_SCHEMA}.documents d ON lv.id = d.id
+        WHERE d.embedding IS NULL
+          AND d.text IS NOT NULL
+        ORDER BY lv.id
     """
     if limit:
         query += f" LIMIT {limit}"
@@ -161,7 +138,7 @@ def fetch_reports_without_embeddings(conn, limit: int = None) -> list[dict]:
     rows = [dict(zip(columns, row)) for row in cur.fetchall()]
     
     cur.close()
-    print(f"  Found {len(rows)} reports without embeddings")
+    print(f"  Found {len(rows)} report series without embeddings")
     return rows
 
 
@@ -249,15 +226,16 @@ async def main(limit: int = None, batch_process_size: int = 500):
         cur.execute(f"""
             SELECT 
                 COUNT(*) as total,
-                COUNT(embedding) as with_embedding
-            FROM {DB_SCHEMA}.documents
+                COUNT(d.embedding) as with_embedding
+            FROM {DB_SCHEMA}.latest_versions lv
+            JOIN {DB_SCHEMA}.documents d ON lv.id = d.id
         """)
         stats = cur.fetchone()
         cur.close()
         
         print("\n" + "=" * 60)
-        print("Final Stats:")
-        print(f"  Total reports: {stats[0]}")
+        print("Final Stats (latest versions only):")
+        print(f"  Total report series: {stats[0]}")
         print(f"  With embeddings: {stats[1]}")
         print(f"  Coverage: {100 * stats[1] / stats[0]:.1f}%")
         print("=" * 60)

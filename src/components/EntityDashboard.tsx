@@ -101,6 +101,22 @@ export function EntityDashboard({ entity, userName }: Props) {
           refetchTrigger={dataVersion}
         />
       </section>
+
+      {/* Data Source Note */}
+      <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-500">
+        <p>
+          <strong className="text-gray-600">About this data:</strong> Reports shown are from 2023 to present, sourced from the{" "}
+          <a
+            href="https://digitallibrary.un.org"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-un-blue hover:underline"
+          >
+            UN Digital Library
+          </a>
+          . Entity assignments are based on official metadata and/or AI identification. Report details (body, year, subjects) come from official data; reporting frequency is estimated by AI.
+        </p>
+      </div>
     </div>
   );
 }

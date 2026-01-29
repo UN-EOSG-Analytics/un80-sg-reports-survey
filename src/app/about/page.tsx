@@ -254,21 +254,13 @@ export default async function AboutPage() {
             <br />
             frequency, format, and consolidation opportunities.
           </p>
-          <div className="flex items-center justify-center gap-4">
-            <Link
-              href={ctaHref}
-              className="inline-flex items-center gap-2 rounded-lg bg-un-blue px-6 py-3 font-medium text-white transition-colors hover:bg-un-blue/90"
-            >
-              {isLoggedIn ? "Go to Dashboard" : "Get Started"}
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link
-              href="/reports"
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-6 py-3 font-medium text-gray-700 transition-colors hover:bg-gray-50"
-            >
-              Browse Reports
-            </Link>
-          </div>
+          <Link
+            href={ctaHref}
+            className="inline-flex items-center gap-2 rounded-lg bg-un-blue px-6 py-3 font-medium text-white transition-colors hover:bg-un-blue/90"
+          >
+            {isLoggedIn ? "Go to Dashboard" : "Get Started"}
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </section>
 
         {/* Feature Grid */}

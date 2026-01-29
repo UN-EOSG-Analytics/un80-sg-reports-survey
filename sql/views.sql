@@ -12,7 +12,7 @@ DROP VIEW IF EXISTS sg_reports_survey.sg_reports;
 --------------------------------------------------------------------------------
 -- SG_REPORTS: Defines what counts as a Secretary-General report
 -- Stage 1 filtering: type-based, excludes CORR/REV, credentials, requires proper_title
--- Filtered to 2023-2025 for survey focus (historical data accessible via documents table)
+-- Filtered to 2023 to present for survey focus (historical data accessible via documents table)
 --------------------------------------------------------------------------------
 CREATE VIEW sg_reports_survey.sg_reports AS
 SELECT d.*,
@@ -45,11 +45,11 @@ WHERE (d.resource_type_level3 @> ARRAY['Secretary-General''s Reports']
   -- Exclude credentials reports (subject term is uppercase plural)
   AND NOT (d.subject_terms @> ARRAY['REPRESENTATIVES'' CREDENTIALS'])
   AND NOT (d.proper_title ILIKE '%credential%')
-  -- Survey focus years (2023-2025)
+  -- Survey focus years (2023 to present)
   AND COALESCE(d.date_year, 
     CASE WHEN d.publication_date ~ '^\d{4}' 
     THEN SUBSTRING(d.publication_date FROM 1 FOR 4)::int END
-  ) BETWEEN 2023 AND 2025;
+  ) >= 2023;
 
 --------------------------------------------------------------------------------
 -- RESOLUTIONS: All resolution documents
@@ -156,7 +156,7 @@ COMMENT ON VIEW sg_reports_survey.report_entities IS 'Combined view of entity su
 --------------------------------------------------------------------------------
 -- LATEST_VERSIONS: Most recent version of each report series
 -- Stage 2 deduplication: picks latest version per proper_title
--- Year filtering inherited from sg_reports view (2023-2025)
+-- Year filtering inherited from sg_reports view (2023 to present)
 --------------------------------------------------------------------------------
 CREATE VIEW sg_reports_survey.latest_versions AS
 WITH version_counts AS (

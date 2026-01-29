@@ -101,8 +101,9 @@ export async function GET(req: NextRequest) {
   const filterEntities = req.nextUrl.searchParams.getAll("filterEntity"); // Filter by reporting entities
   const filterReportTypes = req.nextUrl.searchParams.getAll("filterReportType"); // Filter by report type (Report/Note/Other)
   
-  // Survey focus years (2023-2025) - base filter applied to all queries
-  const SURVEY_YEARS = [2023, 2024, 2025];
+  // Survey focus years (2023 to present) - base filter applied to all queries
+  const currentYear = new Date().getFullYear();
+  const SURVEY_YEARS = Array.from({ length: currentYear - 2023 + 1 }, (_, i) => 2023 + i);
 
   // If a specific symbol is requested, return that single report
   if (symbol) {
@@ -386,7 +387,7 @@ export async function GET(req: NextRequest) {
        HAVING COUNT(*) > 1
        ORDER BY count DESC, subject`
     ),
-    // Entity counts (from report_entity_suggestions, filtered to 2023-2025 via latest_versions)
+    // Entity counts (from report_entity_suggestions, filtered to 2023+ via latest_versions)
     query<{ entity: string; count: number }>(
       `SELECT rs.entity, COUNT(DISTINCT rs.proper_title)::int as count 
        FROM ${DB_SCHEMA}.report_entity_suggestions rs

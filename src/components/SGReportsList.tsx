@@ -54,7 +54,7 @@ interface Filters {
   symbol: string;
   title: string;
   bodies: string[];
-  years: number[]; // Selected years (2023, 2024, 2025)
+  years: number[]; // Selected years (2023 to present)
   frequencies: string[];
   subjects: string[];
   entities: string[]; // Filter by reporting entities
@@ -276,7 +276,7 @@ function FrequencyFilterPopover({
   );
 }
 
-// Year filter (multi-select for 2023-2025)
+// Year filter (multi-select for 2023 to present)
 function YearFilterPopover({
   options,
   selected,

@@ -274,7 +274,7 @@ export default async function AboutPage() {
             <FeatureCard
               icon={FileText}
               title="Browse All Reports"
-              description="View all Secretary-General reports from 2023-2025. Search by symbol or title, filter by issuing body, year, or subject, and sort by any column."
+              description="View all Secretary-General reports from 2023 to present. Search by symbol or title, filter by issuing body, year, or subject, and sort by any column."
             >
               <div className="space-y-2">
                 <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2">

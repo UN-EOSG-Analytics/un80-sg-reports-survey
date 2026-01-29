@@ -29,7 +29,7 @@ export default async function ReportsPage() {
                 >
                   UN Digital Library
                 </a>{" "}
-                (2023–2025)
+                (2023 to present)
               </p>
             </div>
             <ReportsTable mode="all" userEntity={user?.entity} userEmail={user?.email} />

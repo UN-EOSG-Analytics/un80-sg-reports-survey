@@ -12,7 +12,7 @@ export function Footer() {
           >
             UN Digital Library
           </a>{" "}
-          (2023–2025)
+          (2023 to present)
         </p>
         <p className="text-center text-xs text-gray-400">
           © {new Date().getFullYear()} United Nations. All rights reserved.

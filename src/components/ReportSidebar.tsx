@@ -1555,7 +1555,10 @@ export function ReportSidebar({
               </div>
 
               {/* Reporting Pattern visualization */}
-              <div className="border border-gray-200 rounded-md bg-white p-2 hover:border-gray-300 transition-colors cursor-pointer">
+              <div 
+                className="border border-gray-200 rounded-md bg-white p-2 hover:border-gray-300 transition-colors cursor-pointer"
+                onClick={() => setVersionsExpanded(!versionsExpanded)}
+              >
                 <InteractivePublicationPattern
                   versions={report.versions}
                   expanded={versionsExpanded}

@@ -95,12 +95,14 @@ export async function GET(req: NextRequest) {
   const filterTitle = req.nextUrl.searchParams.get("filterTitle") || "";
   const filterSearch = req.nextUrl.searchParams.get("filterSearch") || ""; // Unified search for symbol OR title
   const filterBodies = req.nextUrl.searchParams.getAll("filterBody");
-  const filterYearMin = parseInt(req.nextUrl.searchParams.get("filterYearMin") || "") || null;
-  const filterYearMax = parseInt(req.nextUrl.searchParams.get("filterYearMax") || "") || null;
+  const filterYears = req.nextUrl.searchParams.getAll("filterYear").map(y => parseInt(y)).filter(y => !isNaN(y)); // Array of years
   const filterFrequencies = req.nextUrl.searchParams.getAll("filterFrequency");
   const filterSubjects = req.nextUrl.searchParams.getAll("filterSubject");
   const filterEntities = req.nextUrl.searchParams.getAll("filterEntity"); // Filter by reporting entities
   const filterReportTypes = req.nextUrl.searchParams.getAll("filterReportType"); // Filter by report type (Report/Note/Other)
+  
+  // Survey focus years (2023-2025) - base filter applied to all queries
+  const SURVEY_YEARS = [2023, 2024, 2025];
 
   // If a specific symbol is requested, return that single report
   if (symbol) {
@@ -251,14 +253,10 @@ export async function GET(req: NextRequest) {
     havingParamIndex++;
   }
 
-  if (filterYearMin !== null) {
-    havingClauses.push(`MAX(effective_year) >= $${havingParamIndex}`);
-    havingParams.push(filterYearMin);
-    havingParamIndex++;
-  }
-  if (filterYearMax !== null) {
-    havingClauses.push(`MAX(effective_year) <= $${havingParamIndex}`);
-    havingParams.push(filterYearMax);
+  // Year filter if user selected specific years (base 2023-2025 filtering done in sg_reports view)
+  if (filterYears.length > 0) {
+    havingClauses.push(`MAX(effective_year) = ANY($${havingParamIndex}::int[])`);
+    havingParams.push(filterYears as unknown as string);
     havingParamIndex++;
   }
 
@@ -282,7 +280,7 @@ export async function GET(req: NextRequest) {
   // Otherwise, return paginated list grouped by title
   // Use COALESCE to fall back to publication_date year when date_year is null
   // Extract year from publication_date using substring (format: YYYY-MM-DD or similar)
-  const [reports, countResult, bodyCounts, yearRange, subjectCounts, entityCounts, reportTypeCounts] = await Promise.all([
+  const [reports, countResult, bodyCounts, yearsResult, subjectCounts, entityCounts, reportTypeCounts] = await Promise.all([
     query<ReportRow>(
       `WITH grouped AS (
         SELECT 
@@ -377,11 +375,8 @@ export async function GET(req: NextRequest) {
        WHERE un_body IS NOT NULL
        GROUP BY un_body ORDER BY count DESC`
     ),
-    // Year range (from latest_versions view)
-    query<{ min_year: number; max_year: number }>(
-      `SELECT MIN(effective_year)::int as min_year, MAX(effective_year)::int as max_year
-       FROM ${DB_SCHEMA}.latest_versions`
-    ),
+    // Years available for filtering (hardcoded to survey focus years)
+    Promise.resolve([{ years: SURVEY_YEARS }]),
     // Subject term counts (from latest_versions - one per series)
     // Credentials already excluded by sg_reports view
     query<SubjectCount>(
@@ -391,11 +386,12 @@ export async function GET(req: NextRequest) {
        HAVING COUNT(*) > 1
        ORDER BY count DESC, subject`
     ),
-    // Entity counts (from report_entity_suggestions - all suggested entities)
+    // Entity counts (from report_entity_suggestions, filtered to 2023-2025 via latest_versions)
     query<{ entity: string; count: number }>(
-      `SELECT entity, COUNT(DISTINCT proper_title)::int as count 
-       FROM ${DB_SCHEMA}.report_entity_suggestions
-       GROUP BY entity 
+      `SELECT rs.entity, COUNT(DISTINCT rs.proper_title)::int as count 
+       FROM ${DB_SCHEMA}.report_entity_suggestions rs
+       INNER JOIN ${DB_SCHEMA}.latest_versions lv ON rs.proper_title = lv.proper_title
+       GROUP BY rs.entity 
        ORDER BY count DESC`
     ),
     // Report type counts (from latest_versions - one per series)
@@ -509,7 +505,7 @@ export async function GET(req: NextRequest) {
     entity: modeEntity || null,
     filterOptions: {
       bodies: parsedBodyCounts,
-      yearRange: { min: yearRange[0]?.min_year || 2000, max: yearRange[0]?.max_year || new Date().getFullYear() },
+      years: yearsResult[0]?.years || SURVEY_YEARS,
       frequencies: allFrequencies,
       entities: entityCounts.map((e) => ({ value: e.entity, count: e.count })),
       reportTypes: reportTypeCounts.map((t) => ({ value: t.report_type, count: t.count })),

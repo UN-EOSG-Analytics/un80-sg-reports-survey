@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/tooltip";
 import { ReportSidebar, ReportGroup, SubjectCount, EntitySuggestion, EntityConfirmation } from "@/components/ReportSidebar";
 import { EntityBadges } from "@/components/EntityBadges";
+import { FrequencyBadge } from "@/components/FrequencyBadge";
 
 interface Version {
   symbol: string;
@@ -33,7 +34,7 @@ interface CountItem {
 
 interface FilterOptions {
   bodies: CountItem[];
-  yearRange: { min: number; max: number };
+  years: number[];
   frequencies: string[];
   entities: CountItem[];
   reportTypes: CountItem[];
@@ -53,7 +54,7 @@ interface Filters {
   symbol: string;
   title: string;
   bodies: string[];
-  yearRange: [number, number] | null; // [min, max] or null for no filter
+  years: number[]; // Selected years (2023, 2024, 2025)
   frequencies: string[];
   subjects: string[];
   entities: string[]; // Filter by reporting entities
@@ -275,89 +276,55 @@ function FrequencyFilterPopover({
   );
 }
 
-// Year range slider filter (dual-handle)
-function YearRangeFilter({
-  min,
-  max,
-  value,
+// Year filter (multi-select for 2023-2025)
+function YearFilterPopover({
+  options,
+  selected,
   onChange,
 }: {
-  min: number;
-  max: number;
-  value: [number, number] | null;
-  onChange: (range: [number, number] | null) => void;
+  options: number[];
+  selected: number[];
+  onChange: (values: number[]) => void;
 }) {
-  const [localRange, setLocalRange] = useState<[number, number]>(value || [min, max]);
-  const isActive = value !== null;
-  
-  useEffect(() => {
-    if (value) setLocalRange(value);
-    else setLocalRange([min, max]);
-  }, [value, min, max]);
-
-  const handleApply = () => {
-    if (localRange[0] === min && localRange[1] === max) onChange(null);
-    else onChange(localRange);
+  const toggleOption = (value: number) => {
+    onChange(selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value]);
   };
-
-  const leftPercent = ((localRange[0] - min) / (max - min)) * 100;
-  const rightPercent = ((localRange[1] - min) / (max - min)) * 100;
 
   return (
     <Popover>
       <PopoverTrigger asChild>
         <button
           className={`inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
-            isActive ? "bg-un-blue text-white" : "text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+            selected.length > 0
+              ? "bg-un-blue text-white"
+              : "text-gray-400 hover:bg-gray-200 hover:text-gray-600"
           }`}
         >
           <Filter className="h-3 w-3" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-64 p-4" align="start">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-medium text-gray-700">{localRange[0]}</span>
-            <span className="text-gray-400">–</span>
-            <span className="font-medium text-gray-700">{localRange[1]}</span>
-          </div>
-          <div className="relative h-6 flex items-center">
-            {/* Track background */}
-            <div className="absolute h-1.5 w-full bg-gray-200 rounded" />
-            {/* Active track */}
-            <div
-              className="absolute h-1.5 bg-un-blue rounded"
-              style={{ left: `${leftPercent}%`, right: `${100 - rightPercent}%` }}
-            />
-            {/* Min slider */}
-            <input
-              type="range"
-              min={min}
-              max={max}
-              value={localRange[0]}
-              onChange={(e) => setLocalRange([Math.min(Number(e.target.value), localRange[1] - 1), localRange[1]])}
-              className="absolute w-full h-1.5 appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-un-blue [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-un-blue [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:shadow [&::-moz-range-thumb]:cursor-pointer"
-            />
-            {/* Max slider */}
-            <input
-              type="range"
-              min={min}
-              max={max}
-              value={localRange[1]}
-              onChange={(e) => setLocalRange([localRange[0], Math.max(Number(e.target.value), localRange[0] + 1)])}
-              className="absolute w-full h-1.5 appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-un-blue [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-un-blue [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:shadow [&::-moz-range-thumb]:cursor-pointer"
-            />
-          </div>
-          <div className="flex gap-2">
-            {isActive && (
-              <Button variant="ghost" size="sm" className="flex-1 h-8" onClick={() => onChange(null)}>
-                Clear
-              </Button>
-            )}
-            <Button size="sm" className="flex-1 h-8" onClick={handleApply}>
-              Apply
-            </Button>
-          </div>
+      <PopoverContent className="w-40 p-2" align="start">
+        <div className="space-y-1">
+          {selected.length > 0 && (
+            <button
+              onClick={() => onChange([])}
+              className="mb-2 flex w-full items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+            >
+              <X className="h-3 w-3" /> Clear filter
+            </button>
+          )}
+          {options.map((year) => (
+            <label
+              key={year}
+              className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 rounded cursor-pointer text-sm"
+            >
+              <Checkbox
+                checked={selected.includes(year)}
+                onCheckedChange={() => toggleOption(year)}
+              />
+              <span>{year}</span>
+            </label>
+          ))}
         </div>
       </PopoverContent>
     </Popover>
@@ -647,12 +614,11 @@ function ColumnHeaders({
       </div>
       <div className="flex items-center gap-1">
         <span>Year</span>
-        {filterOptions?.yearRange && (
-          <YearRangeFilter
-            min={filterOptions.yearRange.min}
-            max={filterOptions.yearRange.max}
-            value={filters.yearRange}
-            onChange={(v) => onFilterChange({ ...filters, yearRange: v })}
+        {filterOptions?.years && filterOptions.years.length > 0 && (
+          <YearFilterPopover
+            options={filterOptions.years}
+            selected={filters.years}
+            onChange={(v) => onFilterChange({ ...filters, years: v })}
           />
         )}
         <SortArrow column="year" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
@@ -861,24 +827,13 @@ function ReportRow({
 
       {/* Frequency */}
       <div>
-        {report.frequency ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium cursor-default ${
-                report.frequency === "One-time"
-                  ? "bg-gray-100 text-gray-500"
-                  : "bg-blue-100 text-blue-700"
-              }`}>
-                {report.frequency}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-xs">
-              <p className="text-xs">Estimated based on previous publication dates. Indicative only.</p>
-            </TooltipContent>
-          </Tooltip>
-        ) : (
-          <span className="text-gray-300 text-xs">—</span>
-        )}
+        <FrequencyBadge
+          frequency={report.frequency}
+          calculatedFrequency={report.calculatedFrequency}
+          confirmedFrequency={report.confirmedFrequency}
+          gapHistory={report.gapHistory}
+          size="xs"
+        />
       </div>
 
       {/* Survey column - for mode="my" and mode="all" */}
@@ -1206,7 +1161,7 @@ export function ReportsTable({
     symbol: "",
     title: "",
     bodies: [],
-    yearRange: null,
+    years: [],
     frequencies: [],
     subjects: [],
     entities: [],
@@ -1259,10 +1214,7 @@ export function ReportsTable({
     if (filters.title) params.set("filterTitle", filters.title);
     
     filters.bodies.forEach((b) => params.append("filterBody", b));
-    if (filters.yearRange) {
-      params.set("filterYearMin", String(filters.yearRange[0]));
-      params.set("filterYearMax", String(filters.yearRange[1]));
-    }
+    filters.years.forEach((y) => params.append("filterYear", String(y)));
     filters.frequencies.forEach((f) => params.append("filterFrequency", f));
     filters.subjects.forEach((s) => params.append("filterSubject", s));
     // Entity filter (supports multiple)
@@ -1460,7 +1412,7 @@ export function ReportsTable({
     filters.symbol ||
     filters.title ||
     filters.bodies.length > 0 ||
-    filters.yearRange !== null ||
+    filters.years.length > 0 ||
     filters.frequencies.length > 0 ||
     filters.subjects.length > 0 ||
     filters.entities.length > 0 ||
@@ -1507,7 +1459,7 @@ export function ReportsTable({
                 symbol: "",
                 title: "",
                 bodies: [],
-                yearRange: null,
+                years: [],
                 frequencies: [],
                 subjects: [],
                 entities: [],

@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
         lv.effective_year as date_year,
         (c.id IS NOT NULL) as is_confirmed
       FROM ranked_suggestions rs
-      LEFT JOIN ${DB_SCHEMA}.latest_versions lv ON rs.proper_title = lv.proper_title
+      INNER JOIN ${DB_SCHEMA}.latest_versions lv ON rs.proper_title = lv.proper_title
       LEFT JOIN ${DB_SCHEMA}.report_entity_confirmations c 
         ON rs.proper_title = c.proper_title AND rs.entity = c.entity
       WHERE rs.rn = 1

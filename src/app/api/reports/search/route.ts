@@ -23,7 +23,7 @@ function parseBodyString(bodyStr: string | null): string | null {
 
 /**
  * Search SG reports (not resolutions) by symbol or title.
- * Used for the inline search when adding reports to "My Reports".
+ * Used for the inline search when adding reports to an entity's reports list.
  */
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim();

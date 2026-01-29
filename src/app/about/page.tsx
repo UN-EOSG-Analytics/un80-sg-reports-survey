@@ -249,12 +249,10 @@ export default async function AboutPage() {
           <h2 className="mb-4 text-4xl font-bold tracking-tight text-gray-900">
             SG Reports Survey
           </h2>
-          <p className="mx-auto mb-4 max-w-2xl text-lg text-gray-600">
-            Help improve Secretary-General reporting for the 80th session
-          </p>
-          <p className="mx-auto mb-8 max-w-2xl text-sm text-gray-500">
-            This survey collects entity feedback on report continuation, frequency
-            adjustments, format innovations, and consolidation opportunities.
+          <p className="mx-auto mb-8 max-w-2xl text-lg text-gray-600">
+            Provide feedback on Secretary-General reports:
+            <br />
+            frequency, format, and consolidation opportunities.
           </p>
           <div className="flex items-center justify-center gap-4">
             <Link
@@ -276,7 +274,7 @@ export default async function AboutPage() {
         {/* Feature Grid */}
         <section id="features" className="mx-auto max-w-6xl px-4 pb-20">
           <h3 className="mb-8 text-center text-sm font-semibold uppercase tracking-wider text-gray-400">
-            Platform Features
+            Survey Features
           </h3>
 
           <div className="grid gap-6 md:grid-cols-2">

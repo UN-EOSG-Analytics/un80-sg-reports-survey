@@ -713,7 +713,7 @@ function ReportRow({
   
   return (
     <div
-      className={`grid ${gridCols} items-center gap-x-4 px-4 py-3 text-sm border-b transition-all duration-200 ${
+      className={`grid ${gridCols} items-center gap-x-4 px-4 py-3 text-sm border-b ${
         isSelected ? "bg-blue-50 border-l-2 border-l-un-blue cursor-pointer" : isGrayedOut ? "bg-gray-50/80 opacity-50" : "hover:bg-gray-50 cursor-pointer"
       }`}
       onClick={isGrayedOut ? undefined : onSelect}
@@ -1042,7 +1042,7 @@ function AddReportSearch({
         <Plus className="h-4 w-4 text-gray-400 flex-shrink-0" />
         <input
           type="text"
-          placeholder="Search by symbol or title to add a report..."
+          placeholder={`Add a report to ${entity}'s list — search by symbol (e.g. A/79/...) or title...`}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           onFocus={() => results.length > 0 && setShowResults(true)}
@@ -1518,8 +1518,22 @@ export function ReportsTable({
         </div>
 
         {sortedReports.length === 0 && (
-          <div className="px-4 py-8 text-gray-400">
-            No reports found
+          <div className="px-4 py-8 text-center">
+            {mode === "my" ? (
+              <div className="space-y-2">
+                <p className="text-gray-500">No reports added yet</p>
+                <p className="text-sm text-gray-400">Use the search below to add reports, or add from the suggested reports section.</p>
+              </div>
+            ) : mode === "suggested" ? (
+              <div className="space-y-2">
+                <p className="text-gray-500">No additional suggestions</p>
+                <p className="text-sm text-gray-400">All suggested reports have been added to your list or there are no more matches.</p>
+              </div>
+            ) : hasActiveFilters ? (
+              <p className="text-gray-400">No reports match your filters</p>
+            ) : (
+              <p className="text-gray-400">No reports found</p>
+            )}
           </div>
         )}
       </div>

@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { ReportsTable } from "./SGReportsList";
-import { FileText } from "lucide-react";
+import { FileText, Info } from "lucide-react";
 import Link from "next/link";
 
 interface Props {
@@ -27,10 +27,10 @@ export function EntityDashboard({ entity, userName }: Props) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">
-            My Survey
+            {entity} Reports
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            Manage {entity}&apos;s SG reports and provide feedback
+            Manage your entity&apos;s SG reports and provide feedback
           </p>
         </div>
         <Link
@@ -42,10 +42,34 @@ export function EntityDashboard({ entity, userName }: Props) {
         </Link>
       </div>
 
-      {/* My Reports Section */}
-      <section className="transition-all duration-300 ease-in-out">
+      {/* Instructions Banner */}
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <div className="flex items-start gap-3">
+          <Info className="h-5 w-5 text-un-blue flex-shrink-0 mt-0.5" />
+          <div className="space-y-3 text-sm text-gray-700">
+            <p className="font-medium text-gray-900">How to provide feedback:</p>
+            <ol className="space-y-2 list-none">
+              <li className="flex items-start gap-2">
+                <span className="flex items-center justify-center w-5 h-5 rounded-full bg-un-blue text-white text-xs font-medium flex-shrink-0">1</span>
+                <span><strong>Build your reports list:</strong> Add all recurring SG reports that {entity} is responsible for. Use the search below or add from the suggestions.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="flex items-center justify-center w-5 h-5 rounded-full bg-un-blue text-white text-xs font-medium flex-shrink-0">2</span>
+                <span><strong>Provide feedback on each report:</strong> Click on a report to open the survey panel and share your perspective on its future.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="flex items-center justify-center w-5 h-5 rounded-full bg-un-blue text-white text-xs font-medium flex-shrink-0">3</span>
+                <span><strong>Track your progress:</strong> The &quot;Survey&quot; column shows which reports you&apos;ve provided feedback on.</span>
+              </li>
+            </ol>
+          </div>
+        </div>
+      </div>
+
+      {/* Entity Reports Section */}
+      <section>
         <h2 className="mb-4 text-lg font-semibold text-gray-900">
-          My Reports
+          {entity} Reports
         </h2>
         <ReportsTable
           mode="my"
@@ -59,13 +83,15 @@ export function EntityDashboard({ entity, userName }: Props) {
       </section>
 
       {/* Suggested Reports Section */}
-      <section className="transition-all duration-300 ease-in-out">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">
-          Suggested Reports
-          <span className="ml-2 text-sm font-normal text-gray-500">
-            Reports that may belong to your entity
-          </span>
-        </h2>
+      <section>
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Suggested Reports
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            These reports may belong to {entity} based on their content. Click the <span className="inline-flex items-center justify-center w-4 h-4 text-un-blue border border-un-blue rounded-full align-text-bottom mx-0.5 text-[10px]">+</span> button to add any that are yours, or ignore those that aren&apos;t.
+          </p>
+        </div>
         <ReportsTable
           mode="suggested"
           entity={entity}

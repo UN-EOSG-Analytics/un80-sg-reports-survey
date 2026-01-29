@@ -932,13 +932,21 @@ function AddReportSearch({
       return;
     }
 
-    const timer = setTimeout(async () => {
+      const timer = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const response = await fetch(`/api/documents/search?q=${encodeURIComponent(searchQuery)}`);
+        // Use /api/reports/search which queries the sg_reports view (SG reports only)
+        // not /api/documents/search which queries all documents including resolutions
+        const response = await fetch(`/api/reports/search?q=${encodeURIComponent(searchQuery)}`);
         if (response.ok) {
           const data = await response.json();
-          setResults(data);
+          // Map properTitle -> title for SearchResult interface
+          setResults((data.results || []).map((r: { properTitle: string; symbol: string; body: string | null; year: number | null }) => ({
+            symbol: r.symbol,
+            title: r.properTitle,
+            body: r.body,
+            year: r.year,
+          })));
           setShowResults(true);
           setHighlightedIndex(-1);
         }

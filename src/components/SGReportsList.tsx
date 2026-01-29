@@ -1642,6 +1642,7 @@ export function ReportsTable({
         subjectCounts={data?.subjectCounts || []}
         userEntity={userEntity}
         userEmail={userEmail}
+        onDataChanged={onDataChanged}
         onSave={() => {
           // Refetch survey responses after save
           fetch("/api/survey-responses/my-responses")

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Loader2, ChevronUp, ChevronDown, X, FileText, Search, Check } from "lucide-react";
+import { Loader2, ChevronUp, ChevronDown, X, FileText, Search, Check, Plus, Minus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -295,6 +295,7 @@ function CompactFeedbackForm({
   mergeTargets,
   onMergeTargetsChange,
   userEntity,
+  isConfirmedByUserEntity,
   loadingExisting,
   feedback,
   onFeedbackChange,
@@ -307,6 +308,7 @@ function CompactFeedbackForm({
   mergeTargets: string[];
   onMergeTargetsChange: (targets: string[]) => void;
   userEntity?: string | null;
+  isConfirmedByUserEntity: boolean;
   loadingExisting: boolean;
   feedback: Omit<Feedback, 'mergeTargets'>;
   onFeedbackChange: <K extends keyof Omit<Feedback, 'mergeTargets'>>(key: K, value: Omit<Feedback, 'mergeTargets'>[K]) => void;
@@ -315,7 +317,7 @@ function CompactFeedbackForm({
   submittedBy: { email: string; entity: string | null } | null;
   onSaveClick: () => void;
 }) {
-  const canEdit = userEntity && report.entity === userEntity;
+  const canEdit = userEntity && isConfirmedByUserEntity;
   
   // Show frequency/format options for "continue_with_changes" and "merge"
   const showFrequencyFormat = feedback.status === "continue_with_changes" || feedback.status === "merge";
@@ -347,20 +349,10 @@ function CompactFeedbackForm({
 
   if (!canEdit) {
     return (
-      <div className={`rounded-lg p-3 text-center border text-sm ${!userEntity ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-200"}`}>
-        {!userEntity ? (
-          <p className="text-amber-700">
-            <a href="/login" className="font-medium underline hover:text-amber-900">Log in</a> to submit feedback.
-          </p>
-        ) : (
-          <p className="text-gray-500">
-            {!report.entity ? (
-              "No assigned entity."
-            ) : (
-              <>Only <span className="font-medium text-gray-700">{report.entity}</span> can submit.</>
-            )}
-          </p>
-        )}
+      <div className="rounded-lg p-3 text-center border border-gray-200 bg-gray-50 text-sm">
+        <p className="text-gray-500">
+          Claim this report for your entity to submit feedback.
+        </p>
       </div>
     );
   }
@@ -785,6 +777,7 @@ export interface ReportSidebarProps {
   onClose: () => void;
   subjectCounts: SubjectCount[];
   onSave?: () => void;
+  onDataChanged?: () => void;  // Callback when entity confirmation changes
   userEntity?: string | null;
   userEmail?: string | null;
 }
@@ -794,6 +787,7 @@ export function ReportSidebar({
   onClose,
   subjectCounts,
   onSave,
+  onDataChanged,
   userEntity,
   userEmail,
 }: ReportSidebarProps) {
@@ -818,6 +812,73 @@ export function ReportSidebar({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [loadingExisting, setLoadingExisting] = useState(true);
   const [submittedBy, setSubmittedBy] = useState<{ email: string; entity: string | null } | null>(null);
+  
+  // Entity confirmation state (optimistic updates)
+  const [confirming, setConfirming] = useState(false);
+  const [localConfirmed, setLocalConfirmed] = useState(false);
+  const [localRemoved, setLocalRemoved] = useState(false);
+  
+  // Check if user's entity has confirmed this report
+  // localRemoved overrides server data, localConfirmed adds to it
+  const isConfirmedByUserEntity = userEntity && !localRemoved && (
+    localConfirmed || report?.confirmedEntities?.includes(userEntity)
+  );
+
+  // Reset local state when report changes
+  useEffect(() => {
+    setLocalConfirmed(false);
+    setLocalRemoved(false);
+  }, [report?.title]);
+
+  // Handle confirming entity ownership
+  const handleConfirmEntity = async () => {
+    if (!report || !userEntity || confirming) return;
+    
+    setConfirming(true);
+    try {
+      const response = await fetch("/api/entity-confirmations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          properTitle: report.title,
+          entity: userEntity,
+        }),
+      });
+      
+      if (response.ok) {
+        setLocalConfirmed(true);
+        setLocalRemoved(false);
+        onDataChanged?.();
+      }
+    } catch (error) {
+      console.error("Failed to confirm entity:", error);
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  // Handle removing entity ownership
+  const handleRemoveEntity = async () => {
+    if (!report || !userEntity || confirming) return;
+    
+    setConfirming(true);
+    try {
+      const response = await fetch(
+        `/api/entity-confirmations?properTitle=${encodeURIComponent(report.title)}&entity=${encodeURIComponent(userEntity)}`,
+        { method: "DELETE" }
+      );
+      
+      if (response.ok) {
+        setLocalRemoved(true);
+        setLocalConfirmed(false);
+        onDataChanged?.();
+      }
+    } catch (error) {
+      console.error("Failed to remove entity confirmation:", error);
+    } finally {
+      setConfirming(false);
+    }
+  };
 
   // Fetch similar reports and resolutions when report changes
   useEffect(() => {
@@ -997,20 +1058,6 @@ export function ReportSidebar({
                 <span className="inline-block rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-un-blue">
                   {report.symbol}
                 </span>
-                {report.entity && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="inline-block rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 cursor-default">
-                        {report.entity}
-                      </span>
-                    </TooltipTrigger>
-                    {(report.entityManual || report.entityDri) && (
-                      <TooltipContent>
-                        Source: {report.entityManual ? "Manual list" : "DRI"}
-                      </TooltipContent>
-                    )}
-                  </Tooltip>
-                )}
                 {report.body && (
                   <span className="inline-block rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
                     {abbreviateBody(report.body)}
@@ -1082,6 +1129,52 @@ export function ReportSidebar({
               />
             </div>
 
+            {/* Entity Confirmation */}
+            <div className="space-y-2">
+              <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Entity
+              </h3>
+              {isConfirmedByUserEntity ? (
+                <div className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 p-3">
+                  <div className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-green-600" />
+                    <span className="text-sm text-green-800">
+                      Confirmed for <span className="font-medium">{userEntity}</span>
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleRemoveEntity}
+                    disabled={confirming}
+                    className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-gray-500 hover:bg-green-100 hover:text-gray-700 transition-colors disabled:opacity-50"
+                  >
+                    {confirming ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Minus className="h-3 w-3" />
+                    )}
+                    Remove
+                  </button>
+                </div>
+              ) : userEntity ? (
+                <button
+                  onClick={handleConfirmEntity}
+                  disabled={confirming}
+                  className="w-full flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-50"
+                >
+                  {confirming ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                  Add to {userEntity} Reports
+                </button>
+              ) : (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center text-sm text-amber-700">
+                  <a href="/login" className="font-medium underline hover:text-amber-900">Log in</a> to claim reports for your entity.
+                </div>
+              )}
+            </div>
+
             {/* Feedback Form */}
             <div className="space-y-2">
               <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1092,6 +1185,7 @@ export function ReportSidebar({
                 mergeTargets={mergeTargets}
                 onMergeTargetsChange={setMergeTargets}
                 userEntity={userEntity}
+                isConfirmedByUserEntity={!!isConfirmedByUserEntity}
                 loadingExisting={loadingExisting}
                 feedback={feedback}
                 onFeedbackChange={updateFeedback}

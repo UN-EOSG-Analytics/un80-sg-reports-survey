@@ -163,14 +163,10 @@ function abbreviateBody(body: string | null): string | null {
     .join("");
 }
 
-// Build ODS PDF link from record number
-function buildODSLink(recordNumber: string | null): string | null {
-  if (!recordNumber) return null;
-  const num = recordNumber.replace(/\D/g, "");
-  if (num.length < 7) return null;
-  const pathFormatted = `n${num.slice(0, 2)}/${num.slice(2, 5)}/${num.slice(5, 7)}`;
-  const pdfName = `n${num}`;
-  return `https://documents.un.org/doc/undoc/gen/${pathFormatted}/pdf/${pdfName}.pdf`;
+// Build ODS link from document symbol
+// Uses undocs.org which is the official UN shortlink service
+function buildODSLink(symbol: string): string {
+  return `https://undocs.org/en/${encodeURIComponent(symbol)}`;
 }
 
 // Build Digital Library search link from symbol
@@ -887,17 +883,15 @@ function VersionRow({ v }: { v: Version }) {
             {formattedWordCount} words
           </span>
         )}
-        {buildODSLink(v.recordNumber) && (
-          <a
-            href={buildODSLink(v.recordNumber)!}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium text-un-blue bg-blue-50 rounded hover:bg-blue-100 transition-colors"
-          >
-            <FileText className="h-2.5 w-2.5" />
-            PDF
-          </a>
-        )}
+        <a
+          href={buildODSLink(v.symbol)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium text-un-blue bg-blue-50 rounded hover:bg-blue-100 transition-colors"
+        >
+          <FileText className="h-2.5 w-2.5" />
+          PDF
+        </a>
         <a
           href={buildDLLink(v.symbol)}
           target="_blank"

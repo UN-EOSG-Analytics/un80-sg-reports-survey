@@ -658,18 +658,10 @@ function ColumnHeaders({
   );
 }
 
-// Build ODS PDF link from record number
-// Example: N2518639 → https://documents.un.org/doc/undoc/gen/n25/186/39/pdf/n2518639.pdf
-function buildODSLink(recordNumber: string | null): string | null {
-  if (!recordNumber) return null;
-  // Extract numeric part (e.g., "N2518639" → "2518639")
-  const num = recordNumber.replace(/\D/g, "");
-  if (num.length < 7) return null;
-  // Format: first 2 digits, next 3, next 2 → n25/186/39
-  const pathFormatted = `n${num.slice(0, 2)}/${num.slice(2, 5)}/${num.slice(5, 7)}`;
-  // PDF filename is the full number with 'n' prefix
-  const pdfName = `n${num}`;
-  return `https://documents.un.org/doc/undoc/gen/${pathFormatted}/pdf/${pdfName}.pdf`;
+// Build ODS link from document symbol
+// Uses undocs.org which is the official UN shortlink service
+function buildODSLink(symbol: string): string {
+  return `https://undocs.org/en/${encodeURIComponent(symbol)}`;
 }
 
 // Build Digital Library search link from symbol

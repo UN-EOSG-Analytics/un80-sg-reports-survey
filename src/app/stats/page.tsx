@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Treemap from "@/components/Treemap";
+import { Footer } from "@/components/Footer";
 
 interface TreemapItem {
   name: string;
@@ -31,24 +32,27 @@ export default function StatsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
-      <div className="mx-auto max-w-7xl">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Reports by Type</h1>
-        <p className="text-sm text-gray-600 mb-8">
-          Hierarchy: Resource Type (989__b) → Document Type (989__c) → Subject Terms
-        </p>
-        
-        <div className="bg-white rounded-lg shadow p-4 pt-8">
-          <Treemap data={data} />
-        </div>
+    <div className="flex min-h-screen flex-col">
+      <main className="flex-1 bg-gray-50 p-4 md:p-8">
+        <div className="mx-auto max-w-7xl">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Reports by Type</h1>
+          <p className="text-sm text-gray-600 mb-8">
+            Hierarchy: Resource Type (989__b) → Document Type (989__c) → Subject Terms
+          </p>
+          
+          <div className="bg-white rounded-lg shadow p-4 pt-8">
+            <Treemap data={data} />
+          </div>
 
-        {/* Legend */}
-        <div className="mt-6 flex flex-wrap gap-4 text-xs text-gray-600">
-          <div><strong>Level 1:</strong> Resource Type (989__b)</div>
-          <div><strong>Level 2:</strong> Document Type (989__c)</div>
-          <div><strong>Level 3:</strong> Subject Terms (top 10 per type)</div>
+          {/* Legend */}
+          <div className="mt-6 flex flex-wrap gap-4 text-xs text-gray-600">
+            <div><strong>Level 1:</strong> Resource Type (989__b)</div>
+            <div><strong>Level 2:</strong> Document Type (989__c)</div>
+            <div><strong>Level 3:</strong> Subject Terms (top 10 per type)</div>
+          </div>
         </div>
-      </div>
+      </main>
+      <Footer />
     </div>
   );
 }

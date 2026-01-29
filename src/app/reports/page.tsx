@@ -1,4 +1,5 @@
 import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 import { getCurrentUser } from "@/lib/auth";
 import { fetchEntities } from "@/lib/entities";
 import { ReportsTable } from "@/components/SGReportsList";
@@ -14,13 +15,28 @@ export default async function ReportsPage() {
       <main className="flex-1 bg-background px-6 py-8">
         <div className="mx-auto max-w-7xl">
           <section>
-            <h2 className="mb-6 text-2xl font-bold text-foreground">
-              All Secretary-General&apos;s Reports
-            </h2>
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-foreground">
+                All Secretary-General&apos;s Reports
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Data from the{" "}
+                <a
+                  href="https://digitallibrary.un.org"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-un-blue hover:underline"
+                >
+                  UN Digital Library
+                </a>{" "}
+                (2023–2025)
+              </p>
+            </div>
             <ReportsTable mode="all" userEntity={user?.entity} userEmail={user?.email} />
           </section>
         </div>
       </main>
+      <Footer />
     </div>
   );
 }

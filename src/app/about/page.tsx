@@ -429,27 +429,27 @@ export default async function AboutPage() {
                 <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-un-blue text-lg font-bold text-white">
                   1
                 </div>
-                <h4 className="mb-2 font-semibold text-gray-900">Sign In</h4>
+                <h4 className="mb-2 font-semibold text-gray-900">Sign In &amp; Select Entity</h4>
                 <p className="text-sm text-gray-600">
-                  Enter your email and click the magic link sent to your inbox.
+                  Enter your UN email, click the magic link, and select your organisational entity.
                 </p>
               </div>
               <div>
                 <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-un-blue text-lg font-bold text-white">
                   2
                 </div>
-                <h4 className="mb-2 font-semibold text-gray-900">Select Your Entity</h4>
+                <h4 className="mb-2 font-semibold text-gray-900">Find Your Reports</h4>
                 <p className="text-sm text-gray-600">
-                  Choose your organisational entity on first sign-in to access your dashboard.
+                  Search for and confirm the Secretary-General reports your entity is responsible for.
                 </p>
               </div>
               <div>
                 <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-un-blue text-lg font-bold text-white">
                   3
                 </div>
-                <h4 className="mb-2 font-semibold text-gray-900">Complete Surveys</h4>
+                <h4 className="mb-2 font-semibold text-gray-900">Provide Feedback</h4>
                 <p className="text-sm text-gray-600">
-                  Find your reports and provide feedback on frequency, format, and consolidation.
+                  Share your perspective on frequency, format, and consolidation opportunities.
                 </p>
               </div>
             </div>

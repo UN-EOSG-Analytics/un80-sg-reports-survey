@@ -1,4 +1,5 @@
 import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
 import { getCurrentUser } from "@/lib/auth";
 import { fetchEntities } from "@/lib/entities";
 import { EntityDashboard } from "@/components/EntityDashboard";
@@ -62,6 +63,7 @@ export default async function Home() {
           )}
         </div>
       </main>
+      <Footer />
     </div>
   );
 }

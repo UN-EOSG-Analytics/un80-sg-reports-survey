@@ -96,7 +96,7 @@ export function FrequencyBadge({
           {frequency}
         </span>
       </TooltipTrigger>
-      <TooltipContent className="max-w-xs">
+      <TooltipContent>
         <div className="space-y-0.5">
           {tooltipLines.map((line, i) => (
             <p key={i} className="text-xs">{line}</p>

@@ -55,7 +55,7 @@ export function EntityDashboard({ entity, userName }: Props) {
               </li>
               <li className="flex items-start gap-2">
                 <span className="flex items-center justify-center w-5 h-5 rounded-full bg-un-blue text-white text-xs font-medium flex-shrink-0">2</span>
-                <span><strong>Provide feedback on each report:</strong> Click on a report to open the survey panel and share your perspective on its future.</span>
+                <span><strong>Provide feedback on each report:</strong> Click on a report to open the survey panel and share your perspective.</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="flex items-center justify-center w-5 h-5 rounded-full bg-un-blue text-white text-xs font-medium flex-shrink-0">3</span>

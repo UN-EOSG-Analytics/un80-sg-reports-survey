@@ -53,7 +53,7 @@ def _search_document_symbols(
 
 
 def get_reports_metadata(doc_type="Reports", tag="989__c", start_date=2024):
-    all_results, skip, limit, old_streak = [], 0, 100, 0
+    all_results, skip, limit, old_streak = [], 0, 20, 0
     while True:
         batch = _search_document_symbols(
             query=f"'{doc_type}'", tag=tag, skip=skip, limit=limit
@@ -331,10 +331,10 @@ def fetch_resolutions_for_stored_reports() -> int:
 SOURCES = [
     # Approach 1: Classified as SG Reports
     ("Secretary-General's Reports", "989__c"),
-    # # Approach 2: General reports (will be filtered by title in SQL view)
-    # ("Reports", "989__b"),
-    # # Approach 3: Letters/notes (will be filtered by title in SQL view)
-    # ("Letters and Notes Verbales", "989__b"),
+    # Approach 2: General reports (will be filtered by title in SQL view)
+    ("Reports", "989__b"),
+    # Approach 3: Letters/notes (will be filtered by title in SQL view)
+    ("Letters and Notes Verbales", "989__b"),
 ]
 
 

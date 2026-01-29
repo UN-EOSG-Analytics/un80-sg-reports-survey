@@ -84,14 +84,17 @@ async def extract_mandate_info_async(resolution: tuple) -> dict:
 
 
 def get_resolutions_to_process(year_min: int = 2024) -> list[tuple[str, str, str]]:
-    """Get resolutions that need mandate extraction."""
+    """Get resolutions that need mandate extraction.
+    
+    Note: Identifies resolutions by resource_type_level3 array containing 'Resolution'.
+    """
     conn = psycopg2.connect(DATABASE_URL)
     try:
         with conn.cursor() as cur:
             cur.execute(f"""
                 SELECT symbol, proper_title, text
                 FROM {DB_SCHEMA}.documents
-                WHERE document_category = 'resolution'
+                WHERE 'Resolution' = ANY(resource_type_level3)
                   AND date_year >= %s
                   AND text IS NOT NULL
                   AND LENGTH(text) > 100

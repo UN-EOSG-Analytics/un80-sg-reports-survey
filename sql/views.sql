@@ -21,7 +21,13 @@ SELECT d.*,
               OR array_to_string(d.subtitle, ' ') ILIKE '%Secretary-General%')
     THEN 'title_filter'
     ELSE 'other'
-  END as source
+  END as source,
+  -- Report type based on resource_type_level2
+  CASE 
+    WHEN d.resource_type_level2 @> ARRAY['Reports'] THEN 'Report'
+    WHEN d.resource_type_level2 @> ARRAY['Letters and Notes Verbales'] THEN 'Note'
+    ELSE 'Other'
+  END as report_type
 FROM sg_reports_survey.documents d
 WHERE d.resource_type_level3 @> ARRAY['Secretary-General''s Reports']
    OR ((d.resource_type_level2 @> ARRAY['Reports'] 
@@ -84,7 +90,7 @@ WITH version_counts AS (
 ),
 ranked AS (
   SELECT r.id, r.symbol, r.proper_title, r.title, r.date_year, r.publication_date,
-         r.un_body, r.subject_terms, r.source, r.based_on_resolution_symbols,
+         r.un_body, r.subject_terms, r.source, r.report_type, r.based_on_resolution_symbols,
          COALESCE(r.date_year, 
            CASE WHEN r.publication_date ~ '^\d{4}' 
            THEN SUBSTRING(r.publication_date FROM 1 FOR 4)::int END
@@ -101,8 +107,8 @@ ranked AS (
     AND r.symbol NOT LIKE '%/CORR.%' AND r.symbol NOT LIKE '%/REV.%'
 )
 SELECT r.id, r.symbol, r.proper_title, r.title, r.date_year, r.publication_date,
-       r.un_body, r.subject_terms, r.effective_year, r.source, r.based_on_resolution_symbols,
-       vc.version_count
+       r.un_body, r.subject_terms, r.effective_year, r.source, r.report_type,
+       r.based_on_resolution_symbols, vc.version_count
 FROM ranked r
 JOIN version_counts vc ON r.proper_title = vc.proper_title
 WHERE r.rn = 1;

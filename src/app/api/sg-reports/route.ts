@@ -20,6 +20,7 @@ interface ReportRow {
   symbols: string[];
   years: (number | null)[];
   bodies: (string | null)[];
+  report_types: (string | null)[];
   publication_dates: (string | null)[];
   record_numbers: (string | null)[];
   word_counts: (number | null)[];
@@ -71,6 +72,10 @@ export async function GET(req: NextRequest) {
   const limit = parseInt(req.nextUrl.searchParams.get("limit") || "20");
   const offset = (page - 1) * limit;
   const symbol = req.nextUrl.searchParams.get("symbol");
+  
+  // Mode: all (default), my (confirmed reports), suggested (suggestions for entity)
+  const mode = req.nextUrl.searchParams.get("mode") || "all";
+  const modeEntity = req.nextUrl.searchParams.get("entity"); // Required for mode=my and mode=suggested
 
   // Filter parameters
   const filterSymbol = req.nextUrl.searchParams.get("filterSymbol") || "";
@@ -82,6 +87,7 @@ export async function GET(req: NextRequest) {
   const filterFrequencies = req.nextUrl.searchParams.getAll("filterFrequency");
   const filterSubjects = req.nextUrl.searchParams.getAll("filterSubject");
   const filterEntities = req.nextUrl.searchParams.getAll("filterEntity"); // Filter by reporting entities
+  const filterReportTypes = req.nextUrl.searchParams.getAll("filterReportType"); // Filter by report type (Report/Note/Other)
 
   // If a specific symbol is requested, return that single report
   if (symbol) {
@@ -115,6 +121,11 @@ export async function GET(req: NextRequest) {
       ...report,
       resolutions,
     });
+  }
+
+  // Validate mode
+  if ((mode === "my" || mode === "suggested") && !modeEntity) {
+    return NextResponse.json({ error: "entity parameter required for mode=my or mode=suggested" }, { status: 400 });
   }
 
   // Build WHERE clauses for filters
@@ -163,11 +174,34 @@ export async function GET(req: NextRequest) {
     paramIndex++;
   }
 
+  if (filterReportTypes.length > 0) {
+    whereClauses.push(`r.report_type = ANY($${paramIndex})`);
+    params.push(filterReportTypes as unknown as string);
+    paramIndex++;
+  }
+
   // Year range filter (on effective_year, filter on MAX year of the series)
   // We'll add this as a HAVING clause for proper_title groups
   const havingClauses: string[] = [];
   const havingParams: (string | number)[] = [];
   let havingParamIndex = paramIndex;
+
+  // Mode-specific filtering
+  // mode=my: Filter to reports confirmed by the specified entity
+  // mode=suggested: Filter to reports suggested for the specified entity
+  if (mode === "my" && modeEntity) {
+    havingClauses.push(`(
+      (SELECT re.confirmed_entities FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) @> ARRAY[$${havingParamIndex}]::text[]
+    )`);
+    havingParams.push(modeEntity);
+    havingParamIndex++;
+  } else if (mode === "suggested" && modeEntity) {
+    havingClauses.push(`(
+      (SELECT re.suggested_entities FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) @> ARRAY[$${havingParamIndex}]::text[]
+    )`);
+    havingParams.push(modeEntity);
+    havingParamIndex++;
+  }
 
   // Entity filter (supports multiple) - filter on suggested or confirmed entities
   // This needs to be in HAVING clause since we join with report_entities after grouping
@@ -211,7 +245,7 @@ export async function GET(req: NextRequest) {
   // Otherwise, return paginated list grouped by title
   // Use COALESCE to fall back to publication_date year when date_year is null
   // Extract year from publication_date using substring (format: YYYY-MM-DD or similar)
-  const [reports, countResult, bodyCounts, yearRange, subjectCounts, entityCounts] = await Promise.all([
+  const [reports, countResult, bodyCounts, yearRange, subjectCounts, entityCounts, reportTypeCounts] = await Promise.all([
     query<ReportRow & { frequency: string }>(
       `WITH grouped AS (
         SELECT 
@@ -219,6 +253,7 @@ export async function GET(req: NextRequest) {
           array_agg(symbol ORDER BY effective_year DESC NULLS LAST, symbol) as symbols,
           array_agg(effective_year ORDER BY effective_year DESC NULLS LAST, symbol) as years,
           array_agg(un_body ORDER BY effective_year DESC NULLS LAST, symbol) as bodies,
+          array_agg(report_type ORDER BY effective_year DESC NULLS LAST, symbol) as report_types,
           array_agg(publication_date ORDER BY effective_year DESC NULLS LAST, symbol) as publication_dates,
           array_agg(record_number ORDER BY effective_year DESC NULLS LAST, symbol) as record_numbers,
           array_agg(word_count ORDER BY effective_year DESC NULLS LAST, symbol) as word_counts,
@@ -237,6 +272,7 @@ export async function GET(req: NextRequest) {
             r.proper_title,
             r.symbol,
             r.un_body,
+            r.report_type,
             r.publication_date,
             r.record_number,
             r.word_count,
@@ -365,6 +401,14 @@ export async function GET(req: NextRequest) {
        GROUP BY entity 
        ORDER BY count DESC`
     ),
+    // Report type counts (from latest_versions - one per series)
+    query<{ report_type: string; count: number }>(
+      `SELECT report_type, COUNT(*)::int as count 
+       FROM ${DB_SCHEMA}.latest_versions
+       WHERE report_type IS NOT NULL
+       GROUP BY report_type 
+       ORDER BY count DESC`
+    ),
   ]);
 
   // Parse PostgreSQL array string like {"General Assembly","Human Rights Bodies"} to extract first element
@@ -399,6 +443,7 @@ export async function GET(req: NextRequest) {
       title: r.proper_title?.replace(/\s*:\s*$/, "").trim(),
       symbol: r.symbols[0],
       body: parseBodyString(r.bodies[0]),
+      reportType: r.report_types?.[0] || 'Other', // Report type (Report/Note/Other)
       year: r.years[0] || null,
       // New entity structure
       entity: r.primary_entity || null, // Primary entity (confirmed first, then best suggestion)
@@ -439,11 +484,14 @@ export async function GET(req: NextRequest) {
     total: countResult[0]?.total || 0,
     page,
     limit,
+    mode,
+    entity: modeEntity || null,
     filterOptions: {
       bodies: parsedBodyCounts,
       yearRange: { min: yearRange[0]?.min_year || 2000, max: yearRange[0]?.max_year || new Date().getFullYear() },
       frequencies: allFrequencies,
       entities: entityCounts.map((e) => ({ value: e.entity, count: e.count })),
+      reportTypes: reportTypeCounts.map((t) => ({ value: t.report_type, count: t.count })),
     },
     subjectCounts: subjectCounts.map((s) => ({ subject: s.subject, count: s.count })),
   });

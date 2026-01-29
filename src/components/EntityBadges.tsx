@@ -166,9 +166,8 @@ function EntityBadge({
     
     switch (source.toLowerCase()) {
       case "dgacm":
-        return `DGACM data indicates ${entity} report`;
       case "dri":
-        return `DRI data indicates ${entity} report`;
+        return `Official data indicates ${entity} report`;
       case "ai":
         return `AI suggests ${entity} report`;
       default:

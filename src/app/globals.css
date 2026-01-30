@@ -163,3 +163,16 @@ body {
 body::-webkit-scrollbar {
   display: none;
 }
+
+/**
+ * Scrollbar-hide utility for horizontal scroll areas
+ * Used in suggestion pills and other scrollable containers
+ */
+.scrollbar-hide {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}

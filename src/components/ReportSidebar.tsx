@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Loader2, ChevronUp, ChevronDown, X, FileText, Search, Check, Plus, Minus } from "lucide-react";
+import { Loader2, ChevronUp, ChevronDown, X, FileText, Search, Check, Plus, Minus, MessageSquare, Bot } from "lucide-react";
+import { useChatContext } from "@/components/chat";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -737,14 +738,18 @@ function SimilarReportsGrid({
   loading,
   error,
   onMerge,
+  onCompare,
   mergeTargets,
+  currentSymbol,
   defaultVisible = 4,
 }: {
   similar: SimilarReport[];
   loading: boolean;
   error: string | null;
   onMerge?: (symbol: string) => void;
+  onCompare?: (symbol: string) => void;
   mergeTargets?: string[];
+  currentSymbol?: string;
   defaultVisible?: number;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -806,26 +811,38 @@ function SimilarReportsGrid({
                 )}
               </div>
             </div>
-            {onMerge && (
-              <button
-                onClick={() => onMerge(r.symbol)}
-                className={`self-center flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
-                  isInMerge
-                    ? "bg-un-blue text-white"
-                    : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-                }`}
-                title={isInMerge ? "Remove from merge" : "Merge with this report"}
-              >
-                {isInMerge ? (
-                  <>
-                    <Check className="h-3 w-3" />
-                    Merge
-                  </>
-                ) : (
-                  "Merge"
-                )}
-              </button>
-            )}
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {onCompare && (
+                <button
+                  onClick={() => onCompare(r.symbol)}
+                  className="self-center flex items-center gap-1 px-2 py-1 rounded text-xs text-un-blue bg-blue-50 hover:bg-blue-100 transition-colors font-medium"
+                  title="Compare in AI chat"
+                >
+                  <Bot className="h-3 w-3" />
+                  Compare
+                </button>
+              )}
+              {onMerge && (
+                <button
+                  onClick={() => onMerge(r.symbol)}
+                  className={`self-center flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                    isInMerge
+                      ? "bg-un-blue text-white"
+                      : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                  }`}
+                  title={isInMerge ? "Remove from merge" : "Merge with this report"}
+                >
+                  {isInMerge ? (
+                    <>
+                      <Check className="h-3 w-3" />
+                      Merge
+                    </>
+                  ) : (
+                    "Merge"
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         );
       })}
@@ -900,11 +917,13 @@ function VersionRow({ v }: { v: Version }) {
 function InteractivePublicationPattern({ 
   versions, 
   expanded, 
-  onToggle 
+  onToggle,
+  onCompare,
 }: { 
   versions: Version[]; 
   expanded: boolean;
   onToggle: () => void;
+  onCompare?: () => void;
 }) {
   const years = versions
     .map((v) => v.year)
@@ -973,6 +992,20 @@ function InteractivePublicationPattern({
           })}
         </div>
       </button>
+
+      {/* Compare versions button - always visible when multiple versions */}
+      {versions.length > 1 && onCompare && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onCompare();
+          }}
+          className="mt-2 w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-un-blue bg-blue-50 hover:bg-blue-100 rounded-md transition-colors"
+        >
+          <Bot className="h-3.5 w-3.5" />
+          Compare versions in AI
+        </button>
+      )}
 
       {expanded && (
         <div className="mt-3 pt-3 border-t border-gray-100 space-y-1">
@@ -1161,6 +1194,7 @@ export function ReportSidebar({
   userEntity,
   userEmail,
 }: ReportSidebarProps) {
+  const { prefillPrompt } = useChatContext();
   const [similar, setSimilar] = useState<SimilarReport[]>([]);
   const [similarLoading, setSimilarLoading] = useState(false);
   const [similarError, setSimilarError] = useState<string | null>(null);
@@ -1511,6 +1545,16 @@ export function ReportSidebar({
               <X className="h-4 w-4 text-gray-400" />
             </button>
           </div>
+          {/* Chat action */}
+          <div className="flex flex-wrap gap-2 mt-3">
+            <button
+              onClick={() => prefillPrompt(`Please summarize report ${report.symbol}. Focus on the key findings, recommendations, and any important data points.`)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              Chat about report
+            </button>
+          </div>
         </div>
 
         {/* Scrollable content */}
@@ -1534,6 +1578,10 @@ export function ReportSidebar({
                   versions={report.versions}
                   expanded={versionsExpanded}
                   onToggle={() => setVersionsExpanded(!versionsExpanded)}
+                  onCompare={report.versions.length > 1 ? () => {
+                    const symbols = report.versions.slice(0, 3).map(v => v.symbol).join(", ");
+                    prefillPrompt(`Compare these report versions: ${symbols}. Show key changes between versions in a table.`);
+                  } : undefined}
                 />
                 {!versionsExpanded && (
                   <p className="text-[10px] text-gray-400 mt-2 text-center">
@@ -1728,7 +1776,11 @@ export function ReportSidebar({
                 loading={similarLoading}
                 error={similarError}
                 onMerge={toggleMergeTarget}
+                onCompare={(targetSymbol) => {
+                  prefillPrompt(`Compare reports ${report.symbol} and ${targetSymbol}. Highlight key differences in scope, recommendations, and data.`);
+                }}
                 mergeTargets={mergeTargets}
+                currentSymbol={report.symbol}
                 defaultVisible={4}
               />
             </div>

@@ -75,9 +75,10 @@ export async function GET(req: NextRequest) {
       })),
     });
   } catch (error) {
-    console.error("Error finding similar reports:", error);
+    console.error("Error finding similar reports for symbol:", symbol, error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { error: "Failed to find similar reports" },
+      { error: "Failed to find similar reports", details: errorMessage },
       { status: 500 }
     );
   }

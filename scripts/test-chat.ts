@@ -79,10 +79,23 @@ SELECT * FROM sg_reports WHERE SUBSTRING(publication_date, 1, 4) = '2024';
 \`\`\`
 
 ## Common Tasks
-- **Read a report**: read_document, then summarize key points
-- **Compare reports**: read both, table of differences
-- **Find mandating resolutions**: query based_on_resolution_symbols, then read_document on resolution
-- **Find reports by topic**: query with subject_terms or title ILIKE`;
+- **Summarize a report**: Use read_document to get full text, then summarize key points
+- **Compare reports/versions**: ALWAYS use read_document on BOTH documents to compare actual content, not just SQL metadata. Present differences in a table.
+- **Find similar reports**: Query to find candidates, then read_document to compare content
+- **Find mandating resolutions**: Query based_on_resolution_symbols, then read_document on resolution
+- **Find reports by topic**: Query with subject_terms or title ILIKE
+
+## Important: Content vs Metadata
+- SQL queries only return metadata (title, date, symbol, subject_terms)
+- To analyze or compare actual report CONTENT, you MUST use read_document
+- When user asks to "compare", "summarize", "what does it say", or "differences" → read the document(s)
+
+## Multi-Step Workflows
+You can chain multiple tool calls in sequence. Examples:
+- Query SQL to find relevant reports → read_document on top results → summarize findings
+- Read a report → query SQL to find related reports → read those too → compare
+- Query for reports by topic → read several → synthesize insights across them
+Don't hesitate to make multiple tool calls to fully answer the user's question.`;
 
 // Message types
 interface ChatMessage {

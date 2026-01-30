@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useStickToBottom } from "use-stick-to-bottom";
 import { useChatContext } from "./ChatContext";
 import { ChatMessageCompact } from "./ChatMessageCompact";
-import { ArrowDown, Loader2, Sparkles, ArrowUp } from "lucide-react";
+import { Loader2, Sparkles, ArrowUp } from "lucide-react";
 
 const DEFAULT_SUGGESTIONS = [
   "Summarize report A/80/469",
@@ -141,17 +141,6 @@ export function ChatPanelWidget() {
             </div>
           )}
         </div>
-
-        {/* Scroll button */}
-        {!isAtBottom && messages.length > 0 && (
-          <button
-            onClick={() => scrollToBottom()}
-            className="absolute bottom-1 left-1/2 -translate-x-1/2 px-2 py-0.5 text-[9px] bg-white border border-gray-200 rounded-full shadow-sm hover:bg-gray-50 text-gray-500"
-          >
-            <ArrowDown className="h-2.5 w-2.5 inline mr-0.5" />
-            New
-          </button>
-        )}
       </div>
 
       {/* Input area - full width, no scrollbar */}

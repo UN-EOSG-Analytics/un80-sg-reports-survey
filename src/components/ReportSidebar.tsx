@@ -810,7 +810,7 @@ function SimilarReportsGrid({
                 {onCompare && (
                   <button
                     onClick={() => onCompare(r.symbol)}
-                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-gray-600 bg-gray-50 border border-gray-200 hover:bg-gray-100 hover:border-gray-300 transition-colors"
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
                     title="Compare with AI"
                   >
                     <Sparkles className="h-2.5 w-2.5" />
@@ -901,7 +901,7 @@ function VersionRow({
         {previousSymbol && onCompareWithPrevious && (
           <button
             onClick={() => onCompareWithPrevious(v.symbol, previousSymbol)}
-            className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-gray-600 bg-gray-50 border border-gray-200 hover:bg-gray-100 hover:border-gray-300 rounded transition-colors"
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
             title={`Compare with ${previousSymbol}`}
           >
             <Sparkles className="h-2.5 w-2.5" />
@@ -1545,6 +1545,14 @@ export function ReportSidebar({
                     {abbreviateBody(report.body)}
                   </span>
                 )}
+                <button
+                  onClick={() => prefillPrompt(`Summarize report ${report.symbol} in one paragraph.`)}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                  title="Summarize with AI"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  Summarize
+                </button>
               </div>
               <h2 className="text-sm font-medium text-gray-900 leading-snug line-clamp-2" title={report.title?.replace(/\s*:\s*$/, "").trim() || undefined}>
                 {report.title?.replace(/\s*:\s*$/, "").trim() || "Untitled"}
@@ -1555,16 +1563,6 @@ export function ReportSidebar({
               className="p-1 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
             >
               <X className="h-4 w-4 text-gray-400" />
-            </button>
-          </div>
-          {/* AI summarize action */}
-          <div className="flex flex-wrap gap-2 mt-3">
-            <button
-              onClick={() => prefillPrompt(`Summarize report ${report.symbol} in one paragraph.`)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-600 bg-gray-50 border border-gray-200 hover:bg-gray-100 hover:border-gray-300 rounded-md transition-colors"
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              Summarize with AI
             </button>
           </div>
         </div>

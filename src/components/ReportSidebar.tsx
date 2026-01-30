@@ -807,6 +807,24 @@ function SimilarReportsGrid({
               </p>
               {/* Metadata row with AI button */}
               <div className="flex items-center gap-2 mt-0.5">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    {/* Normalize similarity from 0.7-1.0 range to 0-1 for better contrast */}
+                    <span 
+                      className="text-[10px] font-medium px-1.5 py-0.5 rounded cursor-help"
+                      style={{
+                        // Map 0.7-1.0 → 0-1, then apply to visual range
+                        backgroundColor: `rgba(0, 0, 0, ${0.05 + Math.max(0, (r.similarity - 0.7) / 0.3) * 0.25})`,
+                        color: `rgba(0, 0, 0, ${0.4 + Math.max(0, (r.similarity - 0.7) / 0.3) * 0.5})`,
+                      }}
+                    >
+                      {Math.round(r.similarity * 100)}%
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-xs">Semantic similarity based on meaning, not word-by-word matching</p>
+                  </TooltipContent>
+                </Tooltip>
                 <a
                   href={buildODSLink(r.symbol)}
                   target="_blank"

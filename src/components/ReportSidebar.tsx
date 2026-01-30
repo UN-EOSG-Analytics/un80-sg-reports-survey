@@ -98,7 +98,7 @@ export interface SimilarReport {
 
 // Feedback types (for survey responses)
 export type FeedbackStatus = "continue" | "continue_with_changes" | "merge" | "discontinue" | null;
-export type FrequencyFeedback = "multiple" | "annual" | "biennial" | "triennial" | "quadrennial" | "one-time" | null;
+export type FrequencyFeedback = "multiple-per-year" | "annual" | "biennial" | "triennial" | "quadrennial" | "one-time" | null;
 export type FormatFeedback = "shorter" | "oral" | "dashboard" | "other" | "no-change" | null;
 
 export interface Feedback {
@@ -122,7 +122,7 @@ export type Recommendation = Feedback;
 // =============================================================================
 
 const FREQUENCY_OPTIONS = [
-  { value: "multiple", label: "Multiple times per year" },
+  { value: "multiple-per-year", label: "Multiple times per year" },
   { value: "annual", label: "Annual" },
   { value: "biennial", label: "Biennial (every 2 years)" },
   { value: "triennial", label: "Triennial (every 3 years)" },
@@ -1063,6 +1063,7 @@ function ResolutionsSection({
   const getFrequencyColor = (freq: string | null) => {
     if (!freq) return "bg-gray-100 text-gray-500";
     switch (freq.toLowerCase()) {
+      case "multiple-per-year": return "bg-rose-100 text-rose-700";
       case "annual": return "bg-blue-100 text-blue-700";
       case "biennial": return "bg-green-100 text-green-700";
       case "triennial": return "bg-purple-100 text-purple-700";

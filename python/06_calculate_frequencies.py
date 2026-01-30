@@ -21,15 +21,35 @@ def calculate_frequency(years: list[int]) -> tuple[str, list[int]]:
     Recent gaps are weighted higher (3x, 2x, 1x...).
     
     Args:
-        years: List of publication years for a report group
+        years: List of publication years for a report group (may contain duplicates)
         
     Returns:
         Tuple of (frequency_label, gap_history)
-        - frequency_label: 'annual', 'biennial', 'one-time', etc.
+        - frequency_label: 'annual', 'biennial', 'one-time', 'multiple-per-year', etc.
         - gap_history: List of year gaps (most recent first)
     """
     if len(years) < 2:
         return ("one-time", [])
+    
+    # Check for multiple reports per year pattern BEFORE deduplication
+    year_counts = Counter(years)
+    total_reports = len(years)
+    unique_years = len(year_counts)
+    
+    # If we have significantly more reports than unique years, it's multiple per year
+    # Use threshold: at least 3 reports AND average of 1.5+ reports per year
+    if total_reports >= 3 and unique_years >= 2:
+        avg_per_year = total_reports / unique_years
+        # Count how many years have multiple reports
+        years_with_multiple = sum(1 for count in year_counts.values() if count > 1)
+        
+        # If average is >= 1.5 reports/year AND at least 40% of years have multiples
+        # OR if we consistently have 2+ reports per year (avg >= 2)
+        if avg_per_year >= 2.0 or (avg_per_year >= 1.5 and years_with_multiple >= unique_years * 0.4):
+            # Sort years descending for gap calculation (using unique years)
+            sorted_years = sorted(set(years), reverse=True)
+            gaps = [sorted_years[i] - sorted_years[i + 1] for i in range(len(sorted_years) - 1)] if len(sorted_years) > 1 else []
+            return ("multiple-per-year", gaps)
     
     # Sort years descending (most recent first) and deduplicate
     sorted_years = sorted(set(years), reverse=True)
@@ -80,16 +100,21 @@ def get_report_groups() -> list[tuple[str, list[int]]]:
     Fetch all report groups with their publication years.
     Uses date_year if available, otherwise extracts year from publication_date.
     
+    Note: Does NOT deduplicate years - we need duplicates to detect 
+    "multiple-per-year" frequency patterns.
+    
     Returns:
-        List of (proper_title, years) tuples
+        List of (proper_title, years) tuples - years may contain duplicates
     """
     conn = psycopg2.connect(DATABASE_URL)
     try:
         with conn.cursor() as cur:
+            # Don't use DISTINCT - we need to see duplicate years to detect
+            # multiple-per-year patterns
             cur.execute(f"""
                 SELECT 
                     proper_title,
-                    array_agg(DISTINCT effective_year ORDER BY effective_year DESC) as years
+                    array_agg(effective_year ORDER BY effective_year DESC) as years
                 FROM (
                     SELECT 
                         proper_title,

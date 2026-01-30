@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 const DB_SCHEMA = process.env.DB_SCHEMA || "sg_reports_survey";
 
 // Valid frequency values
-const VALID_FREQUENCIES = ['multiple', 'annual', 'biennial', 'triennial', 'quadrennial', 'quinquennial', 'one-time', 'other'];
+const VALID_FREQUENCIES = ['multiple-per-year', 'annual', 'biennial', 'triennial', 'quadrennial', 'quinquennial', 'one-time', 'other'];
 
 interface FrequencyConfirmationInput {
   properTitle: string;

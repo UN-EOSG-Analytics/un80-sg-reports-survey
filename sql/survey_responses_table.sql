@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS sg_reports_survey.survey_responses (
   status TEXT NOT NULL CHECK (status IN ('continue', 'merge', 'discontinue')),
   
   -- Continue options
-  frequency TEXT CHECK (frequency IS NULL OR frequency IN ('multiple', 'annual', 'biennial', 'triennial', 'quadrennial', 'one-time')),
+  frequency TEXT CHECK (frequency IS NULL OR frequency IN ('multiple-per-year', 'annual', 'biennial', 'triennial', 'quadrennial', 'one-time')),
   format TEXT CHECK (format IS NULL OR format IN ('shorter', 'oral', 'dashboard', 'other', 'no-change')),
   format_other TEXT,  -- When format = 'other'
   

@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS sg_reports_survey.report_frequency_confirmations (
   id SERIAL PRIMARY KEY,
   proper_title TEXT NOT NULL,
-  frequency TEXT NOT NULL CHECK (frequency IN ('multiple', 'annual', 'biennial', 'triennial', 'quadrennial', 'quinquennial', 'one-time', 'other')),
+  frequency TEXT NOT NULL CHECK (frequency IN ('multiple-per-year', 'annual', 'biennial', 'triennial', 'quadrennial', 'quinquennial', 'one-time', 'other')),
   confirmed_by_user_id UUID NOT NULL REFERENCES sg_reports_survey.users(id),
   confirmed_at TIMESTAMPTZ DEFAULT NOW(),
   notes TEXT,

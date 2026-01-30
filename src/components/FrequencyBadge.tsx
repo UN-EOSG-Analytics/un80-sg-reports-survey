@@ -22,6 +22,15 @@ export interface FrequencyBadgeProps {
 // Helper Functions
 // =============================================================================
 
+// Format frequency for display (replace hyphens with spaces for readability)
+function formatFrequency(frequency: string): string {
+  // Special case: "one-time" keeps hyphen, others get spaces
+  if (frequency.toLowerCase() === "one-time") {
+    return frequency;
+  }
+  return frequency.replace(/-/g, " ");
+}
+
 // Get styling based on confirmation status
 // Confirmed: solid gray border with light gray background (same as confirmed entities)
 // Calculated: dotted blue border with blue tinted background (auto-derived, might be flawed)
@@ -93,7 +102,7 @@ export function FrequencyBadge({
         <span
           className={`inline-flex items-center rounded-full font-medium whitespace-nowrap cursor-default ${sizeClasses} ${style}`}
         >
-          {frequency}
+          {formatFrequency(frequency)}
         </span>
       </TooltipTrigger>
       <TooltipContent>

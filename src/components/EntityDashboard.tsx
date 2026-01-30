@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { ReportsTable } from "./SGReportsList";
-import { FileText, Info } from "lucide-react";
+import { Info } from "lucide-react";
 import Link from "next/link";
 
 interface Props {
@@ -24,22 +24,13 @@ export function EntityDashboard({ entity, userName }: Props) {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">
-            {entity} Reports
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Manage your entity&apos;s SG reports and provide feedback
-          </p>
-        </div>
-        <Link
-          href="/reports"
-          className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors"
-        >
-          <FileText className="h-4 w-4" />
-          Browse All Reports
-        </Link>
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">
+          {entity} Reports
+        </h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Manage your entity&apos;s SG reports and provide feedback
+        </p>
       </div>
 
       {/* Instructions Banner */}
@@ -85,11 +76,23 @@ export function EntityDashboard({ entity, userName }: Props) {
       {/* Suggested Reports Section */}
       <section>
         <div className="mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Suggested Reports
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Suggested Reports
+            </h2>
+            <Link
+              href="/reports"
+              className="text-sm text-un-blue hover:underline"
+            >
+              View All Reports &rarr;
+            </Link>
+          </div>
           <p className="mt-1 text-sm text-gray-500">
-            These reports may belong to {entity} based on their content. Click the <span className="inline-flex items-center justify-center w-4 h-4 text-un-blue border border-un-blue rounded-full align-text-bottom mx-0.5 text-[10px]">+</span> button to add any that are yours, or ignore those that aren&apos;t.
+            This is a filtered list of reports that may belong to {entity} based on their content. Click the <span className="inline-flex items-center justify-center w-4 h-4 text-un-blue border border-un-blue rounded-full align-text-bottom mx-0.5 text-[10px]">+</span> button to add any that are yours.
+          </p>
+          <p className="mt-2 text-sm text-gray-500">
+            To find reports not shown here, use the &quot;Add a report&quot; search in your reports list above, or{" "}
+            <Link href="/reports" className="text-un-blue hover:underline">view all reports</Link>.
           </p>
           <p className="mt-2 text-sm text-gray-500">
             Reports are from 2023 to present, sourced from the{" "}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import Link from "next/link";
 import { Loader2, ChevronUp, ChevronDown, Filter, X, Search, ChevronRight, Clock, Layers, Plus, Check, Minus, ArrowRight, Play, GitMerge, XCircle, Pencil } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -571,6 +572,7 @@ function ColumnHeaders({
   const showFeedbackColumn = mode === "all" || mode === "my";
   const showActions = mode === "my" || mode === "suggested";
   const showEntityColumn = mode !== "my";  // Hide entity column in "my" mode
+  const showFilters = mode !== "suggested";  // Hide filter icons in suggested mode
   const gridCols = mode === "all" ? GRID_COLS_ALL : mode === "my" ? GRID_COLS_MY : GRID_COLS_SUGGESTED;
   
   return (
@@ -590,7 +592,7 @@ function ColumnHeaders({
       {showEntityColumn && (
         <div className="flex items-center gap-1">
           <span>Entity</span>
-          {filterOptions?.entities && filterOptions.entities.length > 0 && (
+          {showFilters && filterOptions?.entities && filterOptions.entities.length > 0 && (
             <CountFilterPopover
               options={filterOptions.entities}
               selected={filters.entities}
@@ -603,7 +605,7 @@ function ColumnHeaders({
       )}
       <div className="flex items-center gap-1">
         <span>Body</span>
-        {filterOptions?.bodies && filterOptions.bodies.length > 0 && (
+        {showFilters && filterOptions?.bodies && filterOptions.bodies.length > 0 && (
           <CountFilterPopover
             options={filterOptions.bodies}
             selected={filters.bodies}
@@ -615,7 +617,7 @@ function ColumnHeaders({
       </div>
       <div className="flex items-center gap-1">
         <span>Year</span>
-        {filterOptions?.years && filterOptions.years.length > 0 && (
+        {showFilters && filterOptions?.years && filterOptions.years.length > 0 && (
           <YearFilterPopover
             options={filterOptions.years}
             selected={filters.years}
@@ -626,7 +628,7 @@ function ColumnHeaders({
       </div>
       <div className="flex items-center gap-1">
         <span>Subjects</span>
-        {subjectCounts.length > 0 && (
+        {showFilters && subjectCounts.length > 0 && (
           <SubjectFilterPopover
             subjects={subjectCounts}
             selectedSubjects={filters.subjects}
@@ -641,7 +643,7 @@ function ColumnHeaders({
       </div>
       <div className="flex items-center gap-1">
         <span>Frequency</span>
-        {filterOptions?.frequencies && filterOptions.frequencies.length > 0 && (
+        {showFilters && filterOptions?.frequencies && filterOptions.frequencies.length > 0 && (
           <FrequencyFilterPopover
             options={filterOptions.frequencies}
             selected={filters.frequencies}
@@ -1033,8 +1035,8 @@ function AddReportSearch({
 
   return (
     <div ref={searchRef} className="relative mt-3">
-      <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-        <Plus className="h-4 w-4 text-gray-400 flex-shrink-0" />
+      <div className="flex items-center gap-3 px-4 py-3 bg-blue-50 rounded-lg border border-blue-200 hover:border-blue-300 transition-colors">
+        <Plus className="h-4 w-4 text-un-blue flex-shrink-0" />
         <input
           type="text"
           placeholder={`Add a report to ${entity}'s list — search by symbol (e.g. A/79/...) or title...`}
@@ -1042,10 +1044,10 @@ function AddReportSearch({
           onChange={(e) => setSearchQuery(e.target.value)}
           onFocus={() => results.length > 0 && setShowResults(true)}
           onKeyDown={handleKeyDown}
-          className="flex-1 bg-transparent text-sm text-gray-600 placeholder:text-gray-400 outline-none"
+          className="flex-1 bg-transparent text-sm text-gray-700 placeholder:text-gray-500 outline-none"
         />
         {isSearching && (
-          <Loader2 className="h-4 w-4 animate-spin text-gray-400 flex-shrink-0" />
+          <Loader2 className="h-4 w-4 animate-spin text-un-blue flex-shrink-0" />
         )}
       </div>
 
@@ -1423,58 +1425,65 @@ export function ReportsTable({
 
   return (
     <div className="space-y-4">
-      {/* Search filters */}
-      <div className="flex items-center gap-3">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Search by symbol or title..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="h-9 text-sm pl-9 w-96"
-          />
-          {searchInput && (
-            <button
-              onClick={() => setSearchInput("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          )}
-        </div>
+      {/* Search filters - hidden for suggested mode */}
+      {mode !== "suggested" ? (
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search by symbol or title..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="h-9 text-sm pl-9 w-96"
+            />
+            {searchInput && (
+              <button
+                onClick={() => setSearchInput("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
 
-        
-        {hasActiveFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setSearchInput("");
-              setFilters({
-                search: "",
-                symbol: "",
-                title: "",
-                bodies: [],
-                years: [],
-                frequencies: [],
-                subjects: [],
-                entities: [],
-                reportTypes: [],
-              });
-              setPage(1);
-            }}
-            className="h-8 text-xs text-gray-500"
-          >
-            Clear all filters
-          </Button>
-        )}
-        
-        {/* Right-aligned count */}
-        <p className="text-sm text-gray-500 ml-auto">
-          {data?.total} report series
-          {hasActiveFilters && " (filtered)"}
+          
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSearchInput("");
+                setFilters({
+                  search: "",
+                  symbol: "",
+                  title: "",
+                  bodies: [],
+                  years: [],
+                  frequencies: [],
+                  subjects: [],
+                  entities: [],
+                  reportTypes: [],
+                });
+                setPage(1);
+              }}
+              className="h-8 text-xs text-gray-500"
+            >
+              Clear all filters
+            </Button>
+          )}
+          
+          {/* Right-aligned count */}
+          <p className="text-sm text-gray-500 ml-auto">
+            {data?.total} report series
+            {hasActiveFilters && " (filtered)"}
+          </p>
+        </div>
+      ) : (
+        /* Simple count for suggested mode */
+        <p className="text-sm text-gray-500">
+          {data?.total} suggested reports
         </p>
-      </div>
+      )}
 
       {/* Table */}
       <div className="rounded-lg border border-gray-200 overflow-hidden">
@@ -1522,8 +1531,14 @@ export function ReportsTable({
               </div>
             ) : mode === "suggested" ? (
               <div className="space-y-2">
-                <p className="text-gray-500">No additional suggestions</p>
-                <p className="text-sm text-gray-400">All suggested reports have been added to your list or there are no more matches.</p>
+                <p className="text-gray-500">No suggested reports available</p>
+                <p className="text-sm text-gray-400">
+                  Use the search above to add reports manually, or{" "}
+                  <Link href="/reports" className="text-un-blue hover:underline">
+                    browse all reports
+                  </Link>{" "}
+                  to find reports not in our suggestions.
+                </p>
               </div>
             ) : hasActiveFilters ? (
               <p className="text-gray-400">No reports match your filters</p>

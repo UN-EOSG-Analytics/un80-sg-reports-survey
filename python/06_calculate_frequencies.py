@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""Calculate reporting frequencies using weighted mode algorithm."""
+"""Calculate reporting frequencies using weighted mode algorithm.
+
+Uses sg_reports VIEW (not documents table) to ensure consistency with the app:
+- Only includes Secretary-General reports
+- Filters to 2023+ (survey focus years)  
+- Excludes CORR/REV documents
+- Excludes credentials reports
+
+This ensures frequency calculations match what users see in the UI.
+"""
 
 import os
 from collections import Counter
@@ -95,29 +104,49 @@ def calculate_frequency(years: list[int]) -> tuple[str, list[int]]:
     return (frequency, gaps)
 
 
-def get_report_groups() -> list[tuple[str, list[int]]]:
+def get_report_groups() -> list[tuple[str, str | None, list[int]]]:
     """
     Fetch all report groups with their publication years.
-    Uses date_year if available, otherwise extracts year from publication_date.
     
-    Note: Does NOT deduplicate years - we need duplicates to detect 
-    "multiple-per-year" frequency patterns.
+    Uses sg_reports VIEW (not documents table) to ensure consistency with the app:
+    - Only includes Secretary-General reports
+    - Filters to 2023+ (survey focus years)
+    - Excludes CORR/REV documents
+    - Excludes credentials reports
+    
+    Groups by (proper_title, normalized_body) to separate different UN bodies
+    (GA, ECOSOC, etc.) that may have the same report title.
+    
+    For detecting "multiple-per-year" patterns, we count distinct SYMBOLS per year.
+    Years with multiple distinct symbols will appear multiple times in the result.
     
     Returns:
-        List of (proper_title, years) tuples - years may contain duplicates
+        List of (proper_title, normalized_body, years) tuples - years appear once per distinct symbol
     """
     conn = psycopg2.connect(DATABASE_URL)
     try:
         with conn.cursor() as cur:
-            # Don't use DISTINCT - we need to see duplicate years to detect
-            # multiple-per-year patterns
+            # Use sg_reports VIEW to match app filtering (2023+, SG reports only, no CORR/REV)
+            # Count distinct symbols per year to detect multiple-per-year patterns
+            # Each distinct symbol in a year adds that year once to the array
             cur.execute(f"""
                 SELECT 
                     proper_title,
+                    normalized_body,
                     array_agg(effective_year ORDER BY effective_year DESC) as years
                 FROM (
-                    SELECT 
+                    SELECT DISTINCT
                         proper_title,
+                        symbol,
+                        -- Normalize body: extract first value from PostgreSQL array format
+                        CASE 
+                            WHEN un_body LIKE '{{%}}' THEN 
+                                COALESCE(
+                                    SUBSTRING(un_body FROM '^\\{{"?([^",}}]+)"?'),
+                                    un_body
+                                )
+                            ELSE un_body
+                        END as normalized_body,
                         COALESCE(
                             date_year,
                             CASE 
@@ -125,29 +154,51 @@ def get_report_groups() -> list[tuple[str, list[int]]]:
                                 THEN SUBSTRING(publication_date FROM 1 FOR 4)::int 
                             END
                         ) as effective_year
-                    FROM {DB_SCHEMA}.documents
+                    FROM {DB_SCHEMA}.sg_reports
                     WHERE proper_title IS NOT NULL
                 ) sub
                 WHERE effective_year IS NOT NULL
-                GROUP BY proper_title
+                GROUP BY proper_title, normalized_body
             """)
-            return [(row[0], [y for y in row[1] if y is not None]) for row in cur.fetchall()]
+            return [(row[0], row[1], [y for y in row[2] if y is not None]) for row in cur.fetchall()]
     finally:
         conn.close()
 
 
 def create_frequencies_table():
-    """Create the report_frequencies table if it doesn't exist."""
+    """Create the report_frequencies table if it doesn't exist.
+    
+    The table now uses a composite key of (proper_title, normalized_body)
+    to separate different UN bodies that may have the same report title.
+    """
     conn = psycopg2.connect(DATABASE_URL)
     try:
         with conn.cursor() as cur:
+            # Check if table exists with old schema (without normalized_body)
+            cur.execute(f"""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_schema = '{DB_SCHEMA}' 
+                    AND table_name = 'report_frequencies'
+                    AND column_name = 'normalized_body'
+                )
+            """)
+            has_body_column = cur.fetchone()[0]
+            
+            if not has_body_column:
+                # Drop old table and recreate with new schema
+                print("Migrating report_frequencies table to include normalized_body...")
+                cur.execute(f"DROP TABLE IF EXISTS {DB_SCHEMA}.report_frequencies")
+            
             cur.execute(f"""
                 CREATE TABLE IF NOT EXISTS {DB_SCHEMA}.report_frequencies (
-                    proper_title TEXT PRIMARY KEY,
+                    proper_title TEXT NOT NULL,
+                    normalized_body TEXT NOT NULL DEFAULT '',
                     calculated_frequency TEXT NOT NULL,
                     gap_history INT[],
                     year_count INT,
-                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                    updated_at TIMESTAMPTZ DEFAULT NOW(),
+                    PRIMARY KEY (proper_title, normalized_body)
                 )
             """)
             conn.commit()
@@ -157,16 +208,20 @@ def create_frequencies_table():
 
 
 def update_all_frequencies():
-    """Fetch all report groups and update their calculated frequencies."""
+    """Fetch all report groups and update their calculated frequencies.
+    
+    Now groups by (proper_title, normalized_body) to calculate separate
+    frequencies for different UN bodies with the same report title.
+    """
     print("Fetching report groups...")
     report_groups = get_report_groups()
     print(f"Found {len(report_groups)} report groups")
     
     # Calculate frequencies
     results = []
-    for proper_title, years in tqdm(report_groups, desc="Calculating frequencies"):
+    for proper_title, normalized_body, years in tqdm(report_groups, desc="Calculating frequencies"):
         frequency, gaps = calculate_frequency(years)
-        results.append((proper_title, frequency, gaps if gaps else None, len(years)))
+        results.append((proper_title, normalized_body, frequency, gaps if gaps else None, len(years)))
     
     # Store in database using batch insert
     conn = psycopg2.connect(DATABASE_URL)
@@ -178,16 +233,16 @@ def update_all_frequencies():
                 cur,
                 f"""
                 INSERT INTO {DB_SCHEMA}.report_frequencies 
-                    (proper_title, calculated_frequency, gap_history, year_count, updated_at)
+                    (proper_title, normalized_body, calculated_frequency, gap_history, year_count, updated_at)
                 VALUES %s
-                ON CONFLICT (proper_title) DO UPDATE SET
+                ON CONFLICT (proper_title, normalized_body) DO UPDATE SET
                     calculated_frequency = EXCLUDED.calculated_frequency,
                     gap_history = EXCLUDED.gap_history,
                     year_count = EXCLUDED.year_count,
                     updated_at = NOW()
                 """,
-                [(pt, freq, gaps, yc) for pt, freq, gaps, yc in results],
-                template="(%s, %s, %s, %s, NOW())",
+                [(pt, nb or '', freq, gaps, yc) for pt, nb, freq, gaps, yc in results],
+                template="(%s, %s, %s, %s, %s, NOW())",
                 page_size=500
             )
             conn.commit()
@@ -196,7 +251,7 @@ def update_all_frequencies():
         conn.close()
     
     # Print summary stats
-    freq_counts = Counter(r[1] for r in results)
+    freq_counts = Counter(r[2] for r in results)  # frequency is now at index 2
     print("\nFrequency Distribution:")
     for freq, count in sorted(freq_counts.items(), key=lambda x: -x[1]):
         print(f"  {freq}: {count}")

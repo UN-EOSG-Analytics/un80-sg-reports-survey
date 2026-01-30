@@ -155,38 +155,53 @@ COMMENT ON VIEW sg_reports_survey.report_entities IS 'Combined view of entity su
 
 --------------------------------------------------------------------------------
 -- LATEST_VERSIONS: Most recent version of each report series
--- Stage 2 deduplication: picks latest version per proper_title
+-- Stage 2 deduplication: picks latest version per (proper_title, normalized_body)
+-- Reports are now separated by body (GA vs ECOSOC, etc.)
 -- Year filtering inherited from sg_reports view (2023 to present)
 --------------------------------------------------------------------------------
 CREATE VIEW sg_reports_survey.latest_versions AS
-WITH version_counts AS (
-  SELECT proper_title, COUNT(*)::int as version_count
-  FROM sg_reports_survey.sg_reports
-  GROUP BY proper_title
-),
-ranked AS (
-  SELECT r.id, r.symbol, r.proper_title, r.title, r.date_year, r.publication_date,
-         r.un_body, r.subject_terms, r.source, r.report_type, r.based_on_resolution_symbols,
+WITH normalized AS (
+  -- Normalize body to extract first value from PostgreSQL array format
+  SELECT r.*,
+         CASE 
+           WHEN r.un_body LIKE '{%}' THEN 
+             COALESCE(
+               SUBSTRING(r.un_body FROM '^\{"?([^",}]+)"?'),
+               r.un_body
+             )
+           ELSE r.un_body
+         END as normalized_body,
          COALESCE(r.date_year, 
            CASE WHEN r.publication_date ~ '^\d{4}' 
            THEN SUBSTRING(r.publication_date FROM 1 FOR 4)::int END
-         ) as effective_year,
+         ) as effective_year
+  FROM sg_reports_survey.sg_reports r
+),
+version_counts AS (
+  -- Count versions per (proper_title, normalized_body) group
+  SELECT proper_title, normalized_body, COUNT(*)::int as version_count
+  FROM normalized
+  GROUP BY proper_title, normalized_body
+),
+ranked AS (
+  SELECT r.id, r.symbol, r.proper_title, r.title, r.date_year, r.publication_date,
+         r.un_body, r.normalized_body, r.subject_terms, r.source, r.report_type, 
+         r.based_on_resolution_symbols, r.effective_year,
          ROW_NUMBER() OVER (
-           PARTITION BY r.proper_title 
-           ORDER BY COALESCE(r.date_year, 
-             CASE WHEN r.publication_date ~ '^\d{4}' 
-             THEN SUBSTRING(r.publication_date FROM 1 FOR 4)::int END) DESC NULLS LAST,
+           PARTITION BY r.proper_title, r.normalized_body
+           ORDER BY r.effective_year DESC NULLS LAST,
              r.publication_date DESC NULLS LAST, r.symbol DESC
          ) as rn
-  FROM sg_reports_survey.sg_reports r
+  FROM normalized r
 )
 SELECT r.id, r.symbol, r.proper_title, r.title, r.date_year, r.publication_date,
-       r.un_body, r.subject_terms, r.effective_year, r.source, r.report_type,
+       r.un_body, r.normalized_body, r.subject_terms, r.effective_year, r.source, r.report_type,
        r.based_on_resolution_symbols, vc.version_count,
        d.embedding,
        re.primary_entity as entity
 FROM ranked r
-JOIN version_counts vc ON r.proper_title = vc.proper_title
+JOIN version_counts vc ON r.proper_title = vc.proper_title 
+  AND COALESCE(r.normalized_body, '') = COALESCE(vc.normalized_body, '')
 JOIN sg_reports_survey.documents d ON r.id = d.id
 LEFT JOIN sg_reports_survey.report_entities re ON r.proper_title = re.proper_title
 WHERE r.rn = 1;

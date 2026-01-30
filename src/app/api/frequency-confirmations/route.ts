@@ -9,6 +9,7 @@ const VALID_FREQUENCIES = ['multiple-per-year', 'annual', 'biennial', 'triennial
 
 interface FrequencyConfirmationInput {
   properTitle: string;
+  normalizedBody?: string | null;  // UN body for grouping (e.g., 'General Assembly')
   frequency: string;
   notes?: string | null;
 }
@@ -16,6 +17,7 @@ interface FrequencyConfirmationInput {
 interface FrequencyConfirmationRow {
   id: number;
   proper_title: string;
+  normalized_body: string | null;
   frequency: string;
   confirmed_by_user_id: string;
   confirmed_at: string;
@@ -24,20 +26,28 @@ interface FrequencyConfirmationRow {
   confirmed_by_email?: string;
 }
 
-// GET - Fetch frequency confirmation for a report
+// GET - Fetch frequency confirmation for a report (optionally filtered by body)
 export async function GET(req: NextRequest) {
   const properTitle = req.nextUrl.searchParams.get("properTitle");
+  const normalizedBody = req.nextUrl.searchParams.get("normalizedBody");
   const myConfirmations = req.nextUrl.searchParams.get("my") === "true";
 
   try {
     const whereClauses: string[] = [];
-    const params: string[] = [];
+    const params: (string | null)[] = [];
     let paramIndex = 1;
 
     if (properTitle) {
       whereClauses.push(`c.proper_title = $${paramIndex}`);
       params.push(properTitle);
       paramIndex++;
+      
+      // If normalizedBody is provided, also filter by it
+      if (normalizedBody !== null) {
+        whereClauses.push(`c.normalized_body = $${paramIndex}`);
+        params.push(normalizedBody || '');
+        paramIndex++;
+      }
     }
 
     // If requesting user's own confirmations, require auth
@@ -59,6 +69,7 @@ export async function GET(req: NextRequest) {
       `SELECT 
         c.id,
         c.proper_title,
+        c.normalized_body,
         c.frequency,
         c.confirmed_by_user_id,
         c.confirmed_at,
@@ -75,6 +86,7 @@ export async function GET(req: NextRequest) {
       confirmations: rows.map((row) => ({
         id: row.id,
         properTitle: row.proper_title,
+        normalizedBody: row.normalized_body,
         frequency: row.frequency,
         confirmedByUserId: row.confirmed_by_user_id,
         confirmedByEmail: row.confirmed_by_email,
@@ -85,6 +97,7 @@ export async function GET(req: NextRequest) {
       confirmation: rows.length > 0 ? {
         id: rows[0].id,
         properTitle: rows[0].proper_title,
+        normalizedBody: rows[0].normalized_body,
         frequency: rows[0].frequency,
         confirmedByUserId: rows[0].confirmed_by_user_id,
         confirmedByEmail: rows[0].confirmed_by_email,
@@ -140,22 +153,26 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Upsert - one frequency per report, anyone can confirm/update
+    // Normalize the body value (use empty string instead of null)
+    const normalizedBody = body.normalizedBody || '';
+
+    // Upsert - one frequency per (report, body), anyone can confirm/update
     const result = await query<FrequencyConfirmationRow>(
       `INSERT INTO ${DB_SCHEMA}.report_frequency_confirmations (
         proper_title,
+        normalized_body,
         frequency,
         confirmed_by_user_id,
         notes
-      ) VALUES ($1, $2, $3, $4)
-      ON CONFLICT (proper_title) 
+      ) VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (proper_title, normalized_body) 
       DO UPDATE SET
         frequency = EXCLUDED.frequency,
         confirmed_by_user_id = EXCLUDED.confirmed_by_user_id,
         confirmed_at = NOW(),
         notes = EXCLUDED.notes
       RETURNING *`,
-      [body.properTitle, body.frequency, user.id, body.notes || null]
+      [body.properTitle, normalizedBody, body.frequency, user.id, body.notes || null]
     );
 
     const row = result[0];
@@ -164,6 +181,7 @@ export async function POST(req: NextRequest) {
       confirmation: {
         id: row.id,
         properTitle: row.proper_title,
+        normalizedBody: row.normalized_body,
         frequency: row.frequency,
         confirmedByUserId: row.confirmed_by_user_id,
         confirmedByEmail: user.email,
@@ -188,6 +206,7 @@ export async function DELETE(req: NextRequest) {
   }
 
   const properTitle = req.nextUrl.searchParams.get("properTitle");
+  const normalizedBody = req.nextUrl.searchParams.get("normalizedBody");
 
   if (!properTitle) {
     return NextResponse.json(
@@ -200,9 +219,11 @@ export async function DELETE(req: NextRequest) {
     // Only allow deleting if user created it
     const result = await query<{ id: number }>(
       `DELETE FROM ${DB_SCHEMA}.report_frequency_confirmations 
-       WHERE proper_title = $1 AND confirmed_by_user_id = $2
+       WHERE proper_title = $1 
+       AND normalized_body = $2
+       AND confirmed_by_user_id = $3
        RETURNING id`,
-      [properTitle, user.id]
+      [properTitle, normalizedBody || '', user.id]
     );
 
     // Idempotent delete - if nothing was deleted, that's still success

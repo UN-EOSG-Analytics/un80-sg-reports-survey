@@ -1351,6 +1351,7 @@ export function ReportSidebar({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           properTitle: report.title,
+          normalizedBody: report.body,  // Include body for per-body frequency tracking
           frequency: frequency.toLowerCase().replace('-', '-'),
         }),
       });
@@ -1373,8 +1374,15 @@ export function ReportSidebar({
     
     setFrequencyConfirming(true);
     try {
+      // Build URL with both properTitle and normalizedBody params
+      const params = new URLSearchParams();
+      params.set("properTitle", report.title);
+      if (report.body) {
+        params.set("normalizedBody", report.body);
+      }
+      
       const response = await fetch(
-        `/api/frequency-confirmations?properTitle=${encodeURIComponent(report.title)}`,
+        `/api/frequency-confirmations?${params.toString()}`,
         { method: "DELETE" }
       );
       

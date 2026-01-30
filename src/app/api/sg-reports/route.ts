@@ -17,6 +17,7 @@ interface EntityConfirmation {
 
 interface ReportRow {
   proper_title: string;
+  normalized_body: string | null;  // Normalized body for grouping
   symbols: string[];
   years: (number | null)[];
   bodies: (string | null)[];
@@ -229,6 +230,7 @@ export async function GET(req: NextRequest) {
   // Mode-specific filtering
   // mode=my: Filter to reports confirmed by the specified entity
   // mode=suggested: Filter to reports suggested for the specified entity
+  // Note: Entity confirmations are shared across bodies (keyed by proper_title only)
   if (mode === "my" && modeEntity) {
     havingClauses.push(`(
       (SELECT re.confirmed_entities FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) @> ARRAY[$${havingParamIndex}]::text[]
@@ -245,6 +247,7 @@ export async function GET(req: NextRequest) {
 
   // Entity filter (supports multiple) - filter on suggested or confirmed entities
   // This needs to be in HAVING clause since we join with report_entities after grouping
+  // Note: Entity confirmations are shared across bodies (keyed by proper_title only)
   if (filterEntities.length > 0) {
     havingClauses.push(`(
       (SELECT re.suggested_entities FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) && $${havingParamIndex}::text[] 
@@ -278,7 +281,8 @@ export async function GET(req: NextRequest) {
   const allParams = [...params, ...havingParams];
   const limitParamIndex = havingParamIndex;
 
-  // Otherwise, return paginated list grouped by title
+  // Otherwise, return paginated list grouped by title AND body
+  // Reports with the same title but different bodies (e.g., GA vs ECOSOC) are now separate groups
   // Use COALESCE to fall back to publication_date year when date_year is null
   // Extract year from publication_date using substring (format: YYYY-MM-DD or similar)
   const [reports, countResult, bodyCounts, yearsResult, subjectCounts, entityCounts, reportTypeCounts] = await Promise.all([
@@ -286,6 +290,7 @@ export async function GET(req: NextRequest) {
       `WITH grouped AS (
         SELECT 
           sub.proper_title,
+          sub.normalized_body,
           array_agg(symbol ORDER BY effective_year DESC NULLS LAST, symbol) as symbols,
           array_agg(effective_year ORDER BY effective_year DESC NULLS LAST, symbol) as years,
           array_agg(un_body ORDER BY effective_year DESC NULLS LAST, symbol) as bodies,
@@ -294,18 +299,24 @@ export async function GET(req: NextRequest) {
           array_agg(record_number ORDER BY effective_year DESC NULLS LAST, symbol) as record_numbers,
           array_agg(word_count ORDER BY effective_year DESC NULLS LAST, symbol) as word_counts,
           array_agg(to_json(COALESCE(subject_terms, ARRAY[]::text[])) ORDER BY effective_year DESC NULLS LAST, symbol) as subject_terms_agg,
-          -- Entity fields using scalar subqueries to avoid array_agg on JSONB
+          -- Entity fields using scalar subqueries (shared across bodies, keyed by proper_title only)
           (SELECT re.suggested_entities FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as suggested_entities,
           (SELECT re.confirmed_entities FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as confirmed_entities,
           (SELECT re.suggestions FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as suggestions,
           (SELECT re.confirmations FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as confirmations,
           (SELECT re.primary_entity FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as primary_entity,
           (SELECT COALESCE(re.has_confirmation, false) FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as has_confirmation,
-          -- Pre-computed frequency from report_frequencies table
-          (SELECT rf.calculated_frequency FROM ${DB_SCHEMA}.report_frequencies rf WHERE rf.proper_title = sub.proper_title) as calculated_frequency,
-          (SELECT rf.gap_history FROM ${DB_SCHEMA}.report_frequencies rf WHERE rf.proper_title = sub.proper_title) as gap_history,
-          -- User-confirmed frequency
-          (SELECT rfc.frequency FROM ${DB_SCHEMA}.report_frequency_confirmations rfc WHERE rfc.proper_title = sub.proper_title) as confirmed_frequency,
+          -- Pre-computed frequency from report_frequencies table (per body)
+          (SELECT rf.calculated_frequency FROM ${DB_SCHEMA}.report_frequencies rf 
+           WHERE rf.proper_title = sub.proper_title 
+           AND rf.normalized_body = COALESCE(sub.normalized_body, '')) as calculated_frequency,
+          (SELECT rf.gap_history FROM ${DB_SCHEMA}.report_frequencies rf 
+           WHERE rf.proper_title = sub.proper_title 
+           AND rf.normalized_body = COALESCE(sub.normalized_body, '')) as gap_history,
+          -- User-confirmed frequency (per body)
+          (SELECT rfc.frequency FROM ${DB_SCHEMA}.report_frequency_confirmations rfc 
+           WHERE rfc.proper_title = sub.proper_title
+           AND rfc.normalized_body = COALESCE(sub.normalized_body, '')) as confirmed_frequency,
           COUNT(*)::int as count,
           MAX(effective_year) as latest_year
         FROM (
@@ -313,6 +324,15 @@ export async function GET(req: NextRequest) {
             r.proper_title,
             r.symbol,
             r.un_body,
+            -- Normalize body: extract first value from PostgreSQL array format
+            CASE 
+              WHEN r.un_body LIKE '{%}' THEN 
+                COALESCE(
+                  SUBSTRING(r.un_body FROM '^\\{"?([^",}]+)"?'),
+                  r.un_body
+                )
+              ELSE r.un_body
+            END as normalized_body,
             r.report_type,
             r.publication_date,
             r.record_number,
@@ -328,29 +348,43 @@ export async function GET(req: NextRequest) {
           FROM ${DB_SCHEMA}.sg_reports r
           WHERE ${whereClause}
         ) sub
-        GROUP BY sub.proper_title
+        GROUP BY sub.proper_title, sub.normalized_body
         ${havingClause}
       )
       SELECT * FROM grouped
       WHERE 1=1 ${frequencyFilterSQL}
-      ORDER BY latest_year DESC NULLS LAST, proper_title
+      ORDER BY latest_year DESC NULLS LAST, proper_title, normalized_body
       LIMIT $${limitParamIndex} OFFSET $${limitParamIndex + 1}`,
       [...allParams, limit, offset]
     ),
-    // Count query with same filters
+    // Count query with same filters (grouped by title AND body)
     query<{ total: number }>(
       `WITH grouped AS (
         SELECT 
           sub.proper_title,
-          -- Pre-computed frequency from report_frequencies table
-          (SELECT rf.calculated_frequency FROM ${DB_SCHEMA}.report_frequencies rf WHERE rf.proper_title = sub.proper_title) as calculated_frequency,
-          -- User-confirmed frequency
-          (SELECT rfc.frequency FROM ${DB_SCHEMA}.report_frequency_confirmations rfc WHERE rfc.proper_title = sub.proper_title) as confirmed_frequency,
+          sub.normalized_body,
+          -- Pre-computed frequency from report_frequencies table (per body)
+          (SELECT rf.calculated_frequency FROM ${DB_SCHEMA}.report_frequencies rf 
+           WHERE rf.proper_title = sub.proper_title 
+           AND rf.normalized_body = COALESCE(sub.normalized_body, '')) as calculated_frequency,
+          -- User-confirmed frequency (per body)
+          (SELECT rfc.frequency FROM ${DB_SCHEMA}.report_frequency_confirmations rfc 
+           WHERE rfc.proper_title = sub.proper_title
+           AND rfc.normalized_body = COALESCE(sub.normalized_body, '')) as confirmed_frequency,
           COUNT(*)::int as count,
           MAX(effective_year) as latest_year
         FROM (
           SELECT 
             r.proper_title,
+            -- Normalize body: extract first value from PostgreSQL array format
+            CASE 
+              WHEN r.un_body LIKE '{%}' THEN 
+                COALESCE(
+                  SUBSTRING(r.un_body FROM '^\\{"?([^",}]+)"?'),
+                  r.un_body
+                )
+              ELSE r.un_body
+            END as normalized_body,
             COALESCE(
               r.date_year,
               CASE 
@@ -362,7 +396,7 @@ export async function GET(req: NextRequest) {
           WHERE ${whereClause}
         ) sub
         LEFT JOIN ${DB_SCHEMA}.report_entities re ON sub.proper_title = re.proper_title
-        GROUP BY sub.proper_title
+        GROUP BY sub.proper_title, sub.normalized_body
         ${havingClause}
       )
       SELECT COUNT(*)::int as total FROM grouped
@@ -456,7 +490,7 @@ export async function GET(req: NextRequest) {
     return {
       title: r.proper_title || null,  // Keep original proper_title for database matching
       symbol: r.symbols[0],
-      body: parseBodyString(r.bodies[0]),
+      body: r.normalized_body || parseBodyString(r.bodies[0]),  // Use normalized body from grouping
       reportType: r.report_types?.[0] || 'Other', // Report type (Report/Note/Other)
       year: r.years[0] || null,
       // New entity structure

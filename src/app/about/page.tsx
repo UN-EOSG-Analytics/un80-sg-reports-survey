@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   ArrowRight,
   BarChart3,
+  Bot,
   Building2,
   Calendar,
   Check,
@@ -15,6 +16,7 @@ import {
   Quote,
   Search,
   Sparkles,
+  Users,
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { Header } from "@/components/Header";
@@ -231,6 +233,61 @@ function MockMandateParagraph() {
   );
 }
 
+// Mock AI chat interface
+function MockChatInterface() {
+  return (
+    <div className="space-y-2">
+      {/* User message */}
+      <div className="flex justify-end">
+        <div className="rounded-2xl rounded-br-sm bg-un-blue px-3 py-1.5 max-w-[85%]">
+          <p className="text-[11px] text-white">Compare A/78/554 with A/79/347</p>
+        </div>
+      </div>
+      {/* AI response */}
+      <div className="flex gap-2">
+        <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center">
+          <Sparkles className="h-2.5 w-2.5 text-gray-500" />
+        </div>
+        <div className="flex-1 rounded-lg border border-gray-200 bg-white px-2.5 py-2">
+          <p className="text-[11px] text-gray-600 leading-relaxed">
+            Both reports cover SDG implementation. A/79/347 adds new climate metrics and expands the partnerships section...
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Mock team collaboration - shared entity reports
+function MockTeamCollaboration() {
+  return (
+    <div className="space-y-2">
+      <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">
+        DESA Reports (shared)
+      </div>
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-2 rounded-lg bg-white px-2.5 py-2 shadow-sm">
+          <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-un-blue">
+            A/79/123
+          </span>
+          <span className="flex-1 truncate text-xs text-gray-600">SDG Progress</span>
+          <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
+        </div>
+        <div className="flex items-center gap-2 rounded-lg bg-white px-2.5 py-2 shadow-sm">
+          <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-un-blue">
+            A/78/456
+          </span>
+          <span className="flex-1 truncate text-xs text-gray-600">Financing for Dev</span>
+          <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
+        </div>
+      </div>
+      <p className="text-[10px] text-gray-400 leading-relaxed">
+        All colleagues from DESA see and can update these reports.
+      </p>
+    </div>
+  );
+}
+
 // =============================================================================
 // Main About Page
 // =============================================================================
@@ -300,7 +357,7 @@ export default async function AboutPage() {
             <FeatureCard
               icon={Building2}
               title="Find Your Reports"
-              description="Search for reports authored by your entity and confirm ownership. Once confirmed, you can provide feedback on each report's future."
+              description="Search for reports authored by your entity and confirm ownership. Once confirmed, you can provide feedback on frequency, format, and consolidation."
             >
               <div className="space-y-2">
                 <div className="flex items-center gap-2 rounded-lg border-2 border-dashed border-gray-200 px-3 py-2">
@@ -406,6 +463,24 @@ export default async function AboutPage() {
               description="View the original operative paragraphs from resolutions that mandate each report. Understand exactly what was requested and when."
             >
               <MockMandateParagraph />
+            </FeatureCard>
+
+            {/* 8. AI Chatbot Assistant */}
+            <FeatureCard
+              icon={Bot}
+              title="AI Chatbot Assistant"
+              description="Ask questions about any report. The AI can summarize documents, compare versions, query the database, and find related reports instantly."
+            >
+              <MockChatInterface />
+            </FeatureCard>
+
+            {/* 9. Team Collaboration */}
+            <FeatureCard
+              icon={Users}
+              title="Team Collaboration"
+              description="Multiple colleagues from the same entity can work together on the survey. All team members see the same reports and can contribute feedback."
+            >
+              <MockTeamCollaboration />
             </FeatureCard>
           </div>
         </section>

@@ -1,13 +1,13 @@
 "use client";
 
 import { useRef, useEffect } from "react";
-import { MessageSquare, X, Bot } from "lucide-react";
+import { Sparkles, X, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useChatContext } from "./ChatContext";
 import { ChatPanelWidget } from "./ChatPanelWidget";
 
 export function ChatWidget() {
-  const { isOpen, setIsOpen } = useChatContext();
+  const { isOpen, setIsOpen, messages, clearMessages, isStreaming } = useChatContext();
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Close on click outside
@@ -44,21 +44,33 @@ export function ChatWidget() {
       {isOpen && (
         <div
           ref={panelRef}
-          className="fixed bottom-16 left-4 z-50 w-[380px] h-[520px] animate-in slide-in-from-bottom-4 fade-in duration-200"
+          className="fixed bottom-16 left-4 z-50 w-[440px] h-[600px] animate-in slide-in-from-bottom-4 fade-in duration-200"
         >
           <div className="flex flex-col h-full overflow-hidden rounded-xl shadow-2xl border border-gray-200 bg-white">
-            {/* Compact header */}
-            <div className="flex-shrink-0 border-b border-gray-100 py-2 px-3 flex items-center justify-between bg-gray-50/80">
-              <div className="flex items-center gap-1.5">
-                <Bot className="h-3.5 w-3.5 text-un-blue" />
-                <span className="text-xs font-medium text-gray-700">AI Assistant</span>
+            {/* Compact header with clear button */}
+            <div className="flex-shrink-0 border-b border-gray-100 py-2.5 px-3 flex items-center justify-between bg-gray-50/80">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-un-blue" />
+                <span className="text-sm font-medium text-gray-700">AI Assistant</span>
               </div>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
+              <div className="flex items-center gap-1">
+                {/* Clear button in header - always visible when there are messages */}
+                {messages.length > 0 && (
+                  <button
+                    onClick={clearMessages}
+                    className="p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
+                    title="Clear chat"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
 
             {/* Chat content */}
@@ -83,9 +95,9 @@ export function ChatWidget() {
         {isOpen ? (
           <X className="h-5 w-5" />
         ) : (
-          <MessageSquare className="h-5 w-5" />
+          <Sparkles className="h-5 w-5" />
         )}
-        <span className="sr-only">{isOpen ? "Close chat" : "Open chat"}</span>
+        <span className="sr-only">{isOpen ? "Close AI" : "Open AI"}</span>
       </Button>
     </>
   );

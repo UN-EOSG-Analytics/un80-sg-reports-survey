@@ -4,78 +4,89 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ChatMessage as ChatMessageType } from "./ChatContext";
 import { ChatToolCallCompact } from "./ChatToolCallCompact";
-import { User, Bot } from "lucide-react";
+import { User, Sparkles, Loader2 } from "lucide-react";
 
 interface ChatMessageCompactProps {
   message: ChatMessageType;
+  isStreaming?: boolean;
 }
 
-export function ChatMessageCompact({ message }: ChatMessageCompactProps) {
+export function ChatMessageCompact({ message, isStreaming }: ChatMessageCompactProps) {
   const isUser = message.role === "user";
+  const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
+  const showThinking = !isUser && isStreaming && !message.content && hasToolCalls;
 
   return (
-    <div className={`flex gap-1.5 ${isUser ? "flex-row-reverse" : ""}`}>
+    <div className={`flex gap-2 ${isUser ? "flex-row-reverse" : ""}`}>
       {/* Small avatar */}
       <div
-        className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
+        className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
           isUser ? "bg-un-blue text-white" : "bg-gray-100 text-gray-500"
         }`}
       >
-        {isUser ? <User className="h-2.5 w-2.5" /> : <Bot className="h-2.5 w-2.5" />}
+        {isUser ? <User className="h-3 w-3" /> : <Sparkles className="h-3 w-3" />}
       </div>
 
       {/* Content */}
       <div className={`flex-1 min-w-0 ${isUser ? "text-right" : ""}`}>
         {/* Tool calls */}
-        {!isUser && message.toolCalls && message.toolCalls.length > 0 && (
-          <div className="space-y-1 mb-1.5">
-            {message.toolCalls.map((toolCall, index) => (
+        {!isUser && hasToolCalls && (
+          <div className="space-y-1 mb-2">
+            {message.toolCalls!.map((toolCall, index) => (
               <ChatToolCallCompact key={index} toolCall={toolCall} />
             ))}
+          </div>
+        )}
+
+        {/* Thinking indicator - shown when streaming with tool calls but no content yet */}
+        {showThinking && (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 rounded text-xs text-gray-500 w-fit">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Thinking...
           </div>
         )}
 
         {/* Message content */}
         {message.content && (
           <div
-            className={`inline-block rounded-lg px-2.5 py-1.5 max-w-[95%] text-left ${
+            className={`inline-block rounded-lg px-3 py-2 max-w-[95%] text-left ${
               isUser
                 ? "bg-un-blue text-white rounded-br-sm"
                 : "bg-gray-100 text-gray-800 rounded-bl-sm"
             }`}
           >
             {isUser ? (
-              <p className="whitespace-pre-wrap text-xs leading-relaxed">{message.content}</p>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
             ) : (
-              <div className="markdown-content text-xs leading-relaxed">
+              <div className="markdown-content text-sm leading-relaxed">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
                     // Headings
-                    h1: ({ children }) => <h1 className="text-sm font-bold mt-2 mb-1 text-gray-900">{children}</h1>,
-                    h2: ({ children }) => <h2 className="text-xs font-bold mt-2 mb-1 text-gray-900">{children}</h2>,
-                    h3: ({ children }) => <h3 className="text-xs font-semibold mt-1.5 mb-0.5 text-gray-800">{children}</h3>,
+                    h1: ({ children }) => <h1 className="text-base font-bold mt-2 mb-1 text-gray-900">{children}</h1>,
+                    h2: ({ children }) => <h2 className="text-sm font-bold mt-2 mb-1 text-gray-900">{children}</h2>,
+                    h3: ({ children }) => <h3 className="text-sm font-semibold mt-1.5 mb-0.5 text-gray-800">{children}</h3>,
                     
                     // Paragraphs
-                    p: ({ children }) => <p className="my-1 text-xs leading-relaxed">{children}</p>,
+                    p: ({ children }) => <p className="my-1 text-sm leading-relaxed">{children}</p>,
                     
                     // Lists
-                    ul: ({ children }) => <ul className="my-1 ml-3 list-disc text-xs space-y-0.5">{children}</ul>,
-                    ol: ({ children }) => <ol className="my-1 ml-3 list-decimal text-xs space-y-0.5">{children}</ol>,
-                    li: ({ children }) => <li className="text-xs leading-relaxed">{children}</li>,
+                    ul: ({ children }) => <ul className="my-1 ml-4 list-disc text-sm space-y-0.5">{children}</ul>,
+                    ol: ({ children }) => <ol className="my-1 ml-4 list-decimal text-sm space-y-0.5">{children}</ol>,
+                    li: ({ children }) => <li className="text-sm leading-relaxed">{children}</li>,
                     
                     // Code
                     code: ({ className, children }) => {
                       const isBlock = className?.includes("language-");
                       if (isBlock) {
                         return (
-                          <code className="block bg-gray-800 text-gray-100 p-2 rounded text-[10px] overflow-x-auto my-1">
+                          <code className="block bg-gray-800 text-gray-100 p-2 rounded text-xs overflow-x-auto my-1">
                             {children}
                           </code>
                         );
                       }
                       return (
-                        <code className="bg-gray-200 text-gray-800 px-1 py-0.5 rounded text-[10px]">
+                        <code className="bg-gray-200 text-gray-800 px-1 py-0.5 rounded text-xs">
                           {children}
                         </code>
                       );
@@ -85,7 +96,7 @@ export function ChatMessageCompact({ message }: ChatMessageCompactProps) {
                     // Tables
                     table: ({ children }) => (
                       <div className="overflow-x-auto my-2">
-                        <table className="min-w-full text-[10px] border-collapse">{children}</table>
+                        <table className="min-w-full text-xs border-collapse">{children}</table>
                       </div>
                     ),
                     thead: ({ children }) => <thead className="bg-gray-200">{children}</thead>,

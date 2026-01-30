@@ -78,6 +78,7 @@ def calculate_frequency(years: list[int]) -> tuple[str, list[int]]:
 def get_report_groups() -> list[tuple[str, list[int]]]:
     """
     Fetch all report groups with their publication years.
+    Uses date_year if available, otherwise extracts year from publication_date.
     
     Returns:
         List of (proper_title, years) tuples
@@ -88,10 +89,21 @@ def get_report_groups() -> list[tuple[str, list[int]]]:
             cur.execute(f"""
                 SELECT 
                     proper_title,
-                    array_agg(DISTINCT date_year ORDER BY date_year DESC) as years
-                FROM {DB_SCHEMA}.documents
-                WHERE proper_title IS NOT NULL
-                  AND date_year IS NOT NULL
+                    array_agg(DISTINCT effective_year ORDER BY effective_year DESC) as years
+                FROM (
+                    SELECT 
+                        proper_title,
+                        COALESCE(
+                            date_year,
+                            CASE 
+                                WHEN publication_date ~ '^\\d{{4}}' 
+                                THEN SUBSTRING(publication_date FROM 1 FOR 4)::int 
+                            END
+                        ) as effective_year
+                    FROM {DB_SCHEMA}.documents
+                    WHERE proper_title IS NOT NULL
+                ) sub
+                WHERE effective_year IS NOT NULL
                 GROUP BY proper_title
             """)
             return [(row[0], [y for y in row[1] if y is not None]) for row in cur.fetchall()]

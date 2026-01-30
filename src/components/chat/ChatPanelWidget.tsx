@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useStickToBottom } from "use-stick-to-bottom";
 import { useChatContext } from "./ChatContext";
 import { ChatMessageCompact } from "./ChatMessageCompact";
-import { Trash2, ArrowDown, Loader2, Bot, ArrowUp } from "lucide-react";
+import { ArrowDown, Loader2, Sparkles, ArrowUp } from "lucide-react";
 
 const DEFAULT_SUGGESTIONS = [
   "Summarize report A/79/XXX",
@@ -19,7 +19,6 @@ export function ChatPanelWidget() {
     error,
     sendMessage,
     stopStreaming,
-    clearMessages,
     prefillValue,
     clearPrefill,
   } = useChatContext();
@@ -69,6 +68,13 @@ export function ChatPanelWidget() {
     }
   };
 
+  // Check if we need to show thinking indicator (last message is assistant with no content and no tool calls)
+  const lastMessage = messages[messages.length - 1];
+  const showThinkingIndicator = isStreaming && 
+    lastMessage?.role === "assistant" && 
+    !lastMessage?.content && 
+    (!lastMessage?.toolCalls || lastMessage.toolCalls.length === 0);
+
   return (
     <div className="flex flex-col h-full">
       {/* Messages area */}
@@ -78,17 +84,17 @@ export function ChatPanelWidget() {
       >
         <div ref={contentRef} className="p-3 space-y-2.5 min-h-full">
           {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center py-8 px-4">
-              <p className="text-xs text-gray-400 leading-relaxed mb-4">
+            <div className="flex flex-col items-center justify-center h-full text-center py-8 px-5">
+              <p className="text-sm text-gray-400 leading-relaxed mb-4">
                 Ask about reports, compare documents, or find mandating resolutions.
               </p>
               {/* Suggestions */}
-              <div className="flex flex-wrap justify-center gap-1.5">
+              <div className="flex flex-wrap justify-center gap-2">
                 {DEFAULT_SUGGESTIONS.map((s, i) => (
                   <button
                     key={i}
                     onClick={() => setInputValue(s)}
-                    className="px-2.5 py-1 text-[10px] text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+                    className="px-3 py-1.5 text-xs text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
                   >
                     {s}
                   </button>
@@ -97,18 +103,30 @@ export function ChatPanelWidget() {
             </div>
           ) : (
             <>
-              {messages.map((message) => (
-                <ChatMessageCompact key={message.id} message={message} />
-              ))}
+              {messages.map((message, index) => {
+                // Skip rendering empty assistant messages (they show thinking inline)
+                const isLastMessage = index === messages.length - 1;
+                const isEmpty = !message.content && (!message.toolCalls || message.toolCalls.length === 0);
+                if (message.role === "assistant" && isEmpty && isLastMessage && isStreaming) {
+                  return null;
+                }
+                return (
+                  <ChatMessageCompact 
+                    key={message.id} 
+                    message={message} 
+                    isStreaming={isLastMessage && isStreaming}
+                  />
+                );
+              })}
               
-              {/* Thinking indicator */}
-              {isStreaming && messages.length > 0 && !messages[messages.length - 1]?.content && (
-                <div className="flex gap-1.5 items-center">
-                  <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center">
-                    <Bot className="h-2.5 w-2.5 text-gray-500" />
+              {/* Thinking indicator - only show when there's nothing else to show */}
+              {showThinkingIndicator && (
+                <div className="flex gap-2 items-center">
+                  <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
+                    <Sparkles className="h-3 w-3 text-gray-500" />
                   </div>
-                  <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-100 rounded text-[10px] text-gray-500">
-                    <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 rounded text-xs text-gray-500">
+                    <Loader2 className="h-3 w-3 animate-spin" />
                     Thinking...
                   </div>
                 </div>
@@ -136,9 +154,9 @@ export function ChatPanelWidget() {
         )}
       </div>
 
-      {/* Input area - full width */}
-      <div className="flex-shrink-0 border-t border-gray-100 bg-gray-50/50 p-2">
-        <div className="flex items-end gap-1.5">
+      {/* Input area - full width, no scrollbar */}
+      <div className="flex-shrink-0 border-t border-gray-100 bg-gray-50/50 p-3">
+        <div className="flex items-end gap-2">
           <textarea
             ref={textareaRef}
             value={inputValue}
@@ -147,34 +165,23 @@ export function ChatPanelWidget() {
             placeholder="Ask about reports..."
             disabled={isStreaming}
             rows={1}
-            className="flex-1 resize-none bg-white border border-gray-200 rounded-lg text-xs text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-un-blue focus:ring-1 focus:ring-un-blue py-2 px-2.5 min-h-[36px] max-h-[120px] leading-relaxed"
+            className="flex-1 resize-none bg-white border border-gray-200 rounded-lg text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:border-un-blue focus:ring-1 focus:ring-un-blue py-2.5 px-3 min-h-[42px] max-h-[140px] leading-relaxed overflow-hidden"
           />
           
           {isStreaming ? (
             <button
               onClick={stopStreaming}
-              className="flex-shrink-0 h-9 w-9 rounded-lg bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors"
+              className="flex-shrink-0 h-10 w-10 rounded-lg bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors"
             >
-              <div className="h-2.5 w-2.5 bg-gray-600 rounded-sm" />
+              <div className="h-3 w-3 bg-gray-600 rounded-sm" />
             </button>
           ) : (
             <button
               onClick={handleSend}
               disabled={!inputValue.trim()}
-              className="flex-shrink-0 h-9 w-9 rounded-lg bg-un-blue hover:bg-un-blue/90 disabled:bg-gray-200 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+              className="flex-shrink-0 h-10 w-10 rounded-lg bg-un-blue hover:bg-un-blue/90 disabled:bg-gray-200 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
             >
-              <ArrowUp className="h-4 w-4 text-white" />
-            </button>
-          )}
-
-          {/* Clear button - next to send */}
-          {messages.length > 0 && !isStreaming && (
-            <button
-              onClick={clearMessages}
-              className="flex-shrink-0 h-9 w-9 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors text-gray-400 hover:text-gray-600"
-              title="Clear chat"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
+              <ArrowUp className="h-5 w-5 text-white" />
             </button>
           )}
         </div>

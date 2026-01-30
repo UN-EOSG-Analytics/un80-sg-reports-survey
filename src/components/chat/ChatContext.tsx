@@ -149,7 +149,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
       const decoder = new TextDecoder();
       let buffer = "";
-      let currentToolIndex = -1;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -169,7 +168,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
             switch (event.type) {
               case "tool_start":
-                currentToolIndex++;
                 setMessages((prev) =>
                   prev.map((m) =>
                     m.id === assistantId
@@ -190,24 +188,38 @@ export function ChatProvider({ children }: { children: ReactNode }) {
                 break;
 
               case "tool_result":
+                // Find the FIRST running tool with matching name and update it (FIFO order)
                 setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === assistantId
-                      ? {
-                          ...m,
-                          toolCalls: m.toolCalls?.map((tc, i) =>
-                            i === currentToolIndex
-                              ? {
-                                  ...tc,
-                                  result: event.result,
-                                  success: event.success,
-                                  status: event.success ? "complete" : "error",
-                                }
-                              : tc
-                          ),
-                        }
-                      : m
-                  )
+                  prev.map((m) => {
+                    if (m.id !== assistantId) return m;
+                    
+                    const toolCalls = m.toolCalls || [];
+                    let targetIndex = -1;
+                    
+                    // Find the first (oldest) tool with matching name that is still running
+                    for (let i = 0; i < toolCalls.length; i++) {
+                      if (toolCalls[i].name === event.name && toolCalls[i].status === "running") {
+                        targetIndex = i;
+                        break;
+                      }
+                    }
+                    
+                    if (targetIndex === -1) return m;
+                    
+                    return {
+                      ...m,
+                      toolCalls: toolCalls.map((tc, i) =>
+                        i === targetIndex
+                          ? {
+                              ...tc,
+                              result: event.result,
+                              success: event.success,
+                              status: event.success ? "complete" : "error",
+                            }
+                          : tc
+                      ),
+                    };
+                  })
                 );
                 break;
 

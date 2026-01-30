@@ -18,6 +18,7 @@ import {
 import { ReportSidebar, ReportGroup, SubjectCount, EntitySuggestion, EntityConfirmation } from "@/components/ReportSidebar";
 import { EntityBadges } from "@/components/EntityBadges";
 import { FrequencyBadge } from "@/components/FrequencyBadge";
+import { DocumentSymbolBadge, buildODSLink } from "@/components/DocumentSymbolBadge";
 
 interface Version {
   symbol: string;
@@ -658,12 +659,6 @@ function ColumnHeaders({
   );
 }
 
-// Build ODS link from document symbol
-// Uses undocs.org which is the official UN shortlink service
-function buildODSLink(symbol: string): string {
-  return `https://undocs.org/en/${encodeURIComponent(symbol)}`;
-}
-
 // Build Digital Library search link from symbol
 function buildDLLink(symbol: string): string {
   return `https://digitallibrary.un.org/search?ln=en&p=${encodeURIComponent(symbol)}&f=&c=Resource%20Type&c=UN%20Bodies&sf=&so=d&rg=50&fti=0`;
@@ -772,14 +767,12 @@ function ReportRow({
 
       {/* Symbol */}
       <div className="flex items-center">
-        <span
-          className="inline-block rounded bg-blue-50 px-2 py-0.5 text-xs font-medium whitespace-nowrap text-un-blue truncate max-w-[120px]"
-          title={report.symbol}
-        >
-          {report.symbol.length > 14
-            ? `${report.symbol.slice(0, 14)}…`
-            : report.symbol}
-        </span>
+        <DocumentSymbolBadge 
+          symbol={report.symbol} 
+          size="xs" 
+          maxLength={14}
+          className="max-w-[120px]"
+        />
       </div>
 
       {/* Title */}
@@ -1075,9 +1068,10 @@ function AddReportSearch({
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="inline-block rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-un-blue">
-                      {result.symbol}
-                    </span>
+                    <DocumentSymbolBadge 
+                      symbol={result.symbol} 
+                      size="xs"
+                    />
                     {result.year && (
                       <span className="text-[10px] text-gray-400">{result.year}</span>
                     )}

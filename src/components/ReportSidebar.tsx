@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Loader2, ChevronUp, ChevronDown, X, FileText, Search, Check, Plus, Minus, MessageSquare, Bot } from "lucide-react";
+import { Loader2, ChevronUp, ChevronDown, X, FileText, Search, Check, Plus, Minus, Sparkles } from "lucide-react";
 import { useChatContext } from "@/components/chat";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { DocumentSymbolBadge, buildODSLink } from "@/components/DocumentSymbolBadge";
 
 // =============================================================================
 // Types and Interfaces
@@ -162,12 +163,6 @@ function abbreviateBody(body: string | null): string | null {
     .map((word) => word[0]?.toUpperCase())
     .filter(Boolean)
     .join("");
-}
-
-// Build ODS link from document symbol
-// Uses undocs.org which is the official UN shortlink service
-function buildODSLink(symbol: string): string {
-  return `https://undocs.org/en/${encodeURIComponent(symbol)}`;
 }
 
 // Build Digital Library search link from symbol
@@ -787,13 +782,15 @@ function SimilarReportsGrid({
                 : "bg-white border-gray-200 hover:border-gray-300"
             }`}
           >
+            {/* Left column: Title + metadata */}
             <div className="min-w-0">
               <p className="text-sm text-gray-800 truncate" title={r.title}>
                 {r.title}
               </p>
+              {/* Metadata row with AI button */}
               <div className="flex items-center gap-2 mt-0.5">
                 <a
-                  href={buildDLLink(r.symbol)}
+                  href={buildODSLink(r.symbol)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-[11px] text-un-blue font-medium hover:underline"
@@ -809,23 +806,25 @@ function SimilarReportsGrid({
                     {r.entity}
                   </span>
                 )}
+                {/* AI Compare button - inline in metadata row */}
+                {onCompare && (
+                  <button
+                    onClick={() => onCompare(r.symbol)}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-gray-600 bg-gray-50 border border-gray-200 hover:bg-gray-100 hover:border-gray-300 transition-colors"
+                    title="Compare with AI"
+                  >
+                    <Sparkles className="h-2.5 w-2.5" />
+                    Compare
+                  </button>
+                )}
               </div>
             </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {onCompare && (
-                <button
-                  onClick={() => onCompare(r.symbol)}
-                  className="self-center flex items-center gap-1 px-2 py-1 rounded text-xs text-un-blue bg-blue-50 hover:bg-blue-100 transition-colors font-medium"
-                  title="Compare in AI chat"
-                >
-                  <Bot className="h-3 w-3" />
-                  Compare
-                </button>
-              )}
-              {onMerge && (
+            {/* Right column: Merge button spanning both rows */}
+            {onMerge && (
+              <div className="flex items-center">
                 <button
                   onClick={() => onMerge(r.symbol)}
-                  className={`self-center flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
                     isInMerge
                       ? "bg-un-blue text-white"
                       : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
@@ -841,8 +840,8 @@ function SimilarReportsGrid({
                     "Merge"
                   )}
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         );
       })}
@@ -863,7 +862,15 @@ function SimilarReportsGrid({
 }
 
 // Version row component
-function VersionRow({ v }: { v: Version }) {
+function VersionRow({ 
+  v, 
+  previousSymbol,
+  onCompareWithPrevious,
+}: { 
+  v: Version;
+  previousSymbol?: string;
+  onCompareWithPrevious?: (current: string, previous: string) => void;
+}) {
   const formattedDate = v.publicationDate
     ? new Date(v.publicationDate).toLocaleDateString("en-US", {
         month: "short",
@@ -877,24 +884,35 @@ function VersionRow({ v }: { v: Version }) {
     : null;
 
   return (
-    <div className="flex items-center gap-3 py-2">
-      <span className="text-xs text-gray-500 w-24 flex-shrink-0">
+    <div className="flex items-center gap-2 py-1.5">
+      <span className="text-[11px] text-gray-500 w-20 flex-shrink-0">
         {formattedDate}
       </span>
-      <span className="text-sm font-medium text-gray-900 min-w-0 truncate">
+      <span className="text-xs font-medium text-gray-900 min-w-0 truncate flex-1">
         {v.symbol}
       </span>
-      <div className="flex items-center gap-3 flex-shrink-0 ml-auto">
+      <div className="flex items-center gap-1.5 flex-shrink-0">
         {formattedWordCount && (
-          <span className="text-xs text-gray-400">
-            {formattedWordCount} words
+          <span className="text-[10px] text-gray-400">
+            {formattedWordCount}
           </span>
+        )}
+        {/* Compare with previous version */}
+        {previousSymbol && onCompareWithPrevious && (
+          <button
+            onClick={() => onCompareWithPrevious(v.symbol, previousSymbol)}
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-gray-600 bg-gray-50 border border-gray-200 hover:bg-gray-100 hover:border-gray-300 rounded transition-colors"
+            title={`Compare with ${previousSymbol}`}
+          >
+            <Sparkles className="h-2.5 w-2.5" />
+            vs prev
+          </button>
         )}
         <a
           href={buildODSLink(v.symbol)}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium text-un-blue bg-blue-50 rounded hover:bg-blue-100 transition-colors"
+          className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium text-un-blue bg-blue-50 rounded hover:bg-blue-100 transition-colors"
         >
           <FileText className="h-2.5 w-2.5" />
           PDF
@@ -903,7 +921,7 @@ function VersionRow({ v }: { v: Version }) {
           href={buildDLLink(v.symbol)}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 transition-colors"
+          className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 transition-colors"
         >
           <Search className="h-2.5 w-2.5" />
           DL
@@ -923,7 +941,7 @@ function InteractivePublicationPattern({
   versions: Version[]; 
   expanded: boolean;
   onToggle: () => void;
-  onCompare?: () => void;
+  onCompare?: (current: string, previous: string) => void;
 }) {
   const years = versions
     .map((v) => v.year)
@@ -993,30 +1011,22 @@ function InteractivePublicationPattern({
         </div>
       </button>
 
-      {/* Compare versions button - always visible when multiple versions */}
-      {versions.length > 1 && onCompare && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onCompare();
-          }}
-          className="mt-2 w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-un-blue bg-blue-50 hover:bg-blue-100 rounded-md transition-colors"
-        >
-          <Bot className="h-3.5 w-3.5" />
-          Compare versions in AI
-        </button>
-      )}
-
       {expanded && (
-        <div className="mt-3 pt-3 border-t border-gray-100 space-y-1">
-          {versions.slice(0, 10).map((v) => (
-            <VersionRow key={v.symbol} v={v} />
-          ))}
-          {versions.length > 10 && (
-            <p className="text-xs text-gray-400 pt-1">
-              +{versions.length - 10} more versions
-            </p>
-          )}
+        <div className="mt-3 pt-3 border-t border-gray-100 space-y-0.5">
+          {versions.map((v, index) => {
+            // Previous version is the next item in the array (versions are sorted newest first)
+            const previousVersion = versions[index + 1];
+            return (
+              <VersionRow 
+                key={v.symbol} 
+                v={v} 
+                previousSymbol={previousVersion?.symbol}
+                onCompareWithPrevious={onCompare ? (current, previous) => {
+                  onCompare(current, previous);
+                } : undefined}
+              />
+            );
+          })}
         </div>
       )}
     </div>
@@ -1202,6 +1212,7 @@ export function ReportSidebar({
   const [versionsExpanded, setVersionsExpanded] = useState(false);
   const [resolutions, setResolutions] = useState<ResolutionInfo[]>([]);
   const [resolutionsLoading, setResolutionsLoading] = useState(false);
+  const [mandatingParagraphsExpanded, setMandatingParagraphsExpanded] = useState(false);
   
   // Track sidebar open/close to force refresh on reopen
   const prevReportRef = useRef<ReportGroup | null>(null);
@@ -1275,6 +1286,7 @@ export function ReportSidebar({
     setLocalRemoved(false);
     setLocalFrequencyConfirmed(null);
     setLocalFrequencyRemoved(false);
+    setMandatingParagraphsExpanded(false);
   }, [report?.title]);
 
   // Handle confirming entity ownership
@@ -1515,19 +1527,18 @@ export function ReportSidebar({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/20 z-40 transition-opacity"
+        className="fixed inset-0 bg-black/20 z-40 transition-opacity min-h-screen"
         onClick={onClose}
+        style={{ height: '100vh', minHeight: '100vh' }}
       />
       {/* Sidebar */}
-      <div className="fixed right-0 top-0 h-full w-full max-w-lg bg-white shadow-xl z-50 flex flex-col">
+      <div className="fixed right-0 top-0 h-screen w-full max-w-lg bg-white shadow-xl z-50 flex flex-col">
         {/* Header */}
         <div className="flex-shrink-0 border-b px-4 py-3">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0 space-y-1.5">
               <div className="flex flex-wrap items-center gap-1.5">
-                <span className="inline-block rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-un-blue">
-                  {report.symbol}
-                </span>
+                <DocumentSymbolBadge symbol={report.symbol} size="sm" linkToODS={true} />
                 {report.body && (
                   <span className="inline-block rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
                     {abbreviateBody(report.body)}
@@ -1545,14 +1556,14 @@ export function ReportSidebar({
               <X className="h-4 w-4 text-gray-400" />
             </button>
           </div>
-          {/* Chat action */}
+          {/* AI summarize action */}
           <div className="flex flex-wrap gap-2 mt-3">
             <button
-              onClick={() => prefillPrompt(`Please summarize report ${report.symbol}. Focus on the key findings, recommendations, and any important data points.`)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+              onClick={() => prefillPrompt(`Summarize report ${report.symbol} in one paragraph.`)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-gray-600 bg-gray-50 border border-gray-200 hover:bg-gray-100 hover:border-gray-300 rounded-md transition-colors"
             >
-              <MessageSquare className="h-3.5 w-3.5" />
-              Chat about report
+              <Sparkles className="h-3.5 w-3.5" />
+              Summarize with AI
             </button>
           </div>
         </div>
@@ -1578,10 +1589,9 @@ export function ReportSidebar({
                   versions={report.versions}
                   expanded={versionsExpanded}
                   onToggle={() => setVersionsExpanded(!versionsExpanded)}
-                  onCompare={report.versions.length > 1 ? () => {
-                    const symbols = report.versions.slice(0, 3).map(v => v.symbol).join(", ");
-                    prefillPrompt(`Compare these report versions: ${symbols}. Show key changes between versions in a table.`);
-                  } : undefined}
+                  onCompare={(current, previous) => {
+                    prefillPrompt(`Compare ${current} with ${previous}: what content is the same, and what changed between versions?`);
+                  }}
                 />
                 {!versionsExpanded && (
                   <p className="text-[10px] text-gray-400 mt-2 text-center">
@@ -1591,35 +1601,67 @@ export function ReportSidebar({
               </div>
 
               {/* Mandating Paragraphs (if any resolutions with mandates) */}
-              {resolutions.length > 0 && resolutions.some(r => r.mandates && r.mandates.length > 0) && (
-                <div className="border border-gray-200 rounded-md bg-white p-2 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Mandating Paragraphs</span>
-                    <span className="text-[10px] text-gray-400">AI-extracted</span>
-                  </div>
-                  <div className="space-y-2">
-                    {resolutions.map((res) => 
-                      res.mandates?.map((mandate, idx) => (
-                        <div key={`${res.symbol}-${idx}`} className="text-xs text-gray-600">
+              {(() => {
+                // Collect all mandate paragraphs
+                const allMandates: Array<{ mandate: MandateInfo; resSymbol: string; idx: number }> = [];
+                resolutions.forEach((res) => {
+                  res.mandates?.forEach((mandate, idx) => {
+                    if (mandate.verbatim_paragraph || mandate.summary) {
+                      allMandates.push({ mandate, resSymbol: res.symbol, idx });
+                    }
+                  });
+                });
+
+                if (allMandates.length === 0) return null;
+
+                const INITIAL_VISIBLE = 2;
+                const hasMore = allMandates.length > INITIAL_VISIBLE;
+                const visibleMandates = mandatingParagraphsExpanded 
+                  ? allMandates 
+                  : allMandates.slice(0, INITIAL_VISIBLE);
+
+                return (
+                  <div className="border border-gray-200 rounded-md bg-white p-2 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Mandating Paragraphs {hasMore && `(${allMandates.length})`}
+                      </span>
+                      <span className="text-[10px] text-gray-400">AI-extracted</span>
+                    </div>
+                    <div className="space-y-2">
+                      {visibleMandates.map(({ mandate, resSymbol, idx }) => (
+                        <div key={`${resSymbol}-${idx}`} className="text-xs text-gray-600">
                           {mandate.verbatim_paragraph ? (
                             <span>&quot;{mandate.verbatim_paragraph}&quot;</span>
                           ) : mandate.summary ? (
                             <span>{mandate.summary}</span>
                           ) : null}
                           <a
-                            href={buildDLLink(res.symbol)}
+                            href={buildDLLink(resSymbol)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-block rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-un-blue ml-1.5 hover:bg-blue-100 transition-colors"
                           >
-                            {res.symbol}
+                            {resSymbol}
                           </a>
                         </div>
-                      ))
+                      ))}
+                    </div>
+                    {hasMore && (
+                      <button
+                        onClick={() => setMandatingParagraphsExpanded(!mandatingParagraphsExpanded)}
+                        className="w-full text-xs text-gray-500 hover:text-gray-700 py-1 flex items-center justify-center gap-1 mt-1"
+                      >
+                        {mandatingParagraphsExpanded ? (
+                          <>Show less <ChevronUp className="h-3 w-3" /></>
+                        ) : (
+                          <>Show {allMandates.length - INITIAL_VISIBLE} more <ChevronDown className="h-3 w-3" /></>
+                        )}
+                      </button>
                     )}
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Frequency selection */}
               <div className="space-y-2">
@@ -1777,7 +1819,7 @@ export function ReportSidebar({
                 error={similarError}
                 onMerge={toggleMergeTarget}
                 onCompare={(targetSymbol) => {
-                  prefillPrompt(`Compare reports ${report.symbol} and ${targetSymbol}. Highlight key differences in scope, recommendations, and data.`);
+                  prefillPrompt(`Compare ${report.symbol} and ${targetSymbol}: what content is similar/overlapping, and what are the key differences?`);
                 }}
                 mergeTargets={mergeTargets}
                 currentSymbol={report.symbol}

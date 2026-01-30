@@ -11,6 +11,7 @@ interface EntitySuggestion {
 
 interface EntityConfirmation {
   entity: string;
+  role?: string;
   confirmed_by_email: string;
   confirmed_at: string;
 }
@@ -28,6 +29,8 @@ interface ReportRow {
   subject_terms_agg: (string[] | unknown)[];
   suggested_entities: string[] | null;
   confirmed_entities: string[] | null;
+  lead_entities: string[] | null;
+  contributing_entities: string[] | null;
   suggestions: EntitySuggestion[] | null;
   confirmations: EntityConfirmation[] | null;
   primary_entity: string | null;
@@ -302,6 +305,8 @@ export async function GET(req: NextRequest) {
           -- Entity fields using scalar subqueries (shared across bodies, keyed by proper_title only)
           (SELECT re.suggested_entities FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as suggested_entities,
           (SELECT re.confirmed_entities FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as confirmed_entities,
+          (SELECT re.lead_entities FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as lead_entities,
+          (SELECT re.contributing_entities FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as contributing_entities,
           (SELECT re.suggestions FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as suggestions,
           (SELECT re.confirmations FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as confirmations,
           (SELECT re.primary_entity FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as primary_entity,
@@ -507,6 +512,8 @@ export async function GET(req: NextRequest) {
       entity: r.primary_entity || null, // Primary entity (confirmed first, then best suggestion)
       suggestedEntities: r.suggested_entities || [],
       confirmedEntities: r.confirmed_entities || [],
+      leadEntities: r.lead_entities || [],
+      contributingEntities: r.contributing_entities || [],
       suggestions: r.suggestions || [],
       confirmations: r.confirmations || [],
       hasConfirmation: r.has_confirmation || false,

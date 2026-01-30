@@ -4,9 +4,12 @@ import { getCurrentUser } from "@/lib/auth";
 
 const DB_SCHEMA = process.env.DB_SCHEMA || "sg_reports_survey";
 
+type EntityRole = "lead" | "contributing";
+
 interface ConfirmationInput {
   properTitle: string;
   entity: string;
+  role?: EntityRole;
   notes?: string | null;
 }
 
@@ -14,6 +17,7 @@ interface ConfirmationRow {
   id: number;
   proper_title: string;
   entity: string;
+  role: EntityRole;
   confirmed_by_user_id: string;
   confirmed_at: string;
   notes: string | null;
@@ -25,6 +29,7 @@ interface ConfirmationRow {
 export async function GET(req: NextRequest) {
   const properTitle = req.nextUrl.searchParams.get("properTitle");
   const entity = req.nextUrl.searchParams.get("entity");
+  const role = req.nextUrl.searchParams.get("role") as EntityRole | null;
   const myConfirmations = req.nextUrl.searchParams.get("my") === "true";
 
   try {
@@ -41,6 +46,12 @@ export async function GET(req: NextRequest) {
     if (entity) {
       whereClauses.push(`c.entity = $${paramIndex}`);
       params.push(entity);
+      paramIndex++;
+    }
+
+    if (role && (role === "lead" || role === "contributing")) {
+      whereClauses.push(`c.role = $${paramIndex}`);
+      params.push(role);
       paramIndex++;
     }
 
@@ -64,6 +75,7 @@ export async function GET(req: NextRequest) {
         c.id,
         c.proper_title,
         c.entity,
+        c.role,
         c.confirmed_by_user_id,
         c.confirmed_at,
         c.notes,
@@ -71,7 +83,7 @@ export async function GET(req: NextRequest) {
        FROM ${DB_SCHEMA}.report_entity_confirmations c
        LEFT JOIN ${DB_SCHEMA}.users u ON c.confirmed_by_user_id = u.id
        ${whereClause}
-       ORDER BY c.confirmed_at DESC`,
+       ORDER BY CASE c.role WHEN 'lead' THEN 0 ELSE 1 END, c.confirmed_at DESC`,
       params
     );
 
@@ -80,6 +92,7 @@ export async function GET(req: NextRequest) {
         id: row.id,
         properTitle: row.proper_title,
         entity: row.entity,
+        role: row.role,
         confirmedByUserId: row.confirmed_by_user_id,
         confirmedByEmail: row.confirmed_by_email,
         confirmedAt: row.confirmed_at,
@@ -139,21 +152,26 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Validate role if provided
+    const role: EntityRole = body.role === "contributing" ? "contributing" : "lead";
+
     // Insert the confirmation (upsert - update if same user confirms same entity for same report)
     const result = await query<ConfirmationRow>(
       `INSERT INTO ${DB_SCHEMA}.report_entity_confirmations (
         proper_title,
         entity,
+        role,
         confirmed_by_user_id,
         notes
-      ) VALUES ($1, $2, $3, $4)
+      ) VALUES ($1, $2, $3, $4, $5)
       ON CONFLICT (proper_title, entity) 
       DO UPDATE SET
+        role = EXCLUDED.role,
         confirmed_by_user_id = EXCLUDED.confirmed_by_user_id,
         confirmed_at = NOW(),
         notes = EXCLUDED.notes
       RETURNING *`,
-      [body.properTitle, body.entity, user.id, body.notes || null]
+      [body.properTitle, body.entity, role, user.id, body.notes || null]
     );
 
     const row = result[0];
@@ -163,6 +181,7 @@ export async function POST(req: NextRequest) {
         id: row.id,
         properTitle: row.proper_title,
         entity: row.entity,
+        role: row.role,
         confirmedByUserId: row.confirmed_by_user_id,
         confirmedByEmail: user.email,
         confirmedAt: row.confirmed_at,

@@ -10,6 +10,8 @@ import {
 // Types
 // =============================================================================
 
+export type EntityRole = "lead" | "contributing";
+
 export interface EntitySuggestion {
   entity: string;
   source: string;
@@ -19,6 +21,8 @@ export interface EntitySuggestion {
 export interface EntityBadgesProps {
   suggestions?: EntitySuggestion[];
   confirmedEntities?: string[];
+  leadEntities?: string[];
+  contributingEntities?: string[];
   maxVisible?: number;
   size?: "xs" | "sm";
 }
@@ -27,12 +31,17 @@ export interface EntityBadgesProps {
 // Helper Functions
 // =============================================================================
 
-// Get styling based on source reliability
-// Confirmed: solid gray border with light gray background
+// Get styling based on source reliability and role
+// Lead: solid blue border with blue background
+// Contributing: solid gray border with light gray background
 // Suggested: dotted blue border with blue tinted backgrounds (dark/mid/light based on reliability)
-function getEntityStyle(source: string, isConfirmed: boolean): string {
+function getEntityStyle(source: string, isConfirmed: boolean, role?: EntityRole): string {
   if (isConfirmed) {
-    // Confirmed entities - solid gray border with light gray background
+    if (role === "lead") {
+      // Lead entities - blue accent
+      return "bg-blue-100 text-blue-800 border border-blue-500";
+    }
+    // Contributing entities - gray styling
     return "bg-gray-100 text-gray-800 border border-gray-400";
   }
   
@@ -61,11 +70,15 @@ const SOURCE_PRIORITY: Record<string, number> = {
 };
 
 // Deduplicate and sort entities by reliability
-// Sort order: confirmed > dgacm > dri > ai
+// Sort order: confirmed lead > confirmed contributing > dgacm > dri > ai
 function deduplicateEntities(
   suggestions: EntitySuggestion[],
-  confirmedEntities: string[]
-): Array<{ entity: string; source: string; isConfirmed: boolean; confidence?: number | null }> {
+  confirmedEntities: string[],
+  leadEntities: string[] = [],
+  contributingEntities: string[] = []
+): Array<{ entity: string; source: string; isConfirmed: boolean; role?: EntityRole; confidence?: number | null }> {
+  const leadSet = new Set(leadEntities.map(e => e.toLowerCase()));
+  const contributingSet = new Set(contributingEntities.map(e => e.toLowerCase()));
   const confirmedSet = new Set(confirmedEntities.map(e => e.toLowerCase()));
   const entityMap = new Map<string, { entity: string; source: string; confidence?: number | null }>();
   
@@ -88,10 +101,42 @@ function deduplicateEntities(
   }
   
   // Build result array
-  const result: Array<{ entity: string; source: string; isConfirmed: boolean; confidence?: number | null }> = [];
+  const result: Array<{ entity: string; source: string; isConfirmed: boolean; role?: EntityRole; confidence?: number | null }> = [];
   const addedEntities = new Set<string>();
   
-  // Add confirmed entities first
+  // Add lead entities first
+  for (const entity of leadEntities) {
+    const key = entity.toLowerCase();
+    if (!addedEntities.has(key)) {
+      addedEntities.add(key);
+      const suggestionInfo = entityMap.get(key);
+      result.push({
+        entity,
+        source: suggestionInfo?.source || "confirmed",
+        isConfirmed: true,
+        role: "lead",
+        confidence: suggestionInfo?.confidence,
+      });
+    }
+  }
+  
+  // Add contributing entities
+  for (const entity of contributingEntities) {
+    const key = entity.toLowerCase();
+    if (!addedEntities.has(key)) {
+      addedEntities.add(key);
+      const suggestionInfo = entityMap.get(key);
+      result.push({
+        entity,
+        source: suggestionInfo?.source || "confirmed",
+        isConfirmed: true,
+        role: "contributing",
+        confidence: suggestionInfo?.confidence,
+      });
+    }
+  }
+  
+  // Add any confirmed entities not in lead/contributing (backwards compatibility)
   for (const entity of confirmedEntities) {
     const key = entity.toLowerCase();
     if (!addedEntities.has(key)) {
@@ -119,9 +164,17 @@ function deduplicateEntities(
     }
   }
   
-  // Sort by reliability: confirmed first, then dgacm, dri, ai
+  // Sort by reliability: lead first, then contributing, then dgacm, dri, ai
   result.sort((a, b) => {
-    // Confirmed always comes first
+    // Lead always comes first
+    if (a.role === "lead" && b.role !== "lead") return -1;
+    if (a.role !== "lead" && b.role === "lead") return 1;
+    
+    // Then contributing
+    if (a.role === "contributing" && !b.isConfirmed) return -1;
+    if (!a.isConfirmed && b.role === "contributing") return 1;
+    
+    // Then other confirmed
     if (a.isConfirmed && !b.isConfirmed) return -1;
     if (!a.isConfirmed && b.isConfirmed) return 1;
     
@@ -143,12 +196,14 @@ function EntityBadge({
   entity,
   source,
   isConfirmed,
+  role,
   confidence,
   size = "sm",
 }: {
   entity: string;
   source: string;
   isConfirmed: boolean;
+  role?: EntityRole;
   confidence?: number | null;
   size?: "xs" | "sm";
 }) {
@@ -156,12 +211,13 @@ function EntityBadge({
     ? "px-1.5 py-0.5 text-[10px]" 
     : "px-2 py-0.5 text-xs";
   
-  const style = getEntityStyle(source, isConfirmed);
+  const style = getEntityStyle(source, isConfirmed, role);
   
   // Build tooltip content
   const getTooltipContent = () => {
     if (isConfirmed) {
-      return `Confirmed report by ${entity}`;
+      const roleLabel = role === "lead" ? "Lead" : role === "contributing" ? "Contributing" : "Confirmed";
+      return `${roleLabel}: ${entity}`;
     }
     
     switch (source.toLowerCase()) {
@@ -200,11 +256,13 @@ function EntityBadge({
 export function EntityBadges({
   suggestions = [],
   confirmedEntities = [],
+  leadEntities = [],
+  contributingEntities = [],
   maxVisible = 3,
   size = "sm",
 }: EntityBadgesProps) {
   // Deduplicate entities keeping highest priority source
-  const entities = deduplicateEntities(suggestions, confirmedEntities);
+  const entities = deduplicateEntities(suggestions, confirmedEntities, leadEntities, contributingEntities);
   
   if (entities.length === 0) {
     return <span className="text-gray-300 text-xs">—</span>;
@@ -225,6 +283,7 @@ export function EntityBadges({
                 entity={e.entity}
                 source={e.source}
                 isConfirmed={e.isConfirmed}
+                role={e.role}
                 confidence={e.confidence}
                 size={size}
               />
@@ -242,6 +301,7 @@ export function EntityBadges({
                   entity={e.entity}
                   source={e.source}
                   isConfirmed={e.isConfirmed}
+                  role={e.role}
                   confidence={e.confidence}
                   size="xs"
                 />
@@ -262,6 +322,7 @@ export function EntityBadges({
           entity={e.entity}
           source={e.source}
           isConfirmed={e.isConfirmed}
+          role={e.role}
           confidence={e.confidence}
           size={size}
         />

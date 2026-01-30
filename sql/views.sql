@@ -124,13 +124,20 @@ confirmations_agg AS (
     jsonb_agg(
       jsonb_build_object(
         'entity', c.entity,
+        'role', c.role,
         'confirmed_by_user_id', c.confirmed_by_user_id,
         'confirmed_by_email', u.email,
         'confirmed_at', c.confirmed_at,
         'notes', c.notes
-      ) ORDER BY c.confirmed_at DESC
+      ) ORDER BY 
+        -- Lead entities first, then by confirmation time
+        CASE c.role WHEN 'lead' THEN 0 ELSE 1 END,
+        c.confirmed_at DESC
     ) as confirmations,
-    array_agg(DISTINCT c.entity ORDER BY c.entity) as confirmed_entities
+    array_agg(DISTINCT c.entity ORDER BY c.entity) as confirmed_entities,
+    -- Separate arrays for lead and contributing entities
+    array_agg(DISTINCT c.entity ORDER BY c.entity) FILTER (WHERE c.role = 'lead') as lead_entities,
+    array_agg(DISTINCT c.entity ORDER BY c.entity) FILTER (WHERE c.role = 'contributing') as contributing_entities
   FROM sg_reports_survey.report_entity_confirmations c
   LEFT JOIN sg_reports_survey.users u ON c.confirmed_by_user_id = u.id
   GROUP BY c.proper_title
@@ -141,8 +148,11 @@ SELECT
   s.suggested_entities,
   c.confirmations,
   c.confirmed_entities,
-  -- Primary entity: first confirmed, otherwise highest-confidence suggestion
+  c.lead_entities,
+  c.contributing_entities,
+  -- Primary entity: first lead, then first confirmed, then highest-confidence suggestion
   COALESCE(
+    c.lead_entities[1],
     c.confirmed_entities[1],
     s.suggested_entities[1]
   ) as primary_entity,

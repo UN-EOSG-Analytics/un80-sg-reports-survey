@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS sg_reports_survey.report_entity_confirmations (
   id SERIAL PRIMARY KEY,
   proper_title TEXT NOT NULL,
   entity TEXT NOT NULL REFERENCES systemchart.entities(entity),
+  role TEXT NOT NULL DEFAULT 'lead' CHECK (role IN ('lead', 'contributing')),
   confirmed_by_user_id UUID NOT NULL REFERENCES sg_reports_survey.users(id),
   confirmed_at TIMESTAMPTZ DEFAULT NOW(),
   notes TEXT,
@@ -134,3 +135,4 @@ CREATE TABLE IF NOT EXISTS sg_reports_survey.report_entity_confirmations (
 CREATE INDEX IF NOT EXISTS idx_confirmations_proper_title ON sg_reports_survey.report_entity_confirmations (proper_title);
 CREATE INDEX IF NOT EXISTS idx_confirmations_entity ON sg_reports_survey.report_entity_confirmations (entity);
 CREATE INDEX IF NOT EXISTS idx_confirmations_user ON sg_reports_survey.report_entity_confirmations (confirmed_by_user_id);
+CREATE INDEX IF NOT EXISTS idx_confirmations_role ON sg_reports_survey.report_entity_confirmations (proper_title, role);

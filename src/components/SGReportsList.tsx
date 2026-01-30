@@ -784,8 +784,10 @@ function ReportRow({
       {showEntityColumn && (
         <div className="overflow-hidden">
           <EntityBadges
-            suggestions={report.confirmedEntities && report.confirmedEntities.length > 0 ? [] : report.suggestions}
+            suggestions={report.suggestions}
             confirmedEntities={report.confirmedEntities}
+            leadEntities={report.leadEntities}
+            contributingEntities={report.contributingEntities}
             maxVisible={2}
             size="xs"
           />

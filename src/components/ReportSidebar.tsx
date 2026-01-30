@@ -31,6 +31,8 @@ export interface Version {
   wordCount: number | null;
 }
 
+export type EntityRole = "lead" | "contributing";
+
 export interface ReportGroup {
   title: string;
   symbol: string;
@@ -42,6 +44,8 @@ export interface ReportGroup {
   entityDri?: string | null;
   suggestedEntities?: string[];
   confirmedEntities?: string[];
+  leadEntities?: string[];
+  contributingEntities?: string[];
   suggestions?: EntitySuggestion[];
   confirmations?: EntityConfirmation[];
   hasConfirmation?: boolean;
@@ -64,6 +68,7 @@ export interface EntitySuggestion {
 
 export interface EntityConfirmation {
   entity: string;
+  role?: EntityRole;
   confirmed_by_email?: string;
   confirmed_at?: string;
 }
@@ -503,7 +508,9 @@ function CompactFeedbackForm({
   mergeTargets,
   onMergeTargetsChange,
   userEntity,
-  isConfirmedByUserEntity,
+  currentRole,
+  onRoleChange,
+  roleUpdating,
   loadingExisting,
   feedback,
   onFeedbackChange,
@@ -515,7 +522,9 @@ function CompactFeedbackForm({
   mergeTargets: string[];
   onMergeTargetsChange: (targets: string[]) => void;
   userEntity?: string | null;
-  isConfirmedByUserEntity: boolean;
+  currentRole: EntityRole | null;
+  onRoleChange: (role: EntityRole) => void;
+  roleUpdating: boolean;
   loadingExisting: boolean;
   feedback: Omit<Feedback, 'mergeTargets'>;
   onFeedbackChange: <K extends keyof Omit<Feedback, 'mergeTargets'>>(key: K, value: Omit<Feedback, 'mergeTargets'>[K]) => void;
@@ -523,12 +532,12 @@ function CompactFeedbackForm({
   saveSuccess: boolean;
   onSaveClick: () => void;
 }) {
-  const canEdit = userEntity && isConfirmedByUserEntity;
-  
   // Show frequency/format options for "continue_with_changes" and "merge"
   const showFrequencyFormat = feedback.status === "continue_with_changes" || feedback.status === "merge";
   
   const isFormValid = useMemo(() => {
+    // Role must be selected first
+    if (!currentRole) return false;
     if (!feedback.status) return false;
     
     // "continue" (without changes) doesn't require additional fields
@@ -554,17 +563,7 @@ function CompactFeedbackForm({
     }
     
     return true;
-  }, [feedback, mergeTargets]);
-
-  if (!canEdit) {
-    return (
-      <div className="rounded-lg p-3 border border-gray-200 bg-gray-50 text-sm">
-        <p className="text-gray-500">
-          Confirm this is your entity&apos;s report above to provide feedback.
-        </p>
-      </div>
-    );
-  }
+  }, [feedback, mergeTargets, currentRole]);
 
   // Small label component for form fields
   const FieldLabel = ({ children }: { children: React.ReactNode }) => (
@@ -573,6 +572,25 @@ function CompactFeedbackForm({
 
   return (
     <div className="space-y-3">
+      {/* Q1: Role selection - this creates/updates the entity confirmation */}
+      <div>
+        <FieldLabel>What is the role of {userEntity}?</FieldLabel>
+        <Select
+          value={currentRole ?? undefined}
+          onValueChange={(v) => onRoleChange(v as EntityRole)}
+          disabled={roleUpdating}
+        >
+          <SelectTrigger className="w-full bg-white">
+            <SelectValue placeholder="Select role..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="lead">Lead entity</SelectItem>
+            <SelectItem value="contributing">Contributing entity</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Q2: Action recommendation */}
       <div>
         <FieldLabel>What action do you recommend?</FieldLabel>
         <Select
@@ -1244,6 +1262,8 @@ export function ReportSidebar({
   const [confirming, setConfirming] = useState(false);
   const [localConfirmed, setLocalConfirmed] = useState(false);
   const [localRemoved, setLocalRemoved] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<EntityRole>("lead");
+  const [localRole, setLocalRole] = useState<EntityRole | null>(null);
   
   // Frequency confirmation state
   const [frequencyConfirming, setFrequencyConfirming] = useState(false);
@@ -1255,6 +1275,11 @@ export function ReportSidebar({
   const isConfirmedByUserEntity = userEntity && !localRemoved && (
     localConfirmed || report?.confirmedEntities?.includes(userEntity)
   );
+  
+  // Get current user's entity role (local takes precedence over server data)
+  const currentUserRole: EntityRole | null = localRole || 
+    (userEntity && report?.confirmations?.find(c => c.entity === userEntity)?.role) || 
+    null;
   
   // Effective confirmed frequency (local takes precedence)
   const effectiveConfirmedFrequency = localFrequencyRemoved 
@@ -1290,8 +1315,8 @@ export function ReportSidebar({
     setMandatingParagraphsExpanded(false);
   }, [report?.title]);
 
-  // Handle confirming entity ownership
-  const handleConfirmEntity = async () => {
+  // Handle confirming entity ownership with role
+  const handleConfirmEntity = async (role: EntityRole = selectedRole) => {
     if (!report || !userEntity || confirming) return;
     
     setConfirming(true);
@@ -1302,12 +1327,14 @@ export function ReportSidebar({
         body: JSON.stringify({
           properTitle: report.title,
           entity: userEntity,
+          role,
         }),
       });
       
       if (response.ok) {
         setLocalConfirmed(true);
         setLocalRemoved(false);
+        setLocalRole(role);
         onDataChanged?.();
       }
     } catch (error) {
@@ -1727,52 +1754,9 @@ export function ReportSidebar({
                 </div>
               )}
 
-              {/* Recurring report - need entity confirmation first */}
-              {isFrequencyConfirmed && !isOneTimeReport && !isConfirmedByUserEntity && (
-                <div className="space-y-2">
-                  {userEntity ? (
-                    <>
-                      <p className="text-sm text-gray-600">
-                        Confirm this is {userEntity}&apos;s report to provide feedback.
-                      </p>
-                      <button
-                        onClick={handleConfirmEntity}
-                        disabled={confirming}
-                        className="w-full flex items-center justify-center gap-2 rounded-md border border-gray-300 bg-white p-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
-                      >
-                        {confirming ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Check className="h-4 w-4" />
-                        )}
-                        Confirm as {userEntity} report
-                      </button>
-                    </>
-                  ) : (
-                    <div className="rounded-md border border-amber-200 bg-amber-50 p-2.5 text-sm text-amber-700">
-                      <a href="/login" className="font-medium underline hover:text-amber-900">Log in</a> to confirm this report and provide feedback.
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Recurring report - entity confirmed, show survey */}
-              {isFrequencyConfirmed && !isOneTimeReport && isConfirmedByUserEntity && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-green-600 flex items-center gap-1">
-                      <Check className="h-3 w-3" />
-                      Confirmed: {userEntity}
-                    </span>
-                    <button
-                      onClick={handleRemoveEntity}
-                      disabled={confirming}
-                      className="text-gray-400 hover:text-gray-600 flex items-center gap-1"
-                    >
-                      {confirming ? <Loader2 className="h-3 w-3 animate-spin" /> : <Minus className="h-3 w-3" />}
-                      Undo
-                    </button>
-                  </div>
+              {/* Recurring report - show survey directly */}
+              {isFrequencyConfirmed && !isOneTimeReport && (
+                userEntity ? (
                   <CompactFeedbackForm
                     report={{
                       ...report,
@@ -1781,7 +1765,9 @@ export function ReportSidebar({
                     mergeTargets={mergeTargets}
                     onMergeTargetsChange={setMergeTargets}
                     userEntity={userEntity}
-                    isConfirmedByUserEntity={true}
+                    currentRole={currentUserRole}
+                    onRoleChange={handleConfirmEntity}
+                    roleUpdating={confirming}
                     loadingExisting={loadingExisting}
                     feedback={feedback}
                     onFeedbackChange={updateFeedback}
@@ -1789,7 +1775,11 @@ export function ReportSidebar({
                     saveSuccess={saveSuccess}
                     onSaveClick={handleSave}
                   />
-                </div>
+                ) : (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 p-2.5 text-sm text-amber-700">
+                    <a href="/login" className="font-medium underline hover:text-amber-900">Log in</a> to provide feedback on this report.
+                  </div>
+                )
               )}
             </div>
 

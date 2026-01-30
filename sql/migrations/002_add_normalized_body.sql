@@ -60,17 +60,23 @@ COMMENT ON COLUMN sg_reports_survey.report_frequency_confirmations.notes IS 'Opt
 -- Drop in reverse dependency order
 DROP VIEW IF EXISTS sg_reports_survey.latest_versions;
 
--- Recreate latest_versions with body-based grouping
+-- Recreate latest_versions with body-based grouping (using symbol prefix)
 CREATE VIEW sg_reports_survey.latest_versions AS
 WITH normalized AS (
+  -- Normalize body from symbol prefix (more reliable than un_body which can contain multiple bodies)
   SELECT r.*,
          CASE 
-           WHEN r.un_body LIKE '{%}' THEN 
-             COALESCE(
-               SUBSTRING(r.un_body FROM '^\{"?([^",}]+)"?'),
-               r.un_body
-             )
-           ELSE r.un_body
+           WHEN r.symbol LIKE 'A/HRC/%' THEN 'Human Rights Council'
+           WHEN r.symbol LIKE 'A/%' THEN 'General Assembly'
+           WHEN r.symbol LIKE 'E/%' THEN 'Economic and Social Council'
+           WHEN r.symbol LIKE 'S/%' THEN 'Security Council'
+           ELSE COALESCE(
+             CASE 
+               WHEN r.un_body LIKE '{%}' THEN SUBSTRING(r.un_body FROM '^\{"?([^",}]+)"?')
+               ELSE r.un_body
+             END,
+             'Other'
+           )
          END as normalized_body,
          COALESCE(r.date_year, 
            CASE WHEN r.publication_date ~ '^\d{4}' 

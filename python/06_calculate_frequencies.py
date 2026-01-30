@@ -12,6 +12,7 @@ This ensures frequency calculations match what users see in the UI.
 
 import os
 from collections import Counter
+from typing import Optional
 
 import psycopg2
 from psycopg2.extras import execute_values
@@ -104,7 +105,7 @@ def calculate_frequency(years: list[int]) -> tuple[str, list[int]]:
     return (frequency, gaps)
 
 
-def get_report_groups() -> list[tuple[str, str | None, list[int]]]:
+def get_report_groups() -> list[tuple[str, Optional[str], list[int]]]:
     """
     Fetch all report groups with their publication years.
     
@@ -129,6 +130,7 @@ def get_report_groups() -> list[tuple[str, str | None, list[int]]]:
             # Use sg_reports VIEW to match app filtering (2023+, SG reports only, no CORR/REV)
             # Count distinct symbols per year to detect multiple-per-year patterns
             # Each distinct symbol in a year adds that year once to the array
+            # Group by symbol prefix (A/, E/, S/) for body - more reliable than un_body field
             cur.execute(f"""
                 SELECT 
                     proper_title,
@@ -138,14 +140,19 @@ def get_report_groups() -> list[tuple[str, str | None, list[int]]]:
                     SELECT DISTINCT
                         proper_title,
                         symbol,
-                        -- Normalize body: extract first value from PostgreSQL array format
+                        -- Normalize body from symbol prefix (more reliable than un_body)
                         CASE 
-                            WHEN un_body LIKE '{{%}}' THEN 
-                                COALESCE(
-                                    SUBSTRING(un_body FROM '^\\{{"?([^",}}]+)"?'),
-                                    un_body
-                                )
-                            ELSE un_body
+                            WHEN symbol LIKE 'A/HRC/%' THEN 'Human Rights Council'
+                            WHEN symbol LIKE 'A/%' THEN 'General Assembly'
+                            WHEN symbol LIKE 'E/%' THEN 'Economic and Social Council'
+                            WHEN symbol LIKE 'S/%' THEN 'Security Council'
+                            ELSE COALESCE(
+                                CASE 
+                                    WHEN un_body LIKE '{{%}}' THEN SUBSTRING(un_body FROM '^\\{{"?([^",}}]+)"?')
+                                    ELSE un_body
+                                END,
+                                'Other'
+                            )
                         END as normalized_body,
                         COALESCE(
                             date_year,

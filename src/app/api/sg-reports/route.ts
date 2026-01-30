@@ -324,14 +324,19 @@ export async function GET(req: NextRequest) {
             r.proper_title,
             r.symbol,
             r.un_body,
-            -- Normalize body: extract first value from PostgreSQL array format
+            -- Normalize body from symbol prefix (more reliable than un_body which can contain multiple bodies)
             CASE 
-              WHEN r.un_body LIKE '{%}' THEN 
-                COALESCE(
-                  SUBSTRING(r.un_body FROM '^\\{"?([^",}]+)"?'),
-                  r.un_body
-                )
-              ELSE r.un_body
+              WHEN r.symbol LIKE 'A/%' THEN 'General Assembly'
+              WHEN r.symbol LIKE 'E/%' THEN 'Economic and Social Council'
+              WHEN r.symbol LIKE 'S/%' THEN 'Security Council'
+              WHEN r.symbol LIKE 'A/HRC/%' THEN 'Human Rights Council'
+              ELSE COALESCE(
+                CASE 
+                  WHEN r.un_body LIKE '{%}' THEN SUBSTRING(r.un_body FROM '^\\{"?([^",}]+)"?')
+                  ELSE r.un_body
+                END,
+                'Other'
+              )
             END as normalized_body,
             r.report_type,
             r.publication_date,
@@ -376,14 +381,19 @@ export async function GET(req: NextRequest) {
         FROM (
           SELECT 
             r.proper_title,
-            -- Normalize body: extract first value from PostgreSQL array format
+            -- Normalize body from symbol prefix (more reliable than un_body which can contain multiple bodies)
             CASE 
-              WHEN r.un_body LIKE '{%}' THEN 
-                COALESCE(
-                  SUBSTRING(r.un_body FROM '^\\{"?([^",}]+)"?'),
-                  r.un_body
-                )
-              ELSE r.un_body
+              WHEN r.symbol LIKE 'A/%' THEN 'General Assembly'
+              WHEN r.symbol LIKE 'E/%' THEN 'Economic and Social Council'
+              WHEN r.symbol LIKE 'S/%' THEN 'Security Council'
+              WHEN r.symbol LIKE 'A/HRC/%' THEN 'Human Rights Council'
+              ELSE COALESCE(
+                CASE 
+                  WHEN r.un_body LIKE '{%}' THEN SUBSTRING(r.un_body FROM '^\\{"?([^",}]+)"?')
+                  ELSE r.un_body
+                END,
+                'Other'
+              )
             END as normalized_body,
             COALESCE(
               r.date_year,

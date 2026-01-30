@@ -1,0 +1,971 @@
+{
+  "analysis": {
+    "timestamp": "2026-01-30T14:18:18.242Z",
+    "totalTests": 3,
+    "successfulTests": 3,
+    "failedTests": 0,
+    "totalSqlQueries": 4,
+    "sqlIssues": [],
+    "commonPatterns": [
+      "date_year usage (problematic): 0 queries",
+      "publication_date usage (good): 2 queries",
+      "effective_year usage (good): 0 queries",
+      "latest_versions view usage: 1 queries",
+      "report_frequencies table usage: 1 queries",
+      "Correct array handling (ANY/@>/unnest): 1 queries"
+    ],
+    "recommendations": [
+      "Emphasize latest_versions view which has effective_year and entity columns already computed"
+    ]
+  },
+  "results": [
+    {
+      "testCase": {
+        "id": 1,
+        "prompt": "List all SG reports from 2024",
+        "expectedBehavior": "Should list reports using publication_date or effective_year for 2024"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "List all SG reports from 2024"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\": \"SELECT symbol, proper_title, title, un_body, publication_date FROM sg_reports WHERE SUBSTRING(publication_date, 1, 4) = '2024' ORDER BY publication_date, symbol;\", \"explanation\": \"List all SG reports published in 2024 with key metadata.\"}",
+                "name": "query_database"
+              },
+              "id": "call_JzvwQG3Fom2ALD4k575PrsdQ",
+              "type": "function"
+            },
+            {
+              "function": {
+                "arguments": "{\"query\": \"SELECT COUNT(*) AS report_count FROM sg_reports WHERE SUBSTRING(publication_date, 1, 4) = '2024';\", \"explanation\": \"Count total SG reports published in 2024.\"}",
+                "name": "query_database"
+              },
+              "id": "call_ZIucOolXqhcc0rhOj9hcJTge",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_JzvwQG3Fom2ALD4k575PrsdQ",
+          "content": "{\"explanation\":\"List all SG reports published in 2024 with key metadata.\",\"rowCount\":100,\"rows\":[{\"symbol\":\"A/79/1\",\"proper_title\":\"Report of the Secretary-General on the work of the Organization\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024\"},{\"symbol\":\"A/78/665\",\"proper_title\":\"Human security :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-02\"},{\"symbol\":\"S/2023/1075\",\"proper_title\":\"Report of the Secretary-General on the activities of the United Nations Office for West Africa and the Sahel\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-02\"},{\"symbol\":\"S/2024/12\",\"proper_title\":\"United Nations operation in Cyprus :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-03\"},{\"symbol\":\"S/2024/13\",\"proper_title\":\"Report of the Secretary-General on his mission of good offices in Cyprus\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-03\"},{\"symbol\":\"A/78/702\",\"proper_title\":\"Final disposition of the assets of the African Union-United Nations Hybrid Operation in Darfur :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-05\"},{\"symbol\":\"A/78/706\",\"proper_title\":\"Revised estimates relating to the Independent Institution on Missing Persons in the Syrian Arab Republic :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-08\"},{\"symbol\":\"S/2024/20\",\"proper_title\":\"Implementation of resolution 2697 (2023) :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-08\"},{\"symbol\":\"A/78/717\",\"proper_title\":\"Crimes against humanity :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-12\"},{\"symbol\":\"E/CN.6/2024/3\",\"proper_title\":\"Accelerating the achievement of gender equality and the empowerment of all women and girls by addressing poverty and strengthening institutions and financing with a gender perspective :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\"}\",\"publication_date\":\"2024-01-12\"},{\"symbol\":\"S/2024/62\",\"proper_title\":\"United Nations Integrated Office in Haiti :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-15\"},{\"symbol\":\"E/CN.6/2024/6\",\"proper_title\":\"Women, the girl child and HIV and AIDS :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\"}\",\"publication_date\":\"2024-01-16\"},{\"symbol\":\"E/CN.6/2024/7\",\"proper_title\":\"Release of women and children taken hostage, including those subsequently imprisoned, in armed conflicts :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\"}\",\"publication_date\":\"2024-01-17\"},{\"symbol\":\"A/78/719\",\"proper_title\":\"Budget for the United Nations Peacekeeping Force in Cyprus for the period from 1 July 2024 to 30 June 2025 :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-18\"},{\"symbol\":\"E/CN.5/2024/2\",\"proper_title\":\"Social dimensions of the New Partnership for Africa's Development :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\"}\",\"publication_date\":\"2024-01-18\"},{\"symbol\":\"A/78/720\",\"proper_title\":\"Budget for the United Nations Disengagement Observer Force for the period from 1 July 2024 to 30 June 2025 :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-19\"},{\"symbol\":\"A/78/721\",\"proper_title\":\"Budget for the United Nations Interim Administration Mission in Kosovo for the period from 1 July 2024 to 30 June 2025 :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-19\"},{\"symbol\":\"A/78/722\",\"proper_title\":\"Budget for the Regional Service Centre in Entebbe, Uganda, for the period from 1 July 2024 to 30 June 2025 :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-22\"},{\"symbol\":\"A/78/723\",\"proper_title\":\"Budget for the United Nations Mission for the Referendum in Western Sahara for the period from 1 July 2024 to 30 June 2025 :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-22\"},{\"symbol\":\"A/78/725\",\"proper_title\":\"Budget for the United Nations Interim Force in Lebanon for the period from 1 July 2024 to 30 June 2025 :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-22\"},{\"symbol\":\"A/78/726\",\"proper_title\":\"Overview of the financing of the United Nations peacekeeping operations : budget performance for the period from 1 July 2022 to 30 June 2023 and budget for the period from 1 July 2024 to 30 June 2025 :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-22\"},{\"symbol\":\"S/2024/93\",\"proper_title\":\"Children and armed conflict in the Central African Republic :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-24\"},{\"symbol\":\"A/78/734\",\"proper_title\":\"Budget for the United Nations Support Office in Somalia for the period from 1 July 2024 to 30 June 2025 :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-25\"},{\"symbol\":\"A/78/735\",\"proper_title\":\"Budget for the United Nations Logistics Base at Brindisi, Italy, for the period from 1 July 2024 to 30 June 2025 :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-25\"},{\"symbol\":\"A/79/63\",\"proper_title\":\"Information from Non-Self-Governing Territories transmitted under Article 73 e of the Charter of the United Nations :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-25\"},{\"symbol\":\"S/2024/95\",\"proper_title\":\"Implementation of paragraph 4 of Security Council resolution 2107 (2013) :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-25\"},{\"symbol\":\"S/2024/96\",\"proper_title\":\"Implementation of resolution 2682 (2023) :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-25\"},{\"symbol\":\"A/78/737\",\"proper_title\":\"Budget for the United Nations Interim Security Force for Abyei for the period from 1 July 2024 to 30 June 2025 :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-26\"},{\"symbol\":\"A/78/741\",\"proper_title\":\"Budget for the United Nations Organization Stabilization Mission in the Democratic Republic of the Congo for the period from 1 July 2024 to 30 June 2025 :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-29\"},{\"symbol\":\"A/78/746\",\"proper_title\":\"Budget for the support account for peacekeeping operations for the period from 1 July 2024 to 30 June 2025 :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-30\"},{\"symbol\":\"A/78/753\",\"proper_title\":\"Revised estimates relating to the proposed programme budget for 2024 under section 1, Overall policymaking, direction and coordination, and section 29B, Department of Operational Support :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-31\"},{\"symbol\":\"S/2024/117\",\"proper_title\":\"Eighteenth report of the Secretary-General on the threat posed by ISIL (Da'esh) to international peace and security and the range of United Nations efforts in support of Member States in countering the threat\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-31\"},{\"symbol\":\"A/78/754\",\"proper_title\":\"Budget for the United Nations Mission in South Sudan for the period from 1 July 2024 to 30 June 2025 :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-02-01\"},{\"symbol\":\"S/2024/129\",\"proper_title\":\"Situation in Somalia :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-02-02\"},{\"symbol\":\"A/79/62\",\"proper_title\":\"Progress made in the implementation of and follow-up to the outcomes of the World Summit on the Information Society at the regional and international levels :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\",\\\"General Assembly\\\",\\\"Other UN Bodies and Entities\\\"}\",\"publication_date\":\"2024-02-05\"},{\"symbol\":\"E/2024/3\",\"proper_title\":\"Progress made in the implementation of and follow-up to the outcomes of the World Summit on the Information Society at the regional and international levels :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\",\\\"General Assembly\\\",\\\"Other UN Bodies and Entities\\\"}\",\"publication_date\":\"2024-02-05\"},{\"symbol\":\"A/78/760\",\"proper_title\":\"Budget for the United Nations Multidimensional Integrated Stabilization Mission in the Central African Republic for the period from 1 July 2024 to 30 June 2025 :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-02-07\"},{\"symbol\":\"A/78/761\",\"proper_title\":\"Budget of the United Nations Multidimensional Integrated Stabilization Mission in Mali from 1 July 2024 to 30 June 2025 :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-02-07\"},{\"symbol\":\"A/78/763\",\"proper_title\":\"Donation of assets of the United Nations Multidimensional Integrated Stabilization Mission in Mali :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-02-09\"},{\"symbol\":\"A/AC.198/2024/3\",\"proper_title\":\"Activities of the Department of Global Communications :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-02-12\"},{\"symbol\":\"A/AC.198/2024/4\",\"proper_title\":\"Activities of the Department of Global Communications : outreach and knowledge services :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-02-12\"},{\"symbol\":\"S/2024/161\",\"proper_title\":\"Children and armed conflict in Colombia :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-02-13\"},{\"symbol\":\"A/78/773\",\"proper_title\":\"Implementation of the recommendations of the Board of Auditors concerning United Nations peacekeeping operations for the financial period ended 30 June 2023 :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-02-14\"},{\"symbol\":\"A/78/774\",\"proper_title\":\"Special measures for protection from sexual exploitation and abuse :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-02-14\"},{\"symbol\":\"A/79/789\",\"proper_title\":\"Special measures for protection from sexual exploitation and abuse :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-02-14\"},{\"symbol\":\"E/CN.9/2024/5\",\"proper_title\":\"Programme implementation and progress of work in the field of population in 2023 : Population Division, Department of Economic and Social Affairs :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\"}\",\"publication_date\":\"2024-02-14\"},{\"symbol\":\"CERD/C/112/2\",\"proper_title\":\"Status of submission of reports by States parties under article 9 (1) of the Convention :\",\"title\":null,\"un_body\":\"{\\\"Human Rights Bodies\\\"}\",\"publication_date\":\"2024-02-15\"},{\"symbol\":\"S/2024/170\",\"proper_title\":\"Central African Republic :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-02-15\"},{\"symbol\":\"E/CN.9/2024/3\",\"proper_title\":\"Implementation of the International Conference on Population and Development Programme of Action and its contributions to advancing the 2030 Agenda for Sustainable Development :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\"}\",\"publication_date\":\"2024-02-16\"},{\"symbol\":\"E/CN.9/2024/4\",\"proper_title\":\"Flow of financial resources for assisting in the further implementation of the Programme of Action of the International Conference on Population and Development :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\"}\",\"publication_date\":\"2024-02-16\"},{\"symbol\":\"A/CN.2/R.839\",\"proper_title\":\"Collection of contributions :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-02-20\"},{\"symbol\":\"E/CN.9/2024/2\",\"proper_title\":\"Assessing the status of implementation of the Programme of Action of the International Conference on Population and Development and its contribution to the follow-up and review of the 2030 Agenda for Sustainable Development during the decade of action and delivery for sustainable development :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\"}\",\"publication_date\":\"2024-02-21\"},{\"symbol\":\"S/2024/188\",\"proper_title\":\"Situation in South Sudan :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-02-26\"},{\"symbol\":\"A/78/789\",\"proper_title\":\"The situation in Afghanistan and its implications for international peace and security :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-02-28\"},{\"symbol\":\"S/2024/196\",\"proper_title\":\"The situation in Afghanistan and its implications for international peace and security :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-02-28\"},{\"symbol\":\"A/78/717/ADD.1\",\"proper_title\":\"Crimes against humanity :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-02-29\"},{\"symbol\":\"A/78/779\",\"proper_title\":\"Peacebuilding Fund :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-02-29\"},{\"symbol\":\"A/79/65\",\"proper_title\":\"Conference on the Establishment of a Middle East Zone Free of Nuclear Weapons and Other Weapons of Mass Destruction :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-02-29\"},{\"symbol\":\"A/79/66\",\"proper_title\":\"Implementation of the Declaration on the Granting of Independence to Colonial Countries and Peoples by the specialized agencies and the international institutions associated with the United Nations :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-02-29\"},{\"symbol\":\"S/2024/204\",\"proper_title\":\"Situation in the Sudan pursuant to Security Council resolution 2715 (2023) :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-02-29\"},{\"symbol\":\"S/2024/207\",\"proper_title\":\"Youth and peace and security :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-03-01\"},{\"symbol\":\"A/78/790\",\"proper_title\":\"Multilingualism :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-03-04\"},{\"symbol\":\"S/2024/222\",\"proper_title\":\"Implementation of Security Council resolution 1701 (2006) during the period from 21 October 2023 to 20 February 2024 :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-03-08\"},{\"symbol\":\"E/AC.51/2024/5\",\"proper_title\":\"United Nations system support for Agenda 2063 : The Africa We Want :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\"}\",\"publication_date\":\"2024-03-11\"},{\"symbol\":\"A/HRC/55/71\",\"proper_title\":\"Human rights in the occupied Syrian Golan :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Human Rights Bodies\\\"}\",\"publication_date\":\"2024-03-15\"},{\"symbol\":\"S/2024/242\",\"proper_title\":\"United Nations Disengagement Observer Force :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-03-18\"},{\"symbol\":\"A/79/68\",\"proper_title\":\"Oceans and the law of the sea :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-03-19\"},{\"symbol\":\"A/79/69\",\"proper_title\":\"Multi-year payment plans :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-03-21\"},{\"symbol\":\"S/2024/247\",\"proper_title\":\"Children and armed conflict in Iraq :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-03-21\"},{\"symbol\":\"S/2024/251\",\"proper_title\":\"Report of the Secretary-General on the United Nations Organization Stabilization Mission in the Democratic Republic of the Congo\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-03-21\"},{\"symbol\":\"A/AC.109/2024/18\",\"proper_title\":\"Dissemination of information on decolonization during the period from April 2023 to March 2024 :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-03-22\"},{\"symbol\":\"A/79/71\",\"proper_title\":\"Offers by Member States of study and training facilities for inhabitants of Non-Self-Governing Territories :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-03-27\"},{\"symbol\":\"S/2024/267\",\"proper_title\":\"United Nations Verification Mission in Colombia :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-03-27\"},{\"symbol\":\"S/2024/278\",\"proper_title\":\"Implementation of the Peace, Security and Cooperation Framework for the Democratic Republic of the Congo and the Region :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-04-01\"},{\"symbol\":\"S/2024/282\",\"proper_title\":\"United Nations Interim Administration Mission in Kosovo :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-04-02\"},{\"symbol\":\"S/2024/292\",\"proper_title\":\"Conflict-related sexual violence :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-04-04\"},{\"symbol\":\"A/79/72/ADD.1\",\"proper_title\":\"Implementation of General Assembly resolution 75/233 on the quadrennial comprehensive policy review of operational activities for development of the United Nations System : funding of the United Nations development system :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\",\\\"General Assembly\\\"}\",\"publication_date\":\"2024-04-08\"},{\"symbol\":\"E/2024/12/ADD.1\",\"proper_title\":\"Implementation of General Assembly resolution 75/233 on the quadrennial comprehensive policy review of operational activities for development of the United Nations System : funding of the United Nations development system :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\",\\\"General Assembly\\\"}\",\"publication_date\":\"2024-04-08\"},{\"symbol\":\"A/79/72/ADD.2\",\"proper_title\":\"Implementation of General Assembly resolution 75/233 on the quadrennial comprehensive policy review of operational activities for development of the United Nations System : funding compact for United Nations support to the Sustainable Development Goals :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\",\\\"General Assembly\\\"}\",\"publication_date\":\"2024-04-09\"},{\"symbol\":\"E/2024/12/ADD.2\",\"proper_title\":\"Implementation of General Assembly resolution 75/233 on the quadrennial comprehensive policy review of operational activities for development of the United Nations System : funding compact for United Nations support to the Sustainable Development Goals :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\",\\\"General Assembly\\\"}\",\"publication_date\":\"2024-04-09\"},{\"symbol\":\"S/2024/301\",\"proper_title\":\"United Nations Support Mission in Libya :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-04-09\"},{\"symbol\":\"S/2024/309\",\"proper_title\":\"Assessment of progress achieved on the key benchmarks established in paragraph 2 of resolution 2577 (2021) :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-04-15\"},{\"symbol\":\"S/2024/310\",\"proper_title\":\"United Nations Integrated Office in Haiti :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-04-16\"},{\"symbol\":\"S/2024/319\",\"proper_title\":\"Implementation of Security Council resolution 1559 (2004) :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-04-18\"},{\"symbol\":\"A/79/72\",\"proper_title\":\"Implementation of General Assembly resolution 75/233 on the quadrennial comprehensive policy review of operational activities for development of the United Nations System :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\",\\\"General Assembly\\\"}\",\"publication_date\":\"2024-04-19\"},{\"symbol\":\"E/2024/12\",\"proper_title\":\"Implementation of General Assembly resolution 75/233 on the quadrennial comprehensive policy review of operational activities for development of the United Nations System :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\",\\\"General Assembly\\\"}\",\"publication_date\":\"2024-04-19\"},{\"symbol\":\"A/78/864\",\"proper_title\":\"Status of internally displaced persons and refugees from Abkhazia, Georgia, and the Tskhinvali region/South Ossetia, Georgia :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-04-29\"},{\"symbol\":\"A/78/865\",\"proper_title\":\"Implementation of the United Nations Decade of Action on Nutrition (2016-2025) :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-04-30\"},{\"symbol\":\"A/79/75\",\"proper_title\":\"Follow-up to the 5th United Nations Conference on the Least Developed Countries :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\",\\\"General Assembly\\\"}\",\"publication_date\":\"2024-04-30\"},{\"symbol\":\"E/2024/8\",\"proper_title\":\"Follow-up to the 5th United Nations Conference on the Least Developed Countries :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\",\\\"General Assembly\\\"}\",\"publication_date\":\"2024-04-30\"},{\"symbol\":\"E/HLPF/2024/6\",\"proper_title\":\"From summits to systemic change : progress in food systems transformation since the United Nations Food Systems Summit +2 Stocktaking Moment :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\"}\",\"publication_date\":\"2024-04-30\"},{\"symbol\":\"S/2024/352\",\"proper_title\":\"Implementation of resolution 2684 (2023) :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-04-30\"},{\"symbol\":\"A/79/77\",\"proper_title\":\"Assistance to States for curbing the illicit traffic in small arms and light weapons and collecting them and the illicit trade in small arms and light weapons in all its aspects :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-05-01\"},{\"symbol\":\"A/79/78\",\"proper_title\":\"Strengthening of the coordination of emergency humanitarian assistance of the United Nations :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\",\\\"General Assembly\\\"}\",\"publication_date\":\"2024-05-01\"},{\"symbol\":\"E/2024/52\",\"proper_title\":\"Reinforcing the 2030 Agenda for Sustainable Development and eradicating poverty in times of multiple crises : the effective delivery of sustainable, resilient and innovative solutions :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\"}\",\"publication_date\":\"2024-05-01\"},{\"symbol\":\"E/2024/53\",\"proper_title\":\"Strengthening of the coordination of emergency humanitarian assistance of the United Nations :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\",\\\"General Assembly\\\"}\",\"publication_date\":\"2024-05-01\"},{\"symbol\":\"S/2024/354\",\"proper_title\":\"Situation in Abyei :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-05-01\"},{\"symbol\":\"A/79/79\",\"proper_title\":\"Progress towards the Sustainable Development Goals :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\",\\\"General Assembly\\\"}\",\"publication_date\":\"2024-05-02\"},{\"symbol\":\"A/79/892\",\"proper_title\":\"Status of internally displaced persons and refugees from Abkhazia, Georgia and the Tskhinvali region/South Ossetia, Georgia :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-05-02\"},{\"symbol\":\"E/2024/54\",\"proper_title\":\"Progress towards the Sustainable Development Goals :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\",\\\"General Assembly\\\"}\",\"publication_date\":\"2024-05-02\"}]}"
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_ZIucOolXqhcc0rhOj9hcJTge",
+          "content": "{\"explanation\":\"Count total SG reports published in 2024.\",\"rowCount\":1,\"rows\":[{\"report_count\":\"404\"}]}"
+        },
+        {
+          "role": "assistant",
+          "content": "## Summary\nFound 404 Secretary-General reports published in 2024. Sample listed below; I can provide the full CSV or filter by UN body/topic on request.\n\n| symbol | proper_title | un_body | publication_date |\n|---|---|---|---|\n| A/79/1 | Report of the Secretary-General on the work of the Organization | {\"General Assembly\"} | 2024 |\n| A/78/665 | Human security : | {\"General Assembly\"} | 2024-01-02 |\n| S/2023/1075 | Report of the Secretary-General on the activities of the United Nations Office for West Africa and the Sahel | {\"Security Council\"} | 2024-01-02 |\n| S/2024/12 | United Nations operation in Cyprus : | {\"Security Council\"} | 2024-01-03 |\n| S/2024/13 | Report of the Secretary-General on his mission of good offices in Cyprus | {\"Security Council\"} | 2024-01-03 |\n| A/78/702 | Final disposition of the assets of the African Union-United Nations Hybrid Operation in Darfur : | {\"General Assembly\"} | 2024-01-05 |\n| A/78/706 | Revised estimates relating to the Independent Institution on Missing Persons in the Syrian Arab Republic : | {\"General Assembly\"} | 2024-01-08 |\n| S/2024/20 | Implementation of resolution 2697 (2023) : | {\"Security Council\"} | 2024-01-08 |\n| A/78/717 | Crimes against humanity : | {\"General Assembly\"} | 2024-01-12 |\n| E/CN.6/2024/3 | Accelerating the achievement of gender equality and the empowerment of all women and girls by addressing poverty and strengthening institutions and financing with a gender perspective : | {\"Economic and Social Council\"} | 2024-01-12 |\n| S/2024/62 | United Nations Integrated Office in Haiti : | {\"Security Council\"} | 2024-01-15 |\n| E/CN.6/2024/6 | Women, the girl child and HIV and AIDS : | {\"Economic and Social Council\"} | 2024-01-16 |\n| E/CN.6/2024/7 | Release of women and children taken hostage, including those subsequently imprisoned, in armed conflicts : | {\"Economic and Social Council\"} | 2024-01-17 |\n| A/78/719 | Budget for the United Nations Peacekeeping Force in Cyprus for the period from 1 July 2024 to 30 June 2025 : | {\"General Assembly\"} | 2024-01-18 |\n| E/CN.5/2024/2 | Social dimensions of the New Partnership for Africa's Development : | {\"Economic and Social Council\"} | 2024-01-18 |\n| A/78/720 | Budget for the United Nations Disengagement Observer Force for the period from 1 July 2024 to 30 June 2025 : | {\"General Assembly\"} | 2024-01-19 |\n| A/78/721 | Budget for the United Nations Interim Administration Mission in Kosovo for the period from 1 July 2024 to 30 June 2025 : | {\"General Assembly\"} | 2024-01-19 |\n| A/78/722 | Budget for the Regional Service Centre in Entebbe, Uganda, for the period from 1 July 2024 to 30 June 2025 : | {\"General Assembly\"} | 2024-01-22 |\n| A/78/723 | Budget for the United Nations Mission for the Referendum in Western Sahara for the period from 1 July 2024 to 30 June 2025 : | {\"General Assembly\"} | 2024-01-22 |\n| A/78/725 | Budget for the United Nations Interim Force in Lebanon for the period from 1 July 2024 to 30 June 2025 : | {\"General Assembly\"} | 2024-01-22 |\n| A/78/726 | Overview of the financing of the United Nations peacekeeping operations : budget performance for the period from 1 July 2022 to 30 June 2023 and budget for the period from 1 July 2024 to 30 June 2025 : | {\"General Assembly\"} | 2024-01-22 |\n| S/2024/93 | Children and armed conflict in the Central African Republic : | {\"Security Council\"} | 2024-01-24 |\n| A/78/734 | Budget for the United Nations Support Office in Somalia for the period from 1 July 2024 to 30 June 2025 : | {\"General Assembly\"} | 2024-01-25 |\n| A/78/735 | Budget for the United Nations Logistics Base at Brindisi, Italy, for the period from 1 July 2024 to 30 June 2025 : | {\"General Assembly\"} | 2024-01-25 |\n| A/79/63 | Information from Non-Self-Governing Territories transmitted under Article 73 e of the Charter of the United Nations : | {\"General Assembly\"} | 2024-01-25 |\n\nWould you like the full list (404 items) as a CSV or filtered by UN body/topic?"
+        }
+      ],
+      "toolCalls": [
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT symbol, proper_title, title, un_body, publication_date FROM sg_reports WHERE SUBSTRING(publication_date, 1, 4) = '2024' ORDER BY publication_date, symbol;",
+            "explanation": "List all SG reports published in 2024 with key metadata."
+          },
+          "result": {
+            "explanation": "List all SG reports published in 2024 with key metadata.",
+            "rowCount": 100,
+            "rows": [
+              {
+                "symbol": "A/79/1",
+                "proper_title": "Report of the Secretary-General on the work of the Organization",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024"
+              },
+              {
+                "symbol": "A/78/665",
+                "proper_title": "Human security :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-02"
+              },
+              {
+                "symbol": "S/2023/1075",
+                "proper_title": "Report of the Secretary-General on the activities of the United Nations Office for West Africa and the Sahel",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-02"
+              },
+              {
+                "symbol": "S/2024/12",
+                "proper_title": "United Nations operation in Cyprus :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-03"
+              },
+              {
+                "symbol": "S/2024/13",
+                "proper_title": "Report of the Secretary-General on his mission of good offices in Cyprus",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-03"
+              },
+              {
+                "symbol": "A/78/702",
+                "proper_title": "Final disposition of the assets of the African Union-United Nations Hybrid Operation in Darfur :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-05"
+              },
+              {
+                "symbol": "A/78/706",
+                "proper_title": "Revised estimates relating to the Independent Institution on Missing Persons in the Syrian Arab Republic :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-08"
+              },
+              {
+                "symbol": "S/2024/20",
+                "proper_title": "Implementation of resolution 2697 (2023) :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-08"
+              },
+              {
+                "symbol": "A/78/717",
+                "proper_title": "Crimes against humanity :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-12"
+              },
+              {
+                "symbol": "E/CN.6/2024/3",
+                "proper_title": "Accelerating the achievement of gender equality and the empowerment of all women and girls by addressing poverty and strengthening institutions and financing with a gender perspective :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\"}",
+                "publication_date": "2024-01-12"
+              },
+              {
+                "symbol": "S/2024/62",
+                "proper_title": "United Nations Integrated Office in Haiti :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-15"
+              },
+              {
+                "symbol": "E/CN.6/2024/6",
+                "proper_title": "Women, the girl child and HIV and AIDS :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\"}",
+                "publication_date": "2024-01-16"
+              },
+              {
+                "symbol": "E/CN.6/2024/7",
+                "proper_title": "Release of women and children taken hostage, including those subsequently imprisoned, in armed conflicts :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\"}",
+                "publication_date": "2024-01-17"
+              },
+              {
+                "symbol": "A/78/719",
+                "proper_title": "Budget for the United Nations Peacekeeping Force in Cyprus for the period from 1 July 2024 to 30 June 2025 :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-18"
+              },
+              {
+                "symbol": "E/CN.5/2024/2",
+                "proper_title": "Social dimensions of the New Partnership for Africa's Development :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\"}",
+                "publication_date": "2024-01-18"
+              },
+              {
+                "symbol": "A/78/720",
+                "proper_title": "Budget for the United Nations Disengagement Observer Force for the period from 1 July 2024 to 30 June 2025 :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-19"
+              },
+              {
+                "symbol": "A/78/721",
+                "proper_title": "Budget for the United Nations Interim Administration Mission in Kosovo for the period from 1 July 2024 to 30 June 2025 :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-19"
+              },
+              {
+                "symbol": "A/78/722",
+                "proper_title": "Budget for the Regional Service Centre in Entebbe, Uganda, for the period from 1 July 2024 to 30 June 2025 :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-22"
+              },
+              {
+                "symbol": "A/78/723",
+                "proper_title": "Budget for the United Nations Mission for the Referendum in Western Sahara for the period from 1 July 2024 to 30 June 2025 :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-22"
+              },
+              {
+                "symbol": "A/78/725",
+                "proper_title": "Budget for the United Nations Interim Force in Lebanon for the period from 1 July 2024 to 30 June 2025 :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-22"
+              },
+              {
+                "symbol": "A/78/726",
+                "proper_title": "Overview of the financing of the United Nations peacekeeping operations : budget performance for the period from 1 July 2022 to 30 June 2023 and budget for the period from 1 July 2024 to 30 June 2025 :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-22"
+              },
+              {
+                "symbol": "S/2024/93",
+                "proper_title": "Children and armed conflict in the Central African Republic :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-24"
+              },
+              {
+                "symbol": "A/78/734",
+                "proper_title": "Budget for the United Nations Support Office in Somalia for the period from 1 July 2024 to 30 June 2025 :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-25"
+              },
+              {
+                "symbol": "A/78/735",
+                "proper_title": "Budget for the United Nations Logistics Base at Brindisi, Italy, for the period from 1 July 2024 to 30 June 2025 :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-25"
+              },
+              {
+                "symbol": "A/79/63",
+                "proper_title": "Information from Non-Self-Governing Territories transmitted under Article 73 e of the Charter of the United Nations :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-25"
+              },
+              {
+                "symbol": "S/2024/95",
+                "proper_title": "Implementation of paragraph 4 of Security Council resolution 2107 (2013) :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-25"
+              },
+              {
+                "symbol": "S/2024/96",
+                "proper_title": "Implementation of resolution 2682 (2023) :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-25"
+              },
+              {
+                "symbol": "A/78/737",
+                "proper_title": "Budget for the United Nations Interim Security Force for Abyei for the period from 1 July 2024 to 30 June 2025 :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-26"
+              },
+              {
+                "symbol": "A/78/741",
+                "proper_title": "Budget for the United Nations Organization Stabilization Mission in the Democratic Republic of the Congo for the period from 1 July 2024 to 30 June 2025 :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-29"
+              },
+              {
+                "symbol": "A/78/746",
+                "proper_title": "Budget for the support account for peacekeeping operations for the period from 1 July 2024 to 30 June 2025 :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-30"
+              },
+              {
+                "symbol": "A/78/753",
+                "proper_title": "Revised estimates relating to the proposed programme budget for 2024 under section 1, Overall policymaking, direction and coordination, and section 29B, Department of Operational Support :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-31"
+              },
+              {
+                "symbol": "S/2024/117",
+                "proper_title": "Eighteenth report of the Secretary-General on the threat posed by ISIL (Da'esh) to international peace and security and the range of United Nations efforts in support of Member States in countering the threat",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-31"
+              },
+              {
+                "symbol": "A/78/754",
+                "proper_title": "Budget for the United Nations Mission in South Sudan for the period from 1 July 2024 to 30 June 2025 :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-02-01"
+              },
+              {
+                "symbol": "S/2024/129",
+                "proper_title": "Situation in Somalia :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-02-02"
+              },
+              {
+                "symbol": "A/79/62",
+                "proper_title": "Progress made in the implementation of and follow-up to the outcomes of the World Summit on the Information Society at the regional and international levels :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\",\"General Assembly\",\"Other UN Bodies and Entities\"}",
+                "publication_date": "2024-02-05"
+              },
+              {
+                "symbol": "E/2024/3",
+                "proper_title": "Progress made in the implementation of and follow-up to the outcomes of the World Summit on the Information Society at the regional and international levels :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\",\"General Assembly\",\"Other UN Bodies and Entities\"}",
+                "publication_date": "2024-02-05"
+              },
+              {
+                "symbol": "A/78/760",
+                "proper_title": "Budget for the United Nations Multidimensional Integrated Stabilization Mission in the Central African Republic for the period from 1 July 2024 to 30 June 2025 :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-02-07"
+              },
+              {
+                "symbol": "A/78/761",
+                "proper_title": "Budget of the United Nations Multidimensional Integrated Stabilization Mission in Mali from 1 July 2024 to 30 June 2025 :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-02-07"
+              },
+              {
+                "symbol": "A/78/763",
+                "proper_title": "Donation of assets of the United Nations Multidimensional Integrated Stabilization Mission in Mali :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-02-09"
+              },
+              {
+                "symbol": "A/AC.198/2024/3",
+                "proper_title": "Activities of the Department of Global Communications :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-02-12"
+              },
+              {
+                "symbol": "A/AC.198/2024/4",
+                "proper_title": "Activities of the Department of Global Communications : outreach and knowledge services :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-02-12"
+              },
+              {
+                "symbol": "S/2024/161",
+                "proper_title": "Children and armed conflict in Colombia :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-02-13"
+              },
+              {
+                "symbol": "A/78/773",
+                "proper_title": "Implementation of the recommendations of the Board of Auditors concerning United Nations peacekeeping operations for the financial period ended 30 June 2023 :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-02-14"
+              },
+              {
+                "symbol": "A/78/774",
+                "proper_title": "Special measures for protection from sexual exploitation and abuse :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-02-14"
+              },
+              {
+                "symbol": "A/79/789",
+                "proper_title": "Special measures for protection from sexual exploitation and abuse :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-02-14"
+              },
+              {
+                "symbol": "E/CN.9/2024/5",
+                "proper_title": "Programme implementation and progress of work in the field of population in 2023 : Population Division, Department of Economic and Social Affairs :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\"}",
+                "publication_date": "2024-02-14"
+              },
+              {
+                "symbol": "CERD/C/112/2",
+                "proper_title": "Status of submission of reports by States parties under article 9 (1) of the Convention :",
+                "title": null,
+                "un_body": "{\"Human Rights Bodies\"}",
+                "publication_date": "2024-02-15"
+              },
+              {
+                "symbol": "S/2024/170",
+                "proper_title": "Central African Republic :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-02-15"
+              },
+              {
+                "symbol": "E/CN.9/2024/3",
+                "proper_title": "Implementation of the International Conference on Population and Development Programme of Action and its contributions to advancing the 2030 Agenda for Sustainable Development :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\"}",
+                "publication_date": "2024-02-16"
+              },
+              {
+                "symbol": "E/CN.9/2024/4",
+                "proper_title": "Flow of financial resources for assisting in the further implementation of the Programme of Action of the International Conference on Population and Development :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\"}",
+                "publication_date": "2024-02-16"
+              },
+              {
+                "symbol": "A/CN.2/R.839",
+                "proper_title": "Collection of contributions :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-02-20"
+              },
+              {
+                "symbol": "E/CN.9/2024/2",
+                "proper_title": "Assessing the status of implementation of the Programme of Action of the International Conference on Population and Development and its contribution to the follow-up and review of the 2030 Agenda for Sustainable Development during the decade of action and delivery for sustainable development :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\"}",
+                "publication_date": "2024-02-21"
+              },
+              {
+                "symbol": "S/2024/188",
+                "proper_title": "Situation in South Sudan :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-02-26"
+              },
+              {
+                "symbol": "A/78/789",
+                "proper_title": "The situation in Afghanistan and its implications for international peace and security :",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-02-28"
+              },
+              {
+                "symbol": "S/2024/196",
+                "proper_title": "The situation in Afghanistan and its implications for international peace and security :",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-02-28"
+              },
+              {
+                "symbol": "A/78/717/ADD.1",
+                "proper_title": "Crimes against humanity :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-02-29"
+              },
+              {
+                "symbol": "A/78/779",
+                "proper_title": "Peacebuilding Fund :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-02-29"
+              },
+              {
+                "symbol": "A/79/65",
+                "proper_title": "Conference on the Establishment of a Middle East Zone Free of Nuclear Weapons and Other Weapons of Mass Destruction :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-02-29"
+              },
+              {
+                "symbol": "A/79/66",
+                "proper_title": "Implementation of the Declaration on the Granting of Independence to Colonial Countries and Peoples by the specialized agencies and the international institutions associated with the United Nations :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-02-29"
+              },
+              {
+                "symbol": "S/2024/204",
+                "proper_title": "Situation in the Sudan pursuant to Security Council resolution 2715 (2023) :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-02-29"
+              },
+              {
+                "symbol": "S/2024/207",
+                "proper_title": "Youth and peace and security :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-03-01"
+              },
+              {
+                "symbol": "A/78/790",
+                "proper_title": "Multilingualism :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-03-04"
+              },
+              {
+                "symbol": "S/2024/222",
+                "proper_title": "Implementation of Security Council resolution 1701 (2006) during the period from 21 October 2023 to 20 February 2024 :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-03-08"
+              },
+              {
+                "symbol": "E/AC.51/2024/5",
+                "proper_title": "United Nations system support for Agenda 2063 : The Africa We Want :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\"}",
+                "publication_date": "2024-03-11"
+              },
+              {
+                "symbol": "A/HRC/55/71",
+                "proper_title": "Human rights in the occupied Syrian Golan :",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Human Rights Bodies\"}",
+                "publication_date": "2024-03-15"
+              },
+              {
+                "symbol": "S/2024/242",
+                "proper_title": "United Nations Disengagement Observer Force :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-03-18"
+              },
+              {
+                "symbol": "A/79/68",
+                "proper_title": "Oceans and the law of the sea :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-03-19"
+              },
+              {
+                "symbol": "A/79/69",
+                "proper_title": "Multi-year payment plans :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-03-21"
+              },
+              {
+                "symbol": "S/2024/247",
+                "proper_title": "Children and armed conflict in Iraq :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-03-21"
+              },
+              {
+                "symbol": "S/2024/251",
+                "proper_title": "Report of the Secretary-General on the United Nations Organization Stabilization Mission in the Democratic Republic of the Congo",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-03-21"
+              },
+              {
+                "symbol": "A/AC.109/2024/18",
+                "proper_title": "Dissemination of information on decolonization during the period from April 2023 to March 2024 :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-03-22"
+              },
+              {
+                "symbol": "A/79/71",
+                "proper_title": "Offers by Member States of study and training facilities for inhabitants of Non-Self-Governing Territories :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-03-27"
+              },
+              {
+                "symbol": "S/2024/267",
+                "proper_title": "United Nations Verification Mission in Colombia :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-03-27"
+              },
+              {
+                "symbol": "S/2024/278",
+                "proper_title": "Implementation of the Peace, Security and Cooperation Framework for the Democratic Republic of the Congo and the Region :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-04-01"
+              },
+              {
+                "symbol": "S/2024/282",
+                "proper_title": "United Nations Interim Administration Mission in Kosovo :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-04-02"
+              },
+              {
+                "symbol": "S/2024/292",
+                "proper_title": "Conflict-related sexual violence :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-04-04"
+              },
+              {
+                "symbol": "A/79/72/ADD.1",
+                "proper_title": "Implementation of General Assembly resolution 75/233 on the quadrennial comprehensive policy review of operational activities for development of the United Nations System : funding of the United Nations development system :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\",\"General Assembly\"}",
+                "publication_date": "2024-04-08"
+              },
+              {
+                "symbol": "E/2024/12/ADD.1",
+                "proper_title": "Implementation of General Assembly resolution 75/233 on the quadrennial comprehensive policy review of operational activities for development of the United Nations System : funding of the United Nations development system :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\",\"General Assembly\"}",
+                "publication_date": "2024-04-08"
+              },
+              {
+                "symbol": "A/79/72/ADD.2",
+                "proper_title": "Implementation of General Assembly resolution 75/233 on the quadrennial comprehensive policy review of operational activities for development of the United Nations System : funding compact for United Nations support to the Sustainable Development Goals :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\",\"General Assembly\"}",
+                "publication_date": "2024-04-09"
+              },
+              {
+                "symbol": "E/2024/12/ADD.2",
+                "proper_title": "Implementation of General Assembly resolution 75/233 on the quadrennial comprehensive policy review of operational activities for development of the United Nations System : funding compact for United Nations support to the Sustainable Development Goals :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\",\"General Assembly\"}",
+                "publication_date": "2024-04-09"
+              },
+              {
+                "symbol": "S/2024/301",
+                "proper_title": "United Nations Support Mission in Libya :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-04-09"
+              },
+              {
+                "symbol": "S/2024/309",
+                "proper_title": "Assessment of progress achieved on the key benchmarks established in paragraph 2 of resolution 2577 (2021) :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-04-15"
+              },
+              {
+                "symbol": "S/2024/310",
+                "proper_title": "United Nations Integrated Office in Haiti :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-04-16"
+              },
+              {
+                "symbol": "S/2024/319",
+                "proper_title": "Implementation of Security Council resolution 1559 (2004) :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-04-18"
+              },
+              {
+                "symbol": "A/79/72",
+                "proper_title": "Implementation of General Assembly resolution 75/233 on the quadrennial comprehensive policy review of operational activities for development of the United Nations System :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\",\"General Assembly\"}",
+                "publication_date": "2024-04-19"
+              },
+              {
+                "symbol": "E/2024/12",
+                "proper_title": "Implementation of General Assembly resolution 75/233 on the quadrennial comprehensive policy review of operational activities for development of the United Nations System :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\",\"General Assembly\"}",
+                "publication_date": "2024-04-19"
+              },
+              {
+                "symbol": "A/78/864",
+                "proper_title": "Status of internally displaced persons and refugees from Abkhazia, Georgia, and the Tskhinvali region/South Ossetia, Georgia :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-04-29"
+              },
+              {
+                "symbol": "A/78/865",
+                "proper_title": "Implementation of the United Nations Decade of Action on Nutrition (2016-2025) :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-04-30"
+              },
+              {
+                "symbol": "A/79/75",
+                "proper_title": "Follow-up to the 5th United Nations Conference on the Least Developed Countries :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\",\"General Assembly\"}",
+                "publication_date": "2024-04-30"
+              },
+              {
+                "symbol": "E/2024/8",
+                "proper_title": "Follow-up to the 5th United Nations Conference on the Least Developed Countries :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\",\"General Assembly\"}",
+                "publication_date": "2024-04-30"
+              },
+              {
+                "symbol": "E/HLPF/2024/6",
+                "proper_title": "From summits to systemic change : progress in food systems transformation since the United Nations Food Systems Summit +2 Stocktaking Moment :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\"}",
+                "publication_date": "2024-04-30"
+              },
+              {
+                "symbol": "S/2024/352",
+                "proper_title": "Implementation of resolution 2684 (2023) :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-04-30"
+              },
+              {
+                "symbol": "A/79/77",
+                "proper_title": "Assistance to States for curbing the illicit traffic in small arms and light weapons and collecting them and the illicit trade in small arms and light weapons in all its aspects :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-05-01"
+              },
+              {
+                "symbol": "A/79/78",
+                "proper_title": "Strengthening of the coordination of emergency humanitarian assistance of the United Nations :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\",\"General Assembly\"}",
+                "publication_date": "2024-05-01"
+              },
+              {
+                "symbol": "E/2024/52",
+                "proper_title": "Reinforcing the 2030 Agenda for Sustainable Development and eradicating poverty in times of multiple crises : the effective delivery of sustainable, resilient and innovative solutions :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\"}",
+                "publication_date": "2024-05-01"
+              },
+              {
+                "symbol": "E/2024/53",
+                "proper_title": "Strengthening of the coordination of emergency humanitarian assistance of the United Nations :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\",\"General Assembly\"}",
+                "publication_date": "2024-05-01"
+              },
+              {
+                "symbol": "S/2024/354",
+                "proper_title": "Situation in Abyei :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-05-01"
+              },
+              {
+                "symbol": "A/79/79",
+                "proper_title": "Progress towards the Sustainable Development Goals :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\",\"General Assembly\"}",
+                "publication_date": "2024-05-02"
+              },
+              {
+                "symbol": "A/79/892",
+                "proper_title": "Status of internally displaced persons and refugees from Abkhazia, Georgia and the Tskhinvali region/South Ossetia, Georgia :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-05-02"
+              },
+              {
+                "symbol": "E/2024/54",
+                "proper_title": "Progress towards the Sustainable Development Goals :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\",\"General Assembly\"}",
+                "publication_date": "2024-05-02"
+              }
+            ]
+          },
+          "success": true
+        },
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT COUNT(*) AS report_count FROM sg_reports WHERE SUBSTRING(publication_date, 1, 4) = '2024';",
+            "explanation": "Count total SG reports published in 2024."
+          },
+          "result": {
+            "explanation": "Count total SG reports published in 2024.",
+            "rowCount": 1,
+            "rows": [
+              {
+                "report_count": "404"
+              }
+            ]
+          },
+          "success": true
+        }
+      ],
+      "finalResponse": "## Summary\nFound 404 Secretary-General reports published in 2024. Sample listed below; I can provide the full CSV or filter by UN body/topic on request.\n\n| symbol | proper_title | un_body | publication_date |\n|---|---|---|---|\n| A/79/1 | Report of the Secretary-General on the work of the Organization | {\"General Assembly\"} | 2024 |\n| A/78/665 | Human security : | {\"General Assembly\"} | 2024-01-02 |\n| S/2023/1075 | Report of the Secretary-General on the activities of the United Nations Office for West Africa and the Sahel | {\"Security Council\"} | 2024-01-02 |\n| S/2024/12 | United Nations operation in Cyprus : | {\"Security Council\"} | 2024-01-03 |\n| S/2024/13 | Report of the Secretary-General on his mission of good offices in Cyprus | {\"Security Council\"} | 2024-01-03 |\n| A/78/702 | Final disposition of the assets of the African Union-United Nations Hybrid Operation in Darfur : | {\"General Assembly\"} | 2024-01-05 |\n| A/78/706 | Revised estimates relating to the Independent Institution on Missing Persons in the Syrian Arab Republic : | {\"General Assembly\"} | 2024-01-08 |\n| S/2024/20 | Implementation of resolution 2697 (2023) : | {\"Security Council\"} | 2024-01-08 |\n| A/78/717 | Crimes against humanity : | {\"General Assembly\"} | 2024-01-12 |\n| E/CN.6/2024/3 | Accelerating the achievement of gender equality and the empowerment of all women and girls by addressing poverty and strengthening institutions and financing with a gender perspective : | {\"Economic and Social Council\"} | 2024-01-12 |\n| S/2024/62 | United Nations Integrated Office in Haiti : | {\"Security Council\"} | 2024-01-15 |\n| E/CN.6/2024/6 | Women, the girl child and HIV and AIDS : | {\"Economic and Social Council\"} | 2024-01-16 |\n| E/CN.6/2024/7 | Release of women and children taken hostage, including those subsequently imprisoned, in armed conflicts : | {\"Economic and Social Council\"} | 2024-01-17 |\n| A/78/719 | Budget for the United Nations Peacekeeping Force in Cyprus for the period from 1 July 2024 to 30 June 2025 : | {\"General Assembly\"} | 2024-01-18 |\n| E/CN.5/2024/2 | Social dimensions of the New Partnership for Africa's Development : | {\"Economic and Social Council\"} | 2024-01-18 |\n| A/78/720 | Budget for the United Nations Disengagement Observer Force for the period from 1 July 2024 to 30 June 2025 : | {\"General Assembly\"} | 2024-01-19 |\n| A/78/721 | Budget for the United Nations Interim Administration Mission in Kosovo for the period from 1 July 2024 to 30 June 2025 : | {\"General Assembly\"} | 2024-01-19 |\n| A/78/722 | Budget for the Regional Service Centre in Entebbe, Uganda, for the period from 1 July 2024 to 30 June 2025 : | {\"General Assembly\"} | 2024-01-22 |\n| A/78/723 | Budget for the United Nations Mission for the Referendum in Western Sahara for the period from 1 July 2024 to 30 June 2025 : | {\"General Assembly\"} | 2024-01-22 |\n| A/78/725 | Budget for the United Nations Interim Force in Lebanon for the period from 1 July 2024 to 30 June 2025 : | {\"General Assembly\"} | 2024-01-22 |\n| A/78/726 | Overview of the financing of the United Nations peacekeeping operations : budget performance for the period from 1 July 2022 to 30 June 2023 and budget for the period from 1 July 2024 to 30 June 2025 : | {\"General Assembly\"} | 2024-01-22 |\n| S/2024/93 | Children and armed conflict in the Central African Republic : | {\"Security Council\"} | 2024-01-24 |\n| A/78/734 | Budget for the United Nations Support Office in Somalia for the period from 1 July 2024 to 30 June 2025 : | {\"General Assembly\"} | 2024-01-25 |\n| A/78/735 | Budget for the United Nations Logistics Base at Brindisi, Italy, for the period from 1 July 2024 to 30 June 2025 : | {\"General Assembly\"} | 2024-01-25 |\n| A/79/63 | Information from Non-Self-Governing Territories transmitted under Article 73 e of the Charter of the United Nations : | {\"General Assembly\"} | 2024-01-25 |\n\nWould you like the full list (404 items) as a CSV or filtered by UN body/topic?",
+      "sqlQueries": [
+        "SELECT symbol, proper_title, title, un_body, publication_date FROM sg_reports WHERE SUBSTRING(publication_date, 1, 4) = '2024' ORDER BY publication_date, symbol;",
+        "SELECT COUNT(*) AS report_count FROM sg_reports WHERE SUBSTRING(publication_date, 1, 4) = '2024';"
+      ],
+      "errors": [],
+      "iterations": 2
+    },
+    {
+      "testCase": {
+        "id": 2,
+        "prompt": "What are the most common report topics?",
+        "expectedBehavior": "Should unnest subject_terms and count frequency"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "What are the most common report topics?"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT term, COUNT(*) AS report_count\\nFROM latest_versions lv\\nCROSS JOIN LATERAL unnest(lv.subject_terms) AS term\\nGROUP BY term\\nORDER BY report_count DESC\\nLIMIT 10;\",\"explanation\":\"Find the top 10 most frequent subject terms across the latest versions of report series.\"}",
+                "name": "query_database"
+              },
+              "id": "call_HGdbc55BZ8KnIzWRYAEiFo4d",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_HGdbc55BZ8KnIzWRYAEiFo4d",
+          "content": "{\"explanation\":\"Find the top 10 most frequent subject terms across the latest versions of report series.\",\"rowCount\":10,\"rows\":[{\"term\":\"PEACEKEEPING OPERATIONS\",\"report_count\":\"131\"},{\"term\":\"FINANCIAL RESOURCES\",\"report_count\":\"99\"},{\"term\":\"SUSTAINABLE DEVELOPMENT\",\"report_count\":\"95\"},{\"term\":\"PROGRAMME BUDGETING\",\"report_count\":\"70\"},{\"term\":\"ANALYSIS OF VARIANCE\",\"report_count\":\"69\"},{\"term\":\"HUMAN RIGHTS\",\"report_count\":\"51\"},{\"term\":\"STAFFING\",\"report_count\":\"51\"},{\"term\":\"PROGRAMME EXPENDITURES\",\"report_count\":\"45\"},{\"term\":\"PROGRAMME PLANNING\",\"report_count\":\"44\"},{\"term\":\"HUMANITARIAN ASSISTANCE\",\"report_count\":\"43\"}]}"
+        },
+        {
+          "role": "assistant",
+          "content": "## Top report topics (latest versions)\n\n| Subject term | Report count |\n|---|---:|\n| PEACEKEEPING OPERATIONS | 131 |\n| FINANCIAL RESOURCES | 99 |\n| SUSTAINABLE DEVELOPMENT | 95 |\n| PROGRAMME BUDGETING | 70 |\n| ANALYSIS OF VARIANCE | 69 |\n| HUMAN RIGHTS | 51 |\n| STAFFING | 51 |\n| PROGRAMME EXPENDITURES | 45 |\n| PROGRAMME PLANNING | 44 |\n| HUMANITARIAN ASSISTANCE | 43 |\n\nSummary: Peacekeeping, finance/budgeting, sustainable development, and human rights dominate the latest report series."
+        }
+      ],
+      "toolCalls": [
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT term, COUNT(*) AS report_count\nFROM latest_versions lv\nCROSS JOIN LATERAL unnest(lv.subject_terms) AS term\nGROUP BY term\nORDER BY report_count DESC\nLIMIT 10;",
+            "explanation": "Find the top 10 most frequent subject terms across the latest versions of report series."
+          },
+          "result": {
+            "explanation": "Find the top 10 most frequent subject terms across the latest versions of report series.",
+            "rowCount": 10,
+            "rows": [
+              {
+                "term": "PEACEKEEPING OPERATIONS",
+                "report_count": "131"
+              },
+              {
+                "term": "FINANCIAL RESOURCES",
+                "report_count": "99"
+              },
+              {
+                "term": "SUSTAINABLE DEVELOPMENT",
+                "report_count": "95"
+              },
+              {
+                "term": "PROGRAMME BUDGETING",
+                "report_count": "70"
+              },
+              {
+                "term": "ANALYSIS OF VARIANCE",
+                "report_count": "69"
+              },
+              {
+                "term": "HUMAN RIGHTS",
+                "report_count": "51"
+              },
+              {
+                "term": "STAFFING",
+                "report_count": "51"
+              },
+              {
+                "term": "PROGRAMME EXPENDITURES",
+                "report_count": "45"
+              },
+              {
+                "term": "PROGRAMME PLANNING",
+                "report_count": "44"
+              },
+              {
+                "term": "HUMANITARIAN ASSISTANCE",
+                "report_count": "43"
+              }
+            ]
+          },
+          "success": true
+        }
+      ],
+      "finalResponse": "## Top report topics (latest versions)\n\n| Subject term | Report count |\n|---|---:|\n| PEACEKEEPING OPERATIONS | 131 |\n| FINANCIAL RESOURCES | 99 |\n| SUSTAINABLE DEVELOPMENT | 95 |\n| PROGRAMME BUDGETING | 70 |\n| ANALYSIS OF VARIANCE | 69 |\n| HUMAN RIGHTS | 51 |\n| STAFFING | 51 |\n| PROGRAMME EXPENDITURES | 45 |\n| PROGRAMME PLANNING | 44 |\n| HUMANITARIAN ASSISTANCE | 43 |\n\nSummary: Peacekeeping, finance/budgeting, sustainable development, and human rights dominate the latest report series.",
+      "sqlQueries": [
+        "SELECT term, COUNT(*) AS report_count\nFROM latest_versions lv\nCROSS JOIN LATERAL unnest(lv.subject_terms) AS term\nGROUP BY term\nORDER BY report_count DESC\nLIMIT 10;"
+      ],
+      "errors": [],
+      "iterations": 2
+    },
+    {
+      "testCase": {
+        "id": 3,
+        "prompt": "How many reports are published annually?",
+        "expectedBehavior": "Should use report_frequencies or count by year"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "How many reports are published annually?"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT COUNT(*) AS annual_count FROM report_frequencies WHERE calculated_frequency = 'annual';\",\"explanation\":\"Count how many report series have an annual publication frequency.\"}",
+                "name": "query_database"
+              },
+              "id": "call_15o5N14FuEbjF68A6NNwAwUl",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_15o5N14FuEbjF68A6NNwAwUl",
+          "content": "{\"explanation\":\"Count how many report series have an annual publication frequency.\",\"rowCount\":1,\"rows\":[{\"annual_count\":\"153\"}]}"
+        },
+        {
+          "role": "assistant",
+          "content": "## Summary\n153 report series are published annually.\n\nIf you need a breakdown by UN body or topic, I can provide a table."
+        }
+      ],
+      "toolCalls": [
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT COUNT(*) AS annual_count FROM report_frequencies WHERE calculated_frequency = 'annual';",
+            "explanation": "Count how many report series have an annual publication frequency."
+          },
+          "result": {
+            "explanation": "Count how many report series have an annual publication frequency.",
+            "rowCount": 1,
+            "rows": [
+              {
+                "annual_count": "153"
+              }
+            ]
+          },
+          "success": true
+        }
+      ],
+      "finalResponse": "## Summary\n153 report series are published annually.\n\nIf you need a breakdown by UN body or topic, I can provide a table.",
+      "sqlQueries": [
+        "SELECT COUNT(*) AS annual_count FROM report_frequencies WHERE calculated_frequency = 'annual';"
+      ],
+      "errors": [],
+      "iterations": 2
+    }
+  ]
+}

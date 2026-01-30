@@ -213,3 +213,17 @@ WHERE r.rn = 1;
 
 \echo 'Views created. Stats:'
 SELECT * FROM sg_reports_survey.sg_reports_stats;
+
+--------------------------------------------------------------------------------
+-- RE-GRANT PERMISSIONS TO chat_readonly
+-- Views lose grants when recreated, so re-apply them here
+--------------------------------------------------------------------------------
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'chat_readonly') THEN
+    EXECUTE 'GRANT SELECT ON sg_reports_survey.sg_reports TO chat_readonly';
+    EXECUTE 'GRANT SELECT ON sg_reports_survey.latest_versions TO chat_readonly';
+    RAISE NOTICE 'Granted SELECT on views to chat_readonly';
+  END IF;
+END
+$$;

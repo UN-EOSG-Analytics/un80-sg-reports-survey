@@ -1,0 +1,1266 @@
+{
+  "analysis": {
+    "timestamp": "2026-01-30T14:14:18.180Z",
+    "totalTests": 3,
+    "successfulTests": 0,
+    "failedTests": 3,
+    "totalSqlQueries": 12,
+    "sqlIssues": [],
+    "commonPatterns": [
+      "date_year usage (problematic): 0 queries",
+      "publication_date usage (good): 4 queries",
+      "effective_year usage (good): 2 queries",
+      "latest_versions view usage: 3 queries",
+      "report_frequencies table usage: 1 queries",
+      "Correct array handling (ANY/@>/unnest): 4 queries"
+    ],
+    "recommendations": []
+  },
+  "results": [
+    {
+      "testCase": {
+        "id": 1,
+        "prompt": "List all SG reports from 2024",
+        "expectedBehavior": "Should list reports using publication_date or effective_year for 2024"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "List all SG reports from 2024"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT symbol, proper_title, title, un_body, publication_date FROM sg_reports WHERE SUBSTRING(publication_date, 1, 4) = '2024' ORDER BY publication_date;\",\"explanation\":\"List all Secretary-General reports published in 2024 with key metadata.\"}",
+                "name": "query_database"
+              },
+              "id": "call_ILwsqXALkcXeFiphzmyHy4SH",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_ILwsqXALkcXeFiphzmyHy4SH",
+          "content": "{\"error\":\"Query failed: permission denied for view sg_reports. You may retry with a corrected query. The original query was: SELECT symbol, proper_title, title, un_body, publication_date FROM sg_reports WHERE SUBSTRING(publication_date, 1, 4) = '2024' ORDER BY publication_date;\"}"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT DISTINCT entity FROM latest_versions WHERE effective_year = 2024 ORDER BY entity;\",\"explanation\":\"Identify how the 'entity' field labels Secretary-General reports for 2024 to filter correctly.\"}",
+                "name": "query_database"
+              },
+              "id": "call_oWULpUfWEQP7KlewqKPVi2js",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_oWULpUfWEQP7KlewqKPVi2js",
+          "content": "{\"error\":\"Query failed: permission denied for view latest_versions. You may retry with a corrected query. The original query was: SELECT DISTINCT entity FROM latest_versions WHERE effective_year = 2024 ORDER BY entity;\"}"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT symbol, proper_title, title, un_body, publication_date FROM documents WHERE SUBSTRING(publication_date, 1, 4) = '2024' AND (title ILIKE '%Secretary-General%' OR proper_title ILIKE '%Secretary-General%') ORDER BY publication_date;\",\"explanation\":\"List all documents in 2024 whose title/proper_title indicates a Secretary-General report.\"}",
+                "name": "query_database"
+              },
+              "id": "call_MA974cKw6F7lVF7t88L0kFyI",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_MA974cKw6F7lVF7t88L0kFyI",
+          "content": "{\"explanation\":\"List all documents in 2024 whose title/proper_title indicates a Secretary-General report.\",\"rowCount\":100,\"rows\":[{\"symbol\":\"A/79/1\",\"proper_title\":\"Report of the Secretary-General on the work of the Organization\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024\"},{\"symbol\":\"S/2023/1082\",\"proper_title\":\"Letter dated 27 December 2023 from the Secretary-General addressed to the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-02\"},{\"symbol\":\"S/2023/1075\",\"proper_title\":\"Report of the Secretary-General on the activities of the United Nations Office for West Africa and the Sahel\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-02\"},{\"symbol\":\"S/2023/1079\",\"proper_title\":\"Letter dated 29 December 2023 from the Permanent Representative of the Russian Federation to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-02\"},{\"symbol\":\"S/2023/1083\",\"proper_title\":\"Letter dated 29 December 2023 from the President of the Security Council addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-02\"},{\"symbol\":\"A/78/694\",\"proper_title\":\"Letter dated 20 December 2023 from the Chargé d'affaires a.i. of the Permanent Mission of Turkmenistan to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-02\"},{\"symbol\":\"S/2023/1058\",\"proper_title\":\"Identical letters dated 27 December 2023 from the Chargé d'affaires a.i. of the Permanent Mission of Iraq to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-02\"},{\"symbol\":\"A/78/696\",\"proper_title\":\"Letter dated 2 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-03\"},{\"symbol\":\"S/2024/6\",\"proper_title\":\"Letter dated 2 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-03\"},{\"symbol\":\"A/ES-10/978\",\"proper_title\":\"Identical letters dated 3 January 2024 from the Permanent Observer of the State of Palestine to the United Nations addressed to the Secretary-General, the President of the General Assembly and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-03\"},{\"symbol\":\"S/2023/1065\",\"proper_title\":\"Identical letters dated 29 December 2023 from the Chargé d'affaires a.i. of the Permanent Mission of the Syrian Arab Republic to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-03\"},{\"symbol\":\"S/2024/7\",\"proper_title\":\"Letter dated 2 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-03\"},{\"symbol\":\"A/ES-11/52\",\"proper_title\":\"Letter dated 2 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-03\"},{\"symbol\":\"A/ES-11/51\",\"proper_title\":\"Letter dated 2 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-03\"},{\"symbol\":\"S/2024/13\",\"proper_title\":\"Report of the Secretary-General on his mission of good offices in Cyprus\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-03\"},{\"symbol\":\"S/2024/5\",\"proper_title\":\"Identical letters dated 2 January 2024 from the Permanent Representative of Israel to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-03\"},{\"symbol\":\"A/78/699\",\"proper_title\":\"Letter dated 3 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-03\"},{\"symbol\":\"S/2024/14\",\"proper_title\":\"Letter dated 3 January 2024 from the Permanent Representative of the Islamic Republic of Iran to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-03\"},{\"symbol\":\"S/2024/4\",\"proper_title\":\"Letter dated 2 January 2024 from the Permanent Representative of the Islamic Republic of Iran to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-03\"},{\"symbol\":\"S/2024/18\",\"proper_title\":\"Letter dated 3 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-03\"},{\"symbol\":\"A/78/697\",\"proper_title\":\"Identical letters dated 29 December 2023 from the Chargé d'affaires a.i. of the Permanent Mission of the Syrian Arab Republic to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-03\"},{\"symbol\":\"S/2024/16\",\"proper_title\":\"Identical letters dated 3 January 2024 from the Permanent Observer of the State of Palestine to the United Nations addressed to the Secretary-General, the President of the General Assembly and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-03\"},{\"symbol\":\"A/78/701\",\"proper_title\":\"Letter dated 3 January 2024 from the Permanent Representative of Argentina to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-04\"},{\"symbol\":\"S/2024/21\",\"proper_title\":\"Letter dated 4 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-05\"},{\"symbol\":\"A/ES-11/54\",\"proper_title\":\"Letter dated 4 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-05\"},{\"symbol\":\"S/2024/22\",\"proper_title\":\"Letter dated 4 January 2024 from the Secretary-General addressed to the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-05\"},{\"symbol\":\"A/78/703\",\"proper_title\":\"Letter dated 4 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-05\"},{\"symbol\":\"A/78/704\",\"proper_title\":\"Letter dated 5 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-08\"},{\"symbol\":\"S/2024/26\",\"proper_title\":\"Letter dated 5 January 2024 from the Secretary-General addressed to the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-08\"},{\"symbol\":\"A/78/707\",\"proper_title\":\"Letter dated 8 January 2024 from the Secretary-General addressed to the President of the General Assembly\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-08\"},{\"symbol\":\"S/2024/23\",\"proper_title\":\"Identical letters dated 4 January 2024 from the Chargé d'affaires a.i. of the Permanent Mission of Iraq to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-08\"},{\"symbol\":\"S/2024/31\",\"proper_title\":\"Letter dated 6 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-08\"},{\"symbol\":\"A/ES-11/55\",\"proper_title\":\"Letter dated 5 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-08\"},{\"symbol\":\"A/78/705\",\"proper_title\":\"Letter dated 6 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-08\"},{\"symbol\":\"S/2024/25\",\"proper_title\":\"Letter dated 5 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-08\"},{\"symbol\":\"A/ES-11/56\",\"proper_title\":\"Letter dated 6 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-08\"},{\"symbol\":\"S/2024/24\",\"proper_title\":\"Identical letters dated 4 January 2024 from the Chargé d'affaires a.i. of the Permanent Mission of Lebanon to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-08\"},{\"symbol\":\"A/78/708\",\"proper_title\":\"Identical letters dated 4 January 2024 from the Chargé d'affaires a.i. of the Permanent Mission of Lebanon to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-08\"},{\"symbol\":\"A/78/709\",\"proper_title\":\"Letter dated 8 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-09\"},{\"symbol\":\"S/2024/34\",\"proper_title\":\"Letter dated 8 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-09\"},{\"symbol\":\"A/ES-11/57\",\"proper_title\":\"Letter dated 8 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-09\"},{\"symbol\":\"S/2024/42\",\"proper_title\":\"Letter dated 15 December 2023 from the Secretary-General addressed to the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-10\"},{\"symbol\":\"S/2024/45\",\"proper_title\":\"Letter dated 9 January 2024 from the President of the Security Council addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-10\"},{\"symbol\":\"S/2024/36\",\"proper_title\":\"Identical letters dated 9 January 2024 from the Chargé d'affaires a.i. of the Permanent Mission of Lebanon to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-10\"},{\"symbol\":\"S/2024/44\",\"proper_title\":\"Letter dated 3 January 2024 from the Secretary-General addressed to the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-10\"},{\"symbol\":\"S/2024/43\",\"proper_title\":\"Letter dated 9 January 2024 from the President of the Security Council addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-10\"},{\"symbol\":\"S/2024/48\",\"proper_title\":\"Letter dated 29 December 2023 from the Secretary-General addressed to the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-10\"},{\"symbol\":\"A/78/712\",\"proper_title\":\"Identical letters dated 9 January 2024 from the Chargé d'affaires a.i. of the Permanent Mission of Lebanon to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-10\"},{\"symbol\":\"A/78/710\",\"proper_title\":\"Letter dated 21 December 2023 from the Secretary-General addressed to the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-10\"},{\"symbol\":\"A/78/711\",\"proper_title\":\"Letter dated 10 January 2024 from the Permanent Representative of the Islamic Republic of Iran to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-11\"},{\"symbol\":\"S/2024/52\",\"proper_title\":\"Identical letters dated 11 January 2024 from the Permanent Representative of Israel to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-11\"},{\"symbol\":\"S/2024/49\",\"proper_title\":\"Letter dated 10 January 2024 from the Permanent Representative of the Islamic Republic of Iran to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-11\"},{\"symbol\":\"A/78/707/ADD.1\",\"proper_title\":\"Letter dated 11 January 2024 from the Secretary-General addressed to the President of the General Assembly\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-11\"},{\"symbol\":\"A/78/713\",\"proper_title\":\"Letter dated 11 January 2024 from the Permanent Representative of the Islamic Republic of Iran to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-12\"},{\"symbol\":\"A/78/714\",\"proper_title\":\"Letter dated 11 January 2024 from the Permanent Representative of the Russian Federation to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-12\"},{\"symbol\":\"S/2024/53\",\"proper_title\":\"Letter dated 28 December 2023 from the Chargé d'affaires a.i. of the Permanent Mission of Iraq to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-12\"},{\"symbol\":\"A/78/715\",\"proper_title\":\"Letter dated 12 January 2024 from the Permanent Representatives of Azerbaijan, Kazakhstan, Kyrgyzstan, Tajikistan, Turkmenistan and Uzbekistan to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-15\"},{\"symbol\":\"S/2024/54\",\"proper_title\":\"Identical letters dated 12 January 2024 from the Permanent Observer of the State of Palestine to the United Nations addressed to the Secretary-General, the President of the General Assembly and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-15\"},{\"symbol\":\"A/ES-10/979\",\"proper_title\":\"Identical letters dated 12 January 2024 from the Permanent Observer of the State of Palestine to the United Nations addressed to the Secretary-General, the President of the General Assembly and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-15\"},{\"symbol\":\"S/2024/57\",\"proper_title\":\"Identical letters dated 12 January 2024 from the Permanent Representative of Bahrain to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-15\"},{\"symbol\":\"A/78/716\",\"proper_title\":\"Identical letters dated 12 January 2024 from the Permanent Representative of Bahrain to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-15\"},{\"symbol\":\"S/2024/58\",\"proper_title\":\"Letter dated 12 January 2024 from the Permanent Representative of Cuba to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-16\"},{\"symbol\":\"S/2024/79\",\"proper_title\":\"Letter dated 15 January 2024 from the Secretary-General addressed to the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-17\"},{\"symbol\":\"A/78/718\",\"proper_title\":\"Letter dated 17 January 2024 from the Permanent Representative of Greece to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-18\"},{\"symbol\":\"S/2024/80\",\"proper_title\":\"Letter dated 17 January 2024 from the Permanent Representative of the Russian Federation to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-18\"},{\"symbol\":\"S/2024/81\",\"proper_title\":\"Letter dated 11 January 2024 from the Permanent Representative of the Russian Federation to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-18\"},{\"symbol\":\"S/2024/83\",\"proper_title\":\"Letter dated 17 January 2024 from the President of the Security Council addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-19\"},{\"symbol\":\"S/2024/76\",\"proper_title\":\"Identical letters dated 16 January 2024 from the Chargé d'affaires a.i. of the Permanent Mission of Iraq to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-19\"},{\"symbol\":\"A/ES-10/980\",\"proper_title\":\"Identical letters dated 19 January 2024 from the Permanent Observer of the State of Palestine to the United Nations addressed to the Secretary-General, the President of the General Assembly and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-22\"},{\"symbol\":\"S/2024/90\",\"proper_title\":\"Letter dated 22 January 2024 from the Permanent Representative of the Russian Federation to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-22\"},{\"symbol\":\"S/2024/84\",\"proper_title\":\"Identical letters dated 19 January 2024 from the Permanent Observer of the State of Palestine to the United Nations addressed to the Secretary-General, the President of the General Assembly and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-22\"},{\"symbol\":\"A/78/724\",\"proper_title\":\"Identical letters dated 16 January 2024 from the Chargé d'affaires a.i. of the Permanent Mission of Lebanon to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-22\"},{\"symbol\":\"S/2024/72\",\"proper_title\":\"Identical letters dated 16 January 2024 from the Chargé d'affaires a.i. of the Permanent Mission of Lebanon to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-22\"},{\"symbol\":\"A/78/730\",\"proper_title\":\"Letter dated 20 January 2024 from the Permanent Representative of Azerbaijan to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-22\"},{\"symbol\":\"S/2024/91\",\"proper_title\":\"Identical letters dated 20 December 2023 from the Chargé d'affaires a.i. of the Permanent Mission of Lebanon to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-23\"},{\"symbol\":\"A/78/728\",\"proper_title\":\"Identical letters dated 21 January 2024 from the Chargé d'affaires a.i. of the Permanent Mission of the Syrian Arab Republic to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-23\"},{\"symbol\":\"S/2024/87\",\"proper_title\":\"Identical letters dated 21 January 2024 from the Chargé d'affaires a.i. of the Permanent Mission of the Syrian Arab Republic to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-23\"},{\"symbol\":\"A/78/727\",\"proper_title\":\"Identical letters dated 20 December 2023 from the Chargé d'affaires a.i. of the Permanent Mission of Lebanon to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-23\"},{\"symbol\":\"A/78/732\",\"proper_title\":\"Letter dated 19 January 2024 from the Chargé d'affaires a.i. of the Permanent Mission of the Bolivarian Republic of Venezuela to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-24\"},{\"symbol\":\"A/ES-11/58\",\"proper_title\":\"Letter dated 23 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-24\"},{\"symbol\":\"A/78/729\",\"proper_title\":\"Letter dated 23 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-24\"},{\"symbol\":\"S/2024/94\",\"proper_title\":\"Letter dated 23 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-24\"},{\"symbol\":\"A/78/740\",\"proper_title\":\"Letter dated 23 January 2024 from the Permanent Representative of the Islamic Republic of Iran to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-25\"},{\"symbol\":\"A/78/739\",\"proper_title\":\"Letter dated 23 January 2024 from the Permanent Representative of the Islamic Republic of Iran to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-25\"},{\"symbol\":\"A/78/733\",\"proper_title\":\"Letter dated 23 January 2024 from the Permanent Representative of the Russian Federation to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-25\"},{\"symbol\":\"A/78/748\",\"proper_title\":\"Letter dated 18 January 2024 from the Permanent Representative of Spain to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-25\"},{\"symbol\":\"S/2024/100\",\"proper_title\":\"Identical letters dated 28 December 2023 from the Chargé d'affaires a.i. of the Permanent Mission of Lebanon to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-26\"},{\"symbol\":\"A/78/738\",\"proper_title\":\"Letter dated 26 January 2024 from the Permanent Representative of Armenia to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-26\"},{\"symbol\":\"A/78/749\",\"proper_title\":\"Identical letters dated 28 December 2023 from the Chargé d'affaires a.i. of the Permanent Mission of Lebanon to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-26\"},{\"symbol\":\"S/2024/99\",\"proper_title\":\"Letter dated 26 January 2024 from the Permanent Representative of the Russian Federation to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-26\"},{\"symbol\":\"S/2024/109\",\"proper_title\":\"Identical letters dated 29 January 2024 from the Permanent Representative of Somalia to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-29\"},{\"symbol\":\"S/2024/113\",\"proper_title\":\"Letter dated 29 January 2024 from the President of the Security Council addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-30\"},{\"symbol\":\"A/78/747\",\"proper_title\":\"Letter dated 24 January 2024 from the Permanent Representative of the United Arab Emirates to the United Nations addressed to the Secretary-General\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-01-30\"},{\"symbol\":\"S/2024/111\",\"proper_title\":\"Letter dated 29 January 2024 from the Secretary-General addressed to the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-30\"},{\"symbol\":\"A/78/752\",\"proper_title\":\"Letter dated 30 January 2024 from the Permanent Representative of the Russian Federation to the United Nations addressed to the Secretary-General, the President of the General Assembly and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-31\"},{\"symbol\":\"A/78/751\",\"proper_title\":\"Identical letters dated 26 January 2024 from the Permanent Representative of Morocco to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-31\"},{\"symbol\":\"S/2024/112\",\"proper_title\":\"Letter dated 30 January 2024 from the Permanent Representative of the Russian Federation to the United Nations addressed to the Secretary-General, the President of the General Assembly and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-31\"},{\"symbol\":\"S/2024/116\",\"proper_title\":\"Letter dated 26 January 2024 from the Secretary-General addressed to the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-31\"},{\"symbol\":\"S/2024/117\",\"proper_title\":\"Eighteenth report of the Secretary-General on the threat posed by ISIL (Da'esh) to international peace and security and the range of United Nations efforts in support of Member States in countering the threat\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-31\"},{\"symbol\":\"S/2024/97\",\"proper_title\":\"Identical letters dated 26 January 2024 from the Permanent Representative of Morocco to the United Nations addressed to the Secretary-General and the President of the Security Council\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-31\"}]}"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT symbol, proper_title, un_body, publication_date FROM documents \\nWHERE SUBSTRING(publication_date, 1, 4) = '2024'\\n  AND (\\n    proper_title ILIKE '%report of the secretary-general%'\\n    OR title ILIKE '%report of the secretary-general%'\\n    OR proper_title ILIKE '%Secretary-General’s report%'\\n    OR proper_title ILIKE '%Report of the Secretary-General%'\\n  )\\nORDER BY publication_date;\",\"explanation\":\"Find all 2024 documents whose title indicates they are Secretary-General reports.\"}",
+                "name": "query_database"
+              },
+              "id": "call_JYcEI6Zb1Ia3z5fcfnpJpVEg",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_JYcEI6Zb1Ia3z5fcfnpJpVEg",
+          "content": "{\"explanation\":\"Find all 2024 documents whose title indicates they are Secretary-General reports.\",\"rowCount\":8,\"rows\":[{\"symbol\":\"A/79/1\",\"proper_title\":\"Report of the Secretary-General on the work of the Organization\",\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024\"},{\"symbol\":\"S/2023/1075\",\"proper_title\":\"Report of the Secretary-General on the activities of the United Nations Office for West Africa and the Sahel\",\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-02\"},{\"symbol\":\"S/2024/13\",\"proper_title\":\"Report of the Secretary-General on his mission of good offices in Cyprus\",\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-03\"},{\"symbol\":\"S/2024/117\",\"proper_title\":\"Eighteenth report of the Secretary-General on the threat posed by ISIL (Da'esh) to international peace and security and the range of United Nations efforts in support of Member States in countering the threat\",\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-01-31\"},{\"symbol\":\"E/CN.3/2024/22/CORR.1\",\"proper_title\":\"Report of the Secretary-General on open data :\",\"un_body\":\"{\\\"Economic and Social Council\\\"}\",\"publication_date\":\"2024-02-15\"},{\"symbol\":\"S/2024/251\",\"proper_title\":\"Report of the Secretary-General on the United Nations Organization Stabilization Mission in the Democratic Republic of the Congo\",\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-03-21\"},{\"symbol\":\"S/2024/526\",\"proper_title\":\"Report of the Secretary-General on his mission of good offices in Cyprus\",\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-07-05\"},{\"symbol\":\"S/2024/583\",\"proper_title\":\"Nineteenth report of the Secretary-General on the threat posed by ISIL (Da'esh) to international peace and security and the range of United Nations efforts in support of Member States in countering the threat\",\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2024-07-31\"}]}"
+        },
+        {
+          "role": "assistant",
+          "content": "## Summary\nFound 8 Secretary-General reports published in 2024 (per available documents). See table; can refine if you need a specific UN body or topic.\n\n## SG reports (2024)\n| Symbol | Proper Title | UN Body | Publication Date |\n|---|---|---|---|\n| A/79/1 | Report of the Secretary-General on the work of the Organization | General Assembly | 2024 |\n| S/2023/1075 | Report of the Secretary-General on the activities of the United Nations Office for West Africa and the Sahel | Security Council | 2024-01-02 |\n| S/2024/13 | Report of the Secretary-General on his mission of good offices in Cyprus | Security Council | 2024-01-03 |\n| S/2024/117 | Eighteenth report of the Secretary-General on the threat posed by ISIL (Da'esh)… | Security Council | 2024-01-31 |\n| E/CN.3/2024/22/CORR.1 | Report of the Secretary-General on open data : | Economic and Social Council | 2024-02-15 |\n| S/2024/251 | Report of the Secretary-General on the United Nations Organization Stabilization Mission in the Democratic Republic of the Congo | Security Council | 2024-03-21 |\n| S/2024/526 | Report of the Secretary-General on his mission of good offices in Cyprus | Security Council | 2024-07-05 |\n| S/2024/583 | Nineteenth report of the Secretary-General on the threat posed by ISIL (Da'esh)… | Security Council | 2024-07-31 |\n\nIf you want only Security Council mission reports, or to include corrigenda/exclude them, I can adjust."
+        }
+      ],
+      "toolCalls": [
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT symbol, proper_title, title, un_body, publication_date FROM sg_reports WHERE SUBSTRING(publication_date, 1, 4) = '2024' ORDER BY publication_date;",
+            "explanation": "List all Secretary-General reports published in 2024 with key metadata."
+          },
+          "result": "Query failed: permission denied for view sg_reports. You may retry with a corrected query. The original query was: SELECT symbol, proper_title, title, un_body, publication_date FROM sg_reports WHERE SUBSTRING(publication_date, 1, 4) = '2024' ORDER BY publication_date;",
+          "success": false
+        },
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT DISTINCT entity FROM latest_versions WHERE effective_year = 2024 ORDER BY entity;",
+            "explanation": "Identify how the 'entity' field labels Secretary-General reports for 2024 to filter correctly."
+          },
+          "result": "Query failed: permission denied for view latest_versions. You may retry with a corrected query. The original query was: SELECT DISTINCT entity FROM latest_versions WHERE effective_year = 2024 ORDER BY entity;",
+          "success": false
+        },
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT symbol, proper_title, title, un_body, publication_date FROM documents WHERE SUBSTRING(publication_date, 1, 4) = '2024' AND (title ILIKE '%Secretary-General%' OR proper_title ILIKE '%Secretary-General%') ORDER BY publication_date;",
+            "explanation": "List all documents in 2024 whose title/proper_title indicates a Secretary-General report."
+          },
+          "result": {
+            "explanation": "List all documents in 2024 whose title/proper_title indicates a Secretary-General report.",
+            "rowCount": 100,
+            "rows": [
+              {
+                "symbol": "A/79/1",
+                "proper_title": "Report of the Secretary-General on the work of the Organization",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024"
+              },
+              {
+                "symbol": "S/2023/1082",
+                "proper_title": "Letter dated 27 December 2023 from the Secretary-General addressed to the President of the Security Council",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-02"
+              },
+              {
+                "symbol": "S/2023/1075",
+                "proper_title": "Report of the Secretary-General on the activities of the United Nations Office for West Africa and the Sahel",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-02"
+              },
+              {
+                "symbol": "S/2023/1079",
+                "proper_title": "Letter dated 29 December 2023 from the Permanent Representative of the Russian Federation to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-02"
+              },
+              {
+                "symbol": "S/2023/1083",
+                "proper_title": "Letter dated 29 December 2023 from the President of the Security Council addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-02"
+              },
+              {
+                "symbol": "A/78/694",
+                "proper_title": "Letter dated 20 December 2023 from the Chargé d'affaires a.i. of the Permanent Mission of Turkmenistan to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-02"
+              },
+              {
+                "symbol": "S/2023/1058",
+                "proper_title": "Identical letters dated 27 December 2023 from the Chargé d'affaires a.i. of the Permanent Mission of Iraq to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-02"
+              },
+              {
+                "symbol": "A/78/696",
+                "proper_title": "Letter dated 2 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-03"
+              },
+              {
+                "symbol": "S/2024/6",
+                "proper_title": "Letter dated 2 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-03"
+              },
+              {
+                "symbol": "A/ES-10/978",
+                "proper_title": "Identical letters dated 3 January 2024 from the Permanent Observer of the State of Palestine to the United Nations addressed to the Secretary-General, the President of the General Assembly and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-03"
+              },
+              {
+                "symbol": "S/2023/1065",
+                "proper_title": "Identical letters dated 29 December 2023 from the Chargé d'affaires a.i. of the Permanent Mission of the Syrian Arab Republic to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-03"
+              },
+              {
+                "symbol": "S/2024/7",
+                "proper_title": "Letter dated 2 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-03"
+              },
+              {
+                "symbol": "A/ES-11/52",
+                "proper_title": "Letter dated 2 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-03"
+              },
+              {
+                "symbol": "A/ES-11/51",
+                "proper_title": "Letter dated 2 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-03"
+              },
+              {
+                "symbol": "S/2024/13",
+                "proper_title": "Report of the Secretary-General on his mission of good offices in Cyprus",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-03"
+              },
+              {
+                "symbol": "S/2024/5",
+                "proper_title": "Identical letters dated 2 January 2024 from the Permanent Representative of Israel to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-03"
+              },
+              {
+                "symbol": "A/78/699",
+                "proper_title": "Letter dated 3 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-03"
+              },
+              {
+                "symbol": "S/2024/14",
+                "proper_title": "Letter dated 3 January 2024 from the Permanent Representative of the Islamic Republic of Iran to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-03"
+              },
+              {
+                "symbol": "S/2024/4",
+                "proper_title": "Letter dated 2 January 2024 from the Permanent Representative of the Islamic Republic of Iran to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-03"
+              },
+              {
+                "symbol": "S/2024/18",
+                "proper_title": "Letter dated 3 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-03"
+              },
+              {
+                "symbol": "A/78/697",
+                "proper_title": "Identical letters dated 29 December 2023 from the Chargé d'affaires a.i. of the Permanent Mission of the Syrian Arab Republic to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-03"
+              },
+              {
+                "symbol": "S/2024/16",
+                "proper_title": "Identical letters dated 3 January 2024 from the Permanent Observer of the State of Palestine to the United Nations addressed to the Secretary-General, the President of the General Assembly and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-03"
+              },
+              {
+                "symbol": "A/78/701",
+                "proper_title": "Letter dated 3 January 2024 from the Permanent Representative of Argentina to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-04"
+              },
+              {
+                "symbol": "S/2024/21",
+                "proper_title": "Letter dated 4 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-05"
+              },
+              {
+                "symbol": "A/ES-11/54",
+                "proper_title": "Letter dated 4 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-05"
+              },
+              {
+                "symbol": "S/2024/22",
+                "proper_title": "Letter dated 4 January 2024 from the Secretary-General addressed to the President of the Security Council",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-05"
+              },
+              {
+                "symbol": "A/78/703",
+                "proper_title": "Letter dated 4 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-05"
+              },
+              {
+                "symbol": "A/78/704",
+                "proper_title": "Letter dated 5 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-08"
+              },
+              {
+                "symbol": "S/2024/26",
+                "proper_title": "Letter dated 5 January 2024 from the Secretary-General addressed to the President of the Security Council",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-08"
+              },
+              {
+                "symbol": "A/78/707",
+                "proper_title": "Letter dated 8 January 2024 from the Secretary-General addressed to the President of the General Assembly",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-08"
+              },
+              {
+                "symbol": "S/2024/23",
+                "proper_title": "Identical letters dated 4 January 2024 from the Chargé d'affaires a.i. of the Permanent Mission of Iraq to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-08"
+              },
+              {
+                "symbol": "S/2024/31",
+                "proper_title": "Letter dated 6 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-08"
+              },
+              {
+                "symbol": "A/ES-11/55",
+                "proper_title": "Letter dated 5 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-08"
+              },
+              {
+                "symbol": "A/78/705",
+                "proper_title": "Letter dated 6 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-08"
+              },
+              {
+                "symbol": "S/2024/25",
+                "proper_title": "Letter dated 5 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-08"
+              },
+              {
+                "symbol": "A/ES-11/56",
+                "proper_title": "Letter dated 6 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-08"
+              },
+              {
+                "symbol": "S/2024/24",
+                "proper_title": "Identical letters dated 4 January 2024 from the Chargé d'affaires a.i. of the Permanent Mission of Lebanon to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-08"
+              },
+              {
+                "symbol": "A/78/708",
+                "proper_title": "Identical letters dated 4 January 2024 from the Chargé d'affaires a.i. of the Permanent Mission of Lebanon to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-08"
+              },
+              {
+                "symbol": "A/78/709",
+                "proper_title": "Letter dated 8 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-09"
+              },
+              {
+                "symbol": "S/2024/34",
+                "proper_title": "Letter dated 8 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-09"
+              },
+              {
+                "symbol": "A/ES-11/57",
+                "proper_title": "Letter dated 8 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-09"
+              },
+              {
+                "symbol": "S/2024/42",
+                "proper_title": "Letter dated 15 December 2023 from the Secretary-General addressed to the President of the Security Council",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-10"
+              },
+              {
+                "symbol": "S/2024/45",
+                "proper_title": "Letter dated 9 January 2024 from the President of the Security Council addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-10"
+              },
+              {
+                "symbol": "S/2024/36",
+                "proper_title": "Identical letters dated 9 January 2024 from the Chargé d'affaires a.i. of the Permanent Mission of Lebanon to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-10"
+              },
+              {
+                "symbol": "S/2024/44",
+                "proper_title": "Letter dated 3 January 2024 from the Secretary-General addressed to the President of the Security Council",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-10"
+              },
+              {
+                "symbol": "S/2024/43",
+                "proper_title": "Letter dated 9 January 2024 from the President of the Security Council addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-10"
+              },
+              {
+                "symbol": "S/2024/48",
+                "proper_title": "Letter dated 29 December 2023 from the Secretary-General addressed to the President of the Security Council",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-10"
+              },
+              {
+                "symbol": "A/78/712",
+                "proper_title": "Identical letters dated 9 January 2024 from the Chargé d'affaires a.i. of the Permanent Mission of Lebanon to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-10"
+              },
+              {
+                "symbol": "A/78/710",
+                "proper_title": "Letter dated 21 December 2023 from the Secretary-General addressed to the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-10"
+              },
+              {
+                "symbol": "A/78/711",
+                "proper_title": "Letter dated 10 January 2024 from the Permanent Representative of the Islamic Republic of Iran to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-11"
+              },
+              {
+                "symbol": "S/2024/52",
+                "proper_title": "Identical letters dated 11 January 2024 from the Permanent Representative of Israel to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-11"
+              },
+              {
+                "symbol": "S/2024/49",
+                "proper_title": "Letter dated 10 January 2024 from the Permanent Representative of the Islamic Republic of Iran to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-11"
+              },
+              {
+                "symbol": "A/78/707/ADD.1",
+                "proper_title": "Letter dated 11 January 2024 from the Secretary-General addressed to the President of the General Assembly",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-11"
+              },
+              {
+                "symbol": "A/78/713",
+                "proper_title": "Letter dated 11 January 2024 from the Permanent Representative of the Islamic Republic of Iran to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-12"
+              },
+              {
+                "symbol": "A/78/714",
+                "proper_title": "Letter dated 11 January 2024 from the Permanent Representative of the Russian Federation to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-12"
+              },
+              {
+                "symbol": "S/2024/53",
+                "proper_title": "Letter dated 28 December 2023 from the Chargé d'affaires a.i. of the Permanent Mission of Iraq to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-12"
+              },
+              {
+                "symbol": "A/78/715",
+                "proper_title": "Letter dated 12 January 2024 from the Permanent Representatives of Azerbaijan, Kazakhstan, Kyrgyzstan, Tajikistan, Turkmenistan and Uzbekistan to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-15"
+              },
+              {
+                "symbol": "S/2024/54",
+                "proper_title": "Identical letters dated 12 January 2024 from the Permanent Observer of the State of Palestine to the United Nations addressed to the Secretary-General, the President of the General Assembly and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-15"
+              },
+              {
+                "symbol": "A/ES-10/979",
+                "proper_title": "Identical letters dated 12 January 2024 from the Permanent Observer of the State of Palestine to the United Nations addressed to the Secretary-General, the President of the General Assembly and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-15"
+              },
+              {
+                "symbol": "S/2024/57",
+                "proper_title": "Identical letters dated 12 January 2024 from the Permanent Representative of Bahrain to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-15"
+              },
+              {
+                "symbol": "A/78/716",
+                "proper_title": "Identical letters dated 12 January 2024 from the Permanent Representative of Bahrain to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-15"
+              },
+              {
+                "symbol": "S/2024/58",
+                "proper_title": "Letter dated 12 January 2024 from the Permanent Representative of Cuba to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-16"
+              },
+              {
+                "symbol": "S/2024/79",
+                "proper_title": "Letter dated 15 January 2024 from the Secretary-General addressed to the President of the Security Council",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-17"
+              },
+              {
+                "symbol": "A/78/718",
+                "proper_title": "Letter dated 17 January 2024 from the Permanent Representative of Greece to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-18"
+              },
+              {
+                "symbol": "S/2024/80",
+                "proper_title": "Letter dated 17 January 2024 from the Permanent Representative of the Russian Federation to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-18"
+              },
+              {
+                "symbol": "S/2024/81",
+                "proper_title": "Letter dated 11 January 2024 from the Permanent Representative of the Russian Federation to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-18"
+              },
+              {
+                "symbol": "S/2024/83",
+                "proper_title": "Letter dated 17 January 2024 from the President of the Security Council addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-19"
+              },
+              {
+                "symbol": "S/2024/76",
+                "proper_title": "Identical letters dated 16 January 2024 from the Chargé d'affaires a.i. of the Permanent Mission of Iraq to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-19"
+              },
+              {
+                "symbol": "A/ES-10/980",
+                "proper_title": "Identical letters dated 19 January 2024 from the Permanent Observer of the State of Palestine to the United Nations addressed to the Secretary-General, the President of the General Assembly and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-22"
+              },
+              {
+                "symbol": "S/2024/90",
+                "proper_title": "Letter dated 22 January 2024 from the Permanent Representative of the Russian Federation to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-22"
+              },
+              {
+                "symbol": "S/2024/84",
+                "proper_title": "Identical letters dated 19 January 2024 from the Permanent Observer of the State of Palestine to the United Nations addressed to the Secretary-General, the President of the General Assembly and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-22"
+              },
+              {
+                "symbol": "A/78/724",
+                "proper_title": "Identical letters dated 16 January 2024 from the Chargé d'affaires a.i. of the Permanent Mission of Lebanon to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-22"
+              },
+              {
+                "symbol": "S/2024/72",
+                "proper_title": "Identical letters dated 16 January 2024 from the Chargé d'affaires a.i. of the Permanent Mission of Lebanon to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-22"
+              },
+              {
+                "symbol": "A/78/730",
+                "proper_title": "Letter dated 20 January 2024 from the Permanent Representative of Azerbaijan to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-22"
+              },
+              {
+                "symbol": "S/2024/91",
+                "proper_title": "Identical letters dated 20 December 2023 from the Chargé d'affaires a.i. of the Permanent Mission of Lebanon to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-23"
+              },
+              {
+                "symbol": "A/78/728",
+                "proper_title": "Identical letters dated 21 January 2024 from the Chargé d'affaires a.i. of the Permanent Mission of the Syrian Arab Republic to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-23"
+              },
+              {
+                "symbol": "S/2024/87",
+                "proper_title": "Identical letters dated 21 January 2024 from the Chargé d'affaires a.i. of the Permanent Mission of the Syrian Arab Republic to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-23"
+              },
+              {
+                "symbol": "A/78/727",
+                "proper_title": "Identical letters dated 20 December 2023 from the Chargé d'affaires a.i. of the Permanent Mission of Lebanon to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-23"
+              },
+              {
+                "symbol": "A/78/732",
+                "proper_title": "Letter dated 19 January 2024 from the Chargé d'affaires a.i. of the Permanent Mission of the Bolivarian Republic of Venezuela to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-24"
+              },
+              {
+                "symbol": "A/ES-11/58",
+                "proper_title": "Letter dated 23 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-24"
+              },
+              {
+                "symbol": "A/78/729",
+                "proper_title": "Letter dated 23 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-24"
+              },
+              {
+                "symbol": "S/2024/94",
+                "proper_title": "Letter dated 23 January 2024 from the Permanent Representative of Ukraine to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-24"
+              },
+              {
+                "symbol": "A/78/740",
+                "proper_title": "Letter dated 23 January 2024 from the Permanent Representative of the Islamic Republic of Iran to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-25"
+              },
+              {
+                "symbol": "A/78/739",
+                "proper_title": "Letter dated 23 January 2024 from the Permanent Representative of the Islamic Republic of Iran to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-25"
+              },
+              {
+                "symbol": "A/78/733",
+                "proper_title": "Letter dated 23 January 2024 from the Permanent Representative of the Russian Federation to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-25"
+              },
+              {
+                "symbol": "A/78/748",
+                "proper_title": "Letter dated 18 January 2024 from the Permanent Representative of Spain to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-25"
+              },
+              {
+                "symbol": "S/2024/100",
+                "proper_title": "Identical letters dated 28 December 2023 from the Chargé d'affaires a.i. of the Permanent Mission of Lebanon to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-26"
+              },
+              {
+                "symbol": "A/78/738",
+                "proper_title": "Letter dated 26 January 2024 from the Permanent Representative of Armenia to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-26"
+              },
+              {
+                "symbol": "A/78/749",
+                "proper_title": "Identical letters dated 28 December 2023 from the Chargé d'affaires a.i. of the Permanent Mission of Lebanon to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-26"
+              },
+              {
+                "symbol": "S/2024/99",
+                "proper_title": "Letter dated 26 January 2024 from the Permanent Representative of the Russian Federation to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-26"
+              },
+              {
+                "symbol": "S/2024/109",
+                "proper_title": "Identical letters dated 29 January 2024 from the Permanent Representative of Somalia to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-29"
+              },
+              {
+                "symbol": "S/2024/113",
+                "proper_title": "Letter dated 29 January 2024 from the President of the Security Council addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-30"
+              },
+              {
+                "symbol": "A/78/747",
+                "proper_title": "Letter dated 24 January 2024 from the Permanent Representative of the United Arab Emirates to the United Nations addressed to the Secretary-General",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-01-30"
+              },
+              {
+                "symbol": "S/2024/111",
+                "proper_title": "Letter dated 29 January 2024 from the Secretary-General addressed to the President of the Security Council",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-30"
+              },
+              {
+                "symbol": "A/78/752",
+                "proper_title": "Letter dated 30 January 2024 from the Permanent Representative of the Russian Federation to the United Nations addressed to the Secretary-General, the President of the General Assembly and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-31"
+              },
+              {
+                "symbol": "A/78/751",
+                "proper_title": "Identical letters dated 26 January 2024 from the Permanent Representative of Morocco to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-31"
+              },
+              {
+                "symbol": "S/2024/112",
+                "proper_title": "Letter dated 30 January 2024 from the Permanent Representative of the Russian Federation to the United Nations addressed to the Secretary-General, the President of the General Assembly and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-31"
+              },
+              {
+                "symbol": "S/2024/116",
+                "proper_title": "Letter dated 26 January 2024 from the Secretary-General addressed to the President of the Security Council",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-31"
+              },
+              {
+                "symbol": "S/2024/117",
+                "proper_title": "Eighteenth report of the Secretary-General on the threat posed by ISIL (Da'esh) to international peace and security and the range of United Nations efforts in support of Member States in countering the threat",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-31"
+              },
+              {
+                "symbol": "S/2024/97",
+                "proper_title": "Identical letters dated 26 January 2024 from the Permanent Representative of Morocco to the United Nations addressed to the Secretary-General and the President of the Security Council",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "publication_date": "2024-01-31"
+              }
+            ]
+          },
+          "success": true
+        },
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT symbol, proper_title, un_body, publication_date FROM documents \nWHERE SUBSTRING(publication_date, 1, 4) = '2024'\n  AND (\n    proper_title ILIKE '%report of the secretary-general%'\n    OR title ILIKE '%report of the secretary-general%'\n    OR proper_title ILIKE '%Secretary-General’s report%'\n    OR proper_title ILIKE '%Report of the Secretary-General%'\n  )\nORDER BY publication_date;",
+            "explanation": "Find all 2024 documents whose title indicates they are Secretary-General reports."
+          },
+          "result": {
+            "explanation": "Find all 2024 documents whose title indicates they are Secretary-General reports.",
+            "rowCount": 8,
+            "rows": [
+              {
+                "symbol": "A/79/1",
+                "proper_title": "Report of the Secretary-General on the work of the Organization",
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024"
+              },
+              {
+                "symbol": "S/2023/1075",
+                "proper_title": "Report of the Secretary-General on the activities of the United Nations Office for West Africa and the Sahel",
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-02"
+              },
+              {
+                "symbol": "S/2024/13",
+                "proper_title": "Report of the Secretary-General on his mission of good offices in Cyprus",
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-03"
+              },
+              {
+                "symbol": "S/2024/117",
+                "proper_title": "Eighteenth report of the Secretary-General on the threat posed by ISIL (Da'esh) to international peace and security and the range of United Nations efforts in support of Member States in countering the threat",
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-01-31"
+              },
+              {
+                "symbol": "E/CN.3/2024/22/CORR.1",
+                "proper_title": "Report of the Secretary-General on open data :",
+                "un_body": "{\"Economic and Social Council\"}",
+                "publication_date": "2024-02-15"
+              },
+              {
+                "symbol": "S/2024/251",
+                "proper_title": "Report of the Secretary-General on the United Nations Organization Stabilization Mission in the Democratic Republic of the Congo",
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-03-21"
+              },
+              {
+                "symbol": "S/2024/526",
+                "proper_title": "Report of the Secretary-General on his mission of good offices in Cyprus",
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-07-05"
+              },
+              {
+                "symbol": "S/2024/583",
+                "proper_title": "Nineteenth report of the Secretary-General on the threat posed by ISIL (Da'esh) to international peace and security and the range of United Nations efforts in support of Member States in countering the threat",
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2024-07-31"
+              }
+            ]
+          },
+          "success": true
+        }
+      ],
+      "finalResponse": "## Summary\nFound 8 Secretary-General reports published in 2024 (per available documents). See table; can refine if you need a specific UN body or topic.\n\n## SG reports (2024)\n| Symbol | Proper Title | UN Body | Publication Date |\n|---|---|---|---|\n| A/79/1 | Report of the Secretary-General on the work of the Organization | General Assembly | 2024 |\n| S/2023/1075 | Report of the Secretary-General on the activities of the United Nations Office for West Africa and the Sahel | Security Council | 2024-01-02 |\n| S/2024/13 | Report of the Secretary-General on his mission of good offices in Cyprus | Security Council | 2024-01-03 |\n| S/2024/117 | Eighteenth report of the Secretary-General on the threat posed by ISIL (Da'esh)… | Security Council | 2024-01-31 |\n| E/CN.3/2024/22/CORR.1 | Report of the Secretary-General on open data : | Economic and Social Council | 2024-02-15 |\n| S/2024/251 | Report of the Secretary-General on the United Nations Organization Stabilization Mission in the Democratic Republic of the Congo | Security Council | 2024-03-21 |\n| S/2024/526 | Report of the Secretary-General on his mission of good offices in Cyprus | Security Council | 2024-07-05 |\n| S/2024/583 | Nineteenth report of the Secretary-General on the threat posed by ISIL (Da'esh)… | Security Council | 2024-07-31 |\n\nIf you want only Security Council mission reports, or to include corrigenda/exclude them, I can adjust.",
+      "sqlQueries": [
+        "SELECT symbol, proper_title, title, un_body, publication_date FROM sg_reports WHERE SUBSTRING(publication_date, 1, 4) = '2024' ORDER BY publication_date;",
+        "SELECT DISTINCT entity FROM latest_versions WHERE effective_year = 2024 ORDER BY entity;",
+        "SELECT symbol, proper_title, title, un_body, publication_date FROM documents WHERE SUBSTRING(publication_date, 1, 4) = '2024' AND (title ILIKE '%Secretary-General%' OR proper_title ILIKE '%Secretary-General%') ORDER BY publication_date;",
+        "SELECT symbol, proper_title, un_body, publication_date FROM documents \nWHERE SUBSTRING(publication_date, 1, 4) = '2024'\n  AND (\n    proper_title ILIKE '%report of the secretary-general%'\n    OR title ILIKE '%report of the secretary-general%'\n    OR proper_title ILIKE '%Secretary-General’s report%'\n    OR proper_title ILIKE '%Report of the Secretary-General%'\n  )\nORDER BY publication_date;"
+      ],
+      "errors": [
+        "Tool query_database failed: Query failed: permission denied for view sg_reports. You may retry with a corrected query. The original query was: SELECT symbol, proper_title, title, un_body, publication_date FROM sg_reports WHERE SUBSTRING(publication_date, 1, 4) = '2024' ORDER BY publication_date;",
+        "Tool query_database failed: Query failed: permission denied for view latest_versions. You may retry with a corrected query. The original query was: SELECT DISTINCT entity FROM latest_versions WHERE effective_year = 2024 ORDER BY entity;"
+      ],
+      "iterations": 5
+    },
+    {
+      "testCase": {
+        "id": 2,
+        "prompt": "What are the most common report topics?",
+        "expectedBehavior": "Should unnest subject_terms and count frequency"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "What are the most common report topics?"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT term, COUNT(*) AS report_count\\nFROM (\\n  SELECT UNNEST(subject_terms) AS term\\n  FROM sg_reports\\n) s\\nGROUP BY term\\nORDER BY report_count DESC, term ASC\\nLIMIT 10;\",\"explanation\":\"Top 10 most frequent subject_terms across SG reports (2023+) to identify the most common topics.\"}",
+                "name": "query_database"
+              },
+              "id": "call_WVd5GepLcTT628DFbtZHWWFV",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_WVd5GepLcTT628DFbtZHWWFV",
+          "content": "{\"error\":\"Query failed: permission denied for view sg_reports. You may retry with a corrected query. The original query was: SELECT term, COUNT(*) AS report_count\\nFROM (\\n  SELECT UNNEST(subject_terms) AS term\\n  FROM sg_reports\\n) s\\nGROUP BY term\\nORDER BY report_count DESC, term ASC\\nLIMIT 10;\"}"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT term, COUNT(*) AS report_count\\nFROM (\\n  SELECT UNNEST(subject_terms) AS term\\n  FROM latest_versions\\n  WHERE entity ILIKE '%Secretary-General%'\\n) s\\nGROUP BY term\\nORDER BY report_count DESC, term ASC\\nLIMIT 10;\",\"explanation\":\"Find the top 10 most frequent subject_terms among latest Secretary-General report series to identify common topics.\"}",
+                "name": "query_database"
+              },
+              "id": "call_eRM07GMnptEwE7CF0Pd4qaO4",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_eRM07GMnptEwE7CF0Pd4qaO4",
+          "content": "{\"error\":\"Query failed: permission denied for view latest_versions. You may retry with a corrected query. The original query was: SELECT term, COUNT(*) AS report_count\\nFROM (\\n  SELECT UNNEST(subject_terms) AS term\\n  FROM latest_versions\\n  WHERE entity ILIKE '%Secretary-General%'\\n) s\\nGROUP BY term\\nORDER BY report_count DESC, term ASC\\nLIMIT 10;\"}"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT term, COUNT(*) AS report_count\\nFROM (\\n  SELECT UNNEST(subject_terms) AS term\\n  FROM documents\\n  WHERE un_body ILIKE '%Secretary-General%'\\n    OR title ILIKE '%Secretary-General%'\\n) s\\nGROUP BY term\\nORDER BY report_count DESC, term ASC\\nLIMIT 10;\",\"explanation\":\"Fallback: top subject_terms across documents related to SG reports by filtering on 'Secretary-General' in un_body or title.\"}",
+                "name": "query_database"
+              },
+              "id": "call_6XQDi7Cxv6mqrEJH7XB0M2cQ",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_6XQDi7Cxv6mqrEJH7XB0M2cQ",
+          "content": "{\"explanation\":\"Fallback: top subject_terms across documents related to SG reports by filtering on 'Secretary-General' in un_body or title.\",\"rowCount\":0,\"rows\":[]}"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT term, COUNT(*) AS report_count\\nFROM (\\n  SELECT UNNEST(subject_terms) AS term\\n  FROM documents\\n  WHERE subject_terms IS NOT NULL\\n) s\\nGROUP BY term\\nORDER BY report_count DESC, term ASC\\nLIMIT 10;\",\"explanation\":\"Top 10 most frequent subject_terms across all documents in the database as a proxy for most common report topics.\"}",
+                "name": "query_database"
+              },
+              "id": "call_q92xORSY1xGmDXRTQLneiBJW",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_q92xORSY1xGmDXRTQLneiBJW",
+          "content": "{\"explanation\":\"Top 10 most frequent subject_terms across all documents in the database as a proxy for most common report topics.\",\"rowCount\":10,\"rows\":[{\"term\":\"ISRAEL\",\"report_count\":\"1313\"},{\"term\":\"MILITARY ACTIVITY\",\"report_count\":\"1241\"},{\"term\":\"RUSSIAN FEDERATION\",\"report_count\":\"976\"},{\"term\":\"UKRAINE\",\"report_count\":\"888\"},{\"term\":\"INTERNAL SECURITY\",\"report_count\":\"700\"},{\"term\":\"HUMANITARIAN ASSISTANCE\",\"report_count\":\"665\"},{\"term\":\"MIDDLE EAST SITUATION\",\"report_count\":\"655\"},{\"term\":\"PEACEKEEPING OPERATIONS\",\"report_count\":\"654\"},{\"term\":\"ARMENIA\",\"report_count\":\"646\"},{\"term\":\"AZERBAIJAN\",\"report_count\":\"639\"}]}"
+        },
+        {
+          "role": "assistant",
+          "content": "## Most common report topics (by subject terms)\n\nKey takeaway: Topics cluster around armed conflict, humanitarian crises, and peacekeeping—especially in the Middle East and Eastern Europe.\n\nNote: Counts are from all documents in the database (proxy for SG reports, due to access limits).\n\n| Term                  | Report count |\n|-----------------------|--------------|\n| ISRAEL                | 1313         |\n| MILITARY ACTIVITY     | 1241         |\n| RUSSIAN FEDERATION    | 976          |\n| UKRAINE               | 888          |\n| INTERNAL SECURITY     | 700          |\n| HUMANITARIAN ASSISTANCE | 665        |\n| MIDDLE EAST SITUATION | 655          |\n| PEACEKEEPING OPERATIONS | 654        |\n| ARMENIA               | 646          |\n| AZERBAIJAN            | 639          |"
+        }
+      ],
+      "toolCalls": [
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT term, COUNT(*) AS report_count\nFROM (\n  SELECT UNNEST(subject_terms) AS term\n  FROM sg_reports\n) s\nGROUP BY term\nORDER BY report_count DESC, term ASC\nLIMIT 10;",
+            "explanation": "Top 10 most frequent subject_terms across SG reports (2023+) to identify the most common topics."
+          },
+          "result": "Query failed: permission denied for view sg_reports. You may retry with a corrected query. The original query was: SELECT term, COUNT(*) AS report_count\nFROM (\n  SELECT UNNEST(subject_terms) AS term\n  FROM sg_reports\n) s\nGROUP BY term\nORDER BY report_count DESC, term ASC\nLIMIT 10;",
+          "success": false
+        },
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT term, COUNT(*) AS report_count\nFROM (\n  SELECT UNNEST(subject_terms) AS term\n  FROM latest_versions\n  WHERE entity ILIKE '%Secretary-General%'\n) s\nGROUP BY term\nORDER BY report_count DESC, term ASC\nLIMIT 10;",
+            "explanation": "Find the top 10 most frequent subject_terms among latest Secretary-General report series to identify common topics."
+          },
+          "result": "Query failed: permission denied for view latest_versions. You may retry with a corrected query. The original query was: SELECT term, COUNT(*) AS report_count\nFROM (\n  SELECT UNNEST(subject_terms) AS term\n  FROM latest_versions\n  WHERE entity ILIKE '%Secretary-General%'\n) s\nGROUP BY term\nORDER BY report_count DESC, term ASC\nLIMIT 10;",
+          "success": false
+        },
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT term, COUNT(*) AS report_count\nFROM (\n  SELECT UNNEST(subject_terms) AS term\n  FROM documents\n  WHERE un_body ILIKE '%Secretary-General%'\n    OR title ILIKE '%Secretary-General%'\n) s\nGROUP BY term\nORDER BY report_count DESC, term ASC\nLIMIT 10;",
+            "explanation": "Fallback: top subject_terms across documents related to SG reports by filtering on 'Secretary-General' in un_body or title."
+          },
+          "result": {
+            "explanation": "Fallback: top subject_terms across documents related to SG reports by filtering on 'Secretary-General' in un_body or title.",
+            "rowCount": 0,
+            "rows": []
+          },
+          "success": true
+        },
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT term, COUNT(*) AS report_count\nFROM (\n  SELECT UNNEST(subject_terms) AS term\n  FROM documents\n  WHERE subject_terms IS NOT NULL\n) s\nGROUP BY term\nORDER BY report_count DESC, term ASC\nLIMIT 10;",
+            "explanation": "Top 10 most frequent subject_terms across all documents in the database as a proxy for most common report topics."
+          },
+          "result": {
+            "explanation": "Top 10 most frequent subject_terms across all documents in the database as a proxy for most common report topics.",
+            "rowCount": 10,
+            "rows": [
+              {
+                "term": "ISRAEL",
+                "report_count": "1313"
+              },
+              {
+                "term": "MILITARY ACTIVITY",
+                "report_count": "1241"
+              },
+              {
+                "term": "RUSSIAN FEDERATION",
+                "report_count": "976"
+              },
+              {
+                "term": "UKRAINE",
+                "report_count": "888"
+              },
+              {
+                "term": "INTERNAL SECURITY",
+                "report_count": "700"
+              },
+              {
+                "term": "HUMANITARIAN ASSISTANCE",
+                "report_count": "665"
+              },
+              {
+                "term": "MIDDLE EAST SITUATION",
+                "report_count": "655"
+              },
+              {
+                "term": "PEACEKEEPING OPERATIONS",
+                "report_count": "654"
+              },
+              {
+                "term": "ARMENIA",
+                "report_count": "646"
+              },
+              {
+                "term": "AZERBAIJAN",
+                "report_count": "639"
+              }
+            ]
+          },
+          "success": true
+        }
+      ],
+      "finalResponse": "## Most common report topics (by subject terms)\n\nKey takeaway: Topics cluster around armed conflict, humanitarian crises, and peacekeeping—especially in the Middle East and Eastern Europe.\n\nNote: Counts are from all documents in the database (proxy for SG reports, due to access limits).\n\n| Term                  | Report count |\n|-----------------------|--------------|\n| ISRAEL                | 1313         |\n| MILITARY ACTIVITY     | 1241         |\n| RUSSIAN FEDERATION    | 976          |\n| UKRAINE               | 888          |\n| INTERNAL SECURITY     | 700          |\n| HUMANITARIAN ASSISTANCE | 665        |\n| MIDDLE EAST SITUATION | 655          |\n| PEACEKEEPING OPERATIONS | 654        |\n| ARMENIA               | 646          |\n| AZERBAIJAN            | 639          |",
+      "sqlQueries": [
+        "SELECT term, COUNT(*) AS report_count\nFROM (\n  SELECT UNNEST(subject_terms) AS term\n  FROM sg_reports\n) s\nGROUP BY term\nORDER BY report_count DESC, term ASC\nLIMIT 10;",
+        "SELECT term, COUNT(*) AS report_count\nFROM (\n  SELECT UNNEST(subject_terms) AS term\n  FROM latest_versions\n  WHERE entity ILIKE '%Secretary-General%'\n) s\nGROUP BY term\nORDER BY report_count DESC, term ASC\nLIMIT 10;",
+        "SELECT term, COUNT(*) AS report_count\nFROM (\n  SELECT UNNEST(subject_terms) AS term\n  FROM documents\n  WHERE un_body ILIKE '%Secretary-General%'\n    OR title ILIKE '%Secretary-General%'\n) s\nGROUP BY term\nORDER BY report_count DESC, term ASC\nLIMIT 10;",
+        "SELECT term, COUNT(*) AS report_count\nFROM (\n  SELECT UNNEST(subject_terms) AS term\n  FROM documents\n  WHERE subject_terms IS NOT NULL\n) s\nGROUP BY term\nORDER BY report_count DESC, term ASC\nLIMIT 10;"
+      ],
+      "errors": [
+        "Tool query_database failed: Query failed: permission denied for view sg_reports. You may retry with a corrected query. The original query was: SELECT term, COUNT(*) AS report_count\nFROM (\n  SELECT UNNEST(subject_terms) AS term\n  FROM sg_reports\n) s\nGROUP BY term\nORDER BY report_count DESC, term ASC\nLIMIT 10;",
+        "Tool query_database failed: Query failed: permission denied for view latest_versions. You may retry with a corrected query. The original query was: SELECT term, COUNT(*) AS report_count\nFROM (\n  SELECT UNNEST(subject_terms) AS term\n  FROM latest_versions\n  WHERE entity ILIKE '%Secretary-General%'\n) s\nGROUP BY term\nORDER BY report_count DESC, term ASC\nLIMIT 10;"
+      ],
+      "iterations": 5
+    },
+    {
+      "testCase": {
+        "id": 3,
+        "prompt": "How many reports are published annually?",
+        "expectedBehavior": "Should use report_frequencies or count by year"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "How many reports are published annually?"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT COUNT(*) AS annual_count FROM report_frequencies WHERE calculated_frequency = 'annual';\",\"explanation\":\"Count how many reports are classified with an annual frequency.\"}",
+                "name": "query_database"
+              },
+              "id": "call_4Lic7gJKL3TD01MhSXWjO9Dr",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_4Lic7gJKL3TD01MhSXWjO9Dr",
+          "content": "{\"error\":\"Query failed: permission denied for table report_frequencies. You may retry with a corrected query. The original query was: SELECT COUNT(*) AS annual_count FROM report_frequencies WHERE calculated_frequency = 'annual';\"}"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT effective_year, COUNT(*) AS report_count FROM latest_versions GROUP BY effective_year ORDER BY effective_year;\",\"explanation\":\"Count how many latest-version reports exist per year; if user meant 'per year totals' rather than 'annual frequency'.\"}",
+                "name": "query_database"
+              },
+              "id": "call_4qsFGOEjP2VkSbldfPWFzI0g",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_4qsFGOEjP2VkSbldfPWFzI0g",
+          "content": "{\"error\":\"Query failed: permission denied for view latest_versions. You may retry with a corrected query. The original query was: SELECT effective_year, COUNT(*) AS report_count FROM latest_versions GROUP BY effective_year ORDER BY effective_year;\"}"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT COUNT(*) AS annual_count FROM survey_responses WHERE frequency = 'annual';\",\"explanation\":\"Count how many survey responses indicate an annual frequency, as a proxy if report_frequencies is unavailable.\"}",
+                "name": "query_database"
+              },
+              "id": "call_AEaE7WAryggtF1ZbnaxE1Z95",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_AEaE7WAryggtF1ZbnaxE1Z95",
+          "content": "{\"explanation\":\"Count how many survey responses indicate an annual frequency, as a proxy if report_frequencies is unavailable.\",\"rowCount\":1,\"rows\":[{\"annual_count\":\"0\"}]}"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT SUBSTRING(publication_date, 1, 4) AS year, COUNT(*) AS reports_published FROM sg_reports GROUP BY year ORDER BY year;\",\"explanation\":\"Count how many SG reports were published each year (annual totals), in case the user meant per-year publication counts.\"}",
+                "name": "query_database"
+              },
+              "id": "call_MHOyNStnPFjSFUgI8yD2BJLy",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_MHOyNStnPFjSFUgI8yD2BJLy",
+          "content": "{\"error\":\"Query failed: permission denied for view sg_reports. You may retry with a corrected query. The original query was: SELECT SUBSTRING(publication_date, 1, 4) AS year, COUNT(*) AS reports_published FROM sg_reports GROUP BY year ORDER BY year;\"}"
+        },
+        {
+          "role": "assistant",
+          "content": "## Clarify\nDo you mean the number of report series mandated as “annual” (frequency), or the total number published each year?\n\n## Current survey responses (not official frequency)\nTable below reflects survey_responses only.\n\n| annual_count |\n|--------------|\n| 0 |\n\nIf you want the official count of annual-frequency reports, I can query the report_frequencies table once access is enabled."
+        }
+      ],
+      "toolCalls": [
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT COUNT(*) AS annual_count FROM report_frequencies WHERE calculated_frequency = 'annual';",
+            "explanation": "Count how many reports are classified with an annual frequency."
+          },
+          "result": "Query failed: permission denied for table report_frequencies. You may retry with a corrected query. The original query was: SELECT COUNT(*) AS annual_count FROM report_frequencies WHERE calculated_frequency = 'annual';",
+          "success": false
+        },
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT effective_year, COUNT(*) AS report_count FROM latest_versions GROUP BY effective_year ORDER BY effective_year;",
+            "explanation": "Count how many latest-version reports exist per year; if user meant 'per year totals' rather than 'annual frequency'."
+          },
+          "result": "Query failed: permission denied for view latest_versions. You may retry with a corrected query. The original query was: SELECT effective_year, COUNT(*) AS report_count FROM latest_versions GROUP BY effective_year ORDER BY effective_year;",
+          "success": false
+        },
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT COUNT(*) AS annual_count FROM survey_responses WHERE frequency = 'annual';",
+            "explanation": "Count how many survey responses indicate an annual frequency, as a proxy if report_frequencies is unavailable."
+          },
+          "result": {
+            "explanation": "Count how many survey responses indicate an annual frequency, as a proxy if report_frequencies is unavailable.",
+            "rowCount": 1,
+            "rows": [
+              {
+                "annual_count": "0"
+              }
+            ]
+          },
+          "success": true
+        },
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT SUBSTRING(publication_date, 1, 4) AS year, COUNT(*) AS reports_published FROM sg_reports GROUP BY year ORDER BY year;",
+            "explanation": "Count how many SG reports were published each year (annual totals), in case the user meant per-year publication counts."
+          },
+          "result": "Query failed: permission denied for view sg_reports. You may retry with a corrected query. The original query was: SELECT SUBSTRING(publication_date, 1, 4) AS year, COUNT(*) AS reports_published FROM sg_reports GROUP BY year ORDER BY year;",
+          "success": false
+        }
+      ],
+      "finalResponse": "## Clarify\nDo you mean the number of report series mandated as “annual” (frequency), or the total number published each year?\n\n## Current survey responses (not official frequency)\nTable below reflects survey_responses only.\n\n| annual_count |\n|--------------|\n| 0 |\n\nIf you want the official count of annual-frequency reports, I can query the report_frequencies table once access is enabled.",
+      "sqlQueries": [
+        "SELECT COUNT(*) AS annual_count FROM report_frequencies WHERE calculated_frequency = 'annual';",
+        "SELECT effective_year, COUNT(*) AS report_count FROM latest_versions GROUP BY effective_year ORDER BY effective_year;",
+        "SELECT COUNT(*) AS annual_count FROM survey_responses WHERE frequency = 'annual';",
+        "SELECT SUBSTRING(publication_date, 1, 4) AS year, COUNT(*) AS reports_published FROM sg_reports GROUP BY year ORDER BY year;"
+      ],
+      "errors": [
+        "Tool query_database failed: Query failed: permission denied for table report_frequencies. You may retry with a corrected query. The original query was: SELECT COUNT(*) AS annual_count FROM report_frequencies WHERE calculated_frequency = 'annual';",
+        "Tool query_database failed: Query failed: permission denied for view latest_versions. You may retry with a corrected query. The original query was: SELECT effective_year, COUNT(*) AS report_count FROM latest_versions GROUP BY effective_year ORDER BY effective_year;",
+        "Tool query_database failed: Query failed: permission denied for view sg_reports. You may retry with a corrected query. The original query was: SELECT SUBSTRING(publication_date, 1, 4) AS year, COUNT(*) AS reports_published FROM sg_reports GROUP BY year ORDER BY year;"
+      ],
+      "iterations": 5
+    }
+  ]
+}

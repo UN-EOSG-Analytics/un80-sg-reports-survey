@@ -17,9 +17,9 @@ interface ChatPanelProps {
 export function ChatPanel({
   initialPrompt,
   suggestions = [
-    "List all SG reports from 2024",
-    "What are the most common report topics?",
-    "How many reports are published annually?",
+    "Summarize report A/80/469",
+    "Compare A/78/554 with A/79/347",
+    "List 2024 reports about climate",
   ],
   className = "",
 }: ChatPanelProps) {

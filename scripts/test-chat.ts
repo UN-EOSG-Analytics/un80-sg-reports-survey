@@ -119,8 +119,8 @@ interface TestResult {
   iterations: number;
 }
 
-// Test cases
-const TEST_CASES: TestCase[] = [
+// Test cases - can be overridden via command line args
+const DEFAULT_TEST_CASES: TestCase[] = [
   {
     id: 1,
     prompt: "How many SG reports are there from 2024?",
@@ -176,6 +176,29 @@ const TEST_CASES: TestCase[] = [
       "Should extract year from publication_date, not use date_year",
   },
 ];
+
+// UI suggestion test cases (from ChatPanelWidget.tsx)
+const UI_SUGGESTION_CASES: TestCase[] = [
+  {
+    id: 1,
+    prompt: "Summarize report A/80/469",
+    expectedBehavior: "Should use read_document tool and provide concise summary",
+  },
+  {
+    id: 2,
+    prompt: "Compare A/78/554 with A/79/347",
+    expectedBehavior: "Should read both documents and create comparison table",
+  },
+  {
+    id: 3,
+    prompt: "List 2024 reports about climate",
+    expectedBehavior: "Should query by year and climate topic",
+  },
+];
+
+// Select test cases based on command line args
+const args = process.argv.slice(2);
+const TEST_CASES = args.includes("--ui-suggestions") ? UI_SUGGESTION_CASES : DEFAULT_TEST_CASES;
 
 // Call Azure OpenAI API (non-streaming for simplicity)
 async function callChatCompletion(

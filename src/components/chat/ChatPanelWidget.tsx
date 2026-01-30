@@ -7,9 +7,9 @@ import { ChatMessageCompact } from "./ChatMessageCompact";
 import { ArrowDown, Loader2, Sparkles, ArrowUp } from "lucide-react";
 
 const DEFAULT_SUGGESTIONS = [
-  "Summarize report A/79/XXX",
-  "Compare A/78/123 with A/79/456",
-  "Find resolutions mandating climate reports",
+  "Summarize report A/80/469",
+  "Compare A/78/554 with A/79/347",
+  "List 2024 reports about climate",
 ];
 
 export function ChatPanelWidget() {

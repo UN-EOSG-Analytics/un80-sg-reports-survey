@@ -1,0 +1,2358 @@
+{
+  "analysis": {
+    "timestamp": "2026-01-30T12:27:25.571Z",
+    "totalTests": 10,
+    "successfulTests": 5,
+    "failedTests": 5,
+    "totalSqlQueries": 17,
+    "sqlIssues": [],
+    "commonPatterns": [
+      "date_year usage (problematic): 0 queries",
+      "publication_date usage (good): 6 queries",
+      "effective_year usage (good): 8 queries",
+      "latest_versions view usage: 10 queries",
+      "report_frequencies table usage: 6 queries",
+      "Correct array handling (ANY/@>/unnest): 5 queries"
+    ],
+    "recommendations": []
+  },
+  "results": [
+    {
+      "testCase": {
+        "id": 1,
+        "prompt": "How many SG reports are there from 2024?",
+        "expectedBehavior": "Should use publication_date or effective_year, not date_year which is often empty"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "How many SG reports are there from 2024?"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT COUNT(*) AS count_2024 FROM sg_reports WHERE SUBSTRING(publication_date, 1, 4) = '2024';\",\"explanation\":\"Count Secretary-General reports with publication_date in 2024 using sg_reports.\"}",
+                "name": "query_database"
+              },
+              "id": "call_ydClRkRNYqioKY1aNIxnWVAL",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_ydClRkRNYqioKY1aNIxnWVAL",
+          "content": "{\"explanation\":\"Count Secretary-General reports with publication_date in 2024 using sg_reports.\",\"rowCount\":1,\"rows\":[{\"count_2024\":\"404\"}]}"
+        },
+        {
+          "role": "assistant",
+          "content": "## Summary\nThere are 404 Secretary-General reports published in 2024.\n\n| Year | Count |\n|------|-------|\n| 2024 | 404 |"
+        }
+      ],
+      "toolCalls": [
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT COUNT(*) AS count_2024 FROM sg_reports WHERE SUBSTRING(publication_date, 1, 4) = '2024';",
+            "explanation": "Count Secretary-General reports with publication_date in 2024 using sg_reports."
+          },
+          "result": {
+            "explanation": "Count Secretary-General reports with publication_date in 2024 using sg_reports.",
+            "rowCount": 1,
+            "rows": [
+              {
+                "count_2024": "404"
+              }
+            ]
+          },
+          "success": true
+        }
+      ],
+      "finalResponse": "## Summary\nThere are 404 Secretary-General reports published in 2024.\n\n| Year | Count |\n|------|-------|\n| 2024 | 404 |",
+      "sqlQueries": [
+        "SELECT COUNT(*) AS count_2024 FROM sg_reports WHERE SUBSTRING(publication_date, 1, 4) = '2024';"
+      ],
+      "errors": [],
+      "iterations": 2
+    },
+    {
+      "testCase": {
+        "id": 2,
+        "prompt": "List reports about climate change",
+        "expectedBehavior": "Should search subject_terms array or title ILIKE '%climate%'"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "List reports about climate change"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT s.symbol, s.proper_title, s.title, s.un_body, s.publication_date, rf.calculated_frequency\\nFROM sg_reports s\\nLEFT JOIN report_frequencies rf ON rf.proper_title = s.proper_title\\nWHERE 'CLIMATE CHANGE' = ANY(s.subject_terms)\\nORDER BY s.publication_date DESC;\",\"explanation\":\"List Secretary-General reports tagged with the subject term 'CLIMATE CHANGE', including publication date, UN body, and frequency.\"}",
+                "name": "query_database"
+              },
+              "id": "call_PQQRxyr3v7gcjF7vV4GZCcq7",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_PQQRxyr3v7gcjF7vV4GZCcq7",
+          "content": "{\"error\":\"Schema-prefixed table 's.symbol' is not allowed. Use table names directly: documents, sg_reports, latest_versions, report_entity_suggestions, report_entity_confirmations, report_frequency_confirmations, report_frequencies, survey_responses. Please retry with a corrected query.\"}"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT sg_reports.symbol, sg_reports.proper_title, sg_reports.title, sg_reports.un_body, sg_reports.publication_date, report_frequencies.calculated_frequency\\nFROM sg_reports\\nLEFT JOIN report_frequencies ON report_frequencies.proper_title = sg_reports.proper_title\\nWHERE 'CLIMATE CHANGE' = ANY(sg_reports.subject_terms)\\nORDER BY sg_reports.publication_date DESC;\",\"explanation\":\"List SG reports tagged 'CLIMATE CHANGE' with publication date, UN body, and frequency.\"}",
+                "name": "query_database"
+              },
+              "id": "call_Xe5mJWuVYepgWqa0q1dHGgwB",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_Xe5mJWuVYepgWqa0q1dHGgwB",
+          "content": "{\"explanation\":\"List SG reports tagged 'CLIMATE CHANGE' with publication date, UN body, and frequency.\",\"rowCount\":19,\"rows\":[{\"symbol\":\"A/81/61\",\"proper_title\":\"Follow-up to the 30th anniversary of the International Year of the Family and beyond :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\",\\\"General Assembly\\\"}\",\"publication_date\":\"2025-12-31\",\"calculated_frequency\":\"one-time\"},{\"symbol\":\"E/2026/47\",\"proper_title\":\"Follow-up to the 30th anniversary of the International Year of the Family and beyond :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\",\\\"General Assembly\\\"}\",\"publication_date\":\"2025-12-31\",\"calculated_frequency\":\"one-time\"},{\"symbol\":\"E/CN.3/2026/10\",\"proper_title\":\"Environment and climate change statistics :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\"}\",\"publication_date\":\"2025-12-11\",\"calculated_frequency\":\"one-time\"},{\"symbol\":\"A/80/390\",\"proper_title\":\"International cooperation on humanitarian assistance in the field of natural disasters, from relief to development :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2025-09-22\",\"calculated_frequency\":\"multiple-per-year\"},{\"symbol\":\"A/80/364\",\"proper_title\":\"Oceans and the law of the sea :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2025-09-04\",\"calculated_frequency\":\"multiple-per-year\"},{\"symbol\":\"A/HRC/60/52\",\"proper_title\":\"Synthesis report on opportunities, best practices, actionable solutions, challenges and barriers relevant to just transition and the full realization of human rights for all people :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Human Rights Bodies\\\"}\",\"publication_date\":\"2025-09-01\",\"calculated_frequency\":\"one-time\"},{\"symbol\":\"A/80/345\",\"proper_title\":\"Safety of journalists and the issue of impunity :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2025-08-21\",\"calculated_frequency\":\"biennial\"},{\"symbol\":\"A/80/255\",\"proper_title\":\"Sustainable mountain development :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2025-07-24\",\"calculated_frequency\":\"triennial\"},{\"symbol\":\"E/CN.5/2025/4\",\"proper_title\":\"Policies and programmes involving youth :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\"}\",\"publication_date\":\"2025-01-10\",\"calculated_frequency\":\"multiple-per-year\"},{\"symbol\":\"A/80/61\",\"proper_title\":\"Preparations for and observance of the 30th anniversary of the International Year of the Family :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\",\\\"General Assembly\\\"}\",\"publication_date\":\"2024-12-24\",\"calculated_frequency\":\"multiple-per-year\"},{\"symbol\":\"E/2025/11\",\"proper_title\":\"Preparations for and observance of the 30th anniversary of the International Year of the Family :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\",\\\"General Assembly\\\"}\",\"publication_date\":\"2024-12-24\",\"calculated_frequency\":\"multiple-per-year\"},{\"symbol\":\"A/79/340\",\"proper_title\":\"Oceans and the law of the sea :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-09-06\",\"calculated_frequency\":\"multiple-per-year\"},{\"symbol\":\"A/HRC/57/30\",\"proper_title\":\"Analytical study on the impact of loss and damage from the adverse effects of climate change on the full enjoyment of human rights, exploring equity-based approaches and solutions to addressing the same :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Human Rights Bodies\\\"}\",\"publication_date\":\"2024-08-28\",\"calculated_frequency\":\"one-time\"},{\"symbol\":\"A/79/248\",\"proper_title\":\"Eradicating rural poverty to implement the 2030 Agenda for Sustainable Development :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2024-08-05\",\"calculated_frequency\":\"multiple-per-year\"},{\"symbol\":\"E/2024/55\",\"proper_title\":\"Long-term impacts of current trends on the realization of the Sustainable Development Goals :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\"}\",\"publication_date\":\"2024-05-03\",\"calculated_frequency\":\"one-time\"},{\"symbol\":\"E/CN.3/2024/20\",\"proper_title\":\"Climate change statistics :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\"}\",\"publication_date\":\"2023-12-18\",\"calculated_frequency\":\"biennial\"},{\"symbol\":\"A/78/339\",\"proper_title\":\"Oceans and the law of the sea :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2023-09-01\",\"calculated_frequency\":\"multiple-per-year\"},{\"symbol\":\"A/HRC/53/47\",\"proper_title\":\"Adverse impact of climate change on the full realization of the right to food :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Human Rights Bodies\\\"}\",\"publication_date\":\"2023-06-19\",\"calculated_frequency\":\"one-time\"},{\"symbol\":\"A/78/67\",\"proper_title\":\"Oceans and the law of the sea :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2023-03-14\",\"calculated_frequency\":\"multiple-per-year\"}]}"
+        },
+        {
+          "role": "assistant",
+          "content": "## Key findings\n- 19 SG reports tagged with “CLIMATE CHANGE” (2023–2025), largely from the General Assembly and ECOSOC.\n- Recurring series: Oceans and the law of the sea; climate change statistics; several human rights-focused analyses.\n\n| Symbol | Proper title | UN body | Publication date | Frequency |\n|---|---|---|---|---|\n| `A/81/61` | Follow-up to the 30th anniversary of the International Year of the Family and beyond : | {\"Economic and Social Council\",\"General Assembly\"} | 2025-12-31 | one-time |\n| `E/2026/47` | Follow-up to the 30th anniversary of the International Year of the Family and beyond : | {\"Economic and Social Council\",\"General Assembly\"} | 2025-12-31 | one-time |\n| `E/CN.3/2026/10` | Environment and climate change statistics : | {\"Economic and Social Council\"} | 2025-12-11 | one-time |\n| `A/80/390` | International cooperation on humanitarian assistance in the field of natural disasters, from relief to development : | {\"General Assembly\"} | 2025-09-22 | multiple-per-year |\n| `A/80/364` | Oceans and the law of the sea : | {\"General Assembly\"} | 2025-09-04 | multiple-per-year |\n| `A/HRC/60/52` | Synthesis report on opportunities, best practices, actionable solutions, challenges and barriers relevant to just transition and the full realization of human rights for all people : | {\"General Assembly\",\"Human Rights Bodies\"} | 2025-09-01 | one-time |\n| `A/80/345` | Safety of journalists and the issue of impunity : | {\"General Assembly\"} | 2025-08-21 | biennial |\n| `A/80/255` | Sustainable mountain development : | {\"General Assembly\"} | 2025-07-24 | triennial |\n| `E/CN.5/2025/4` | Policies and programmes involving youth : | {\"Economic and Social Council\"} | 2025-01-10 | multiple-per-year |\n| `A/80/61` | Preparations for and observance of the 30th anniversary of the International Year of the Family : | {\"Economic and Social Council\",\"General Assembly\"} | 2024-12-24 | multiple-per-year |\n| `E/2025/11` | Preparations for and observance of the 30th anniversary of the International Year of the Family : | {\"Economic and Social Council\",\"General Assembly\"} | 2024-12-24 | multiple-per-year |\n| `A/79/340` | Oceans and the law of the sea : | {\"General Assembly\"} | 2024-09-06 | multiple-per-year |\n| `A/HRC/57/30` | Analytical study on the impact of loss and damage from the adverse effects of climate change on the full enjoyment of human rights, exploring equity-based approaches and solutions to addressing the same : | {\"General Assembly\",\"Human Rights Bodies\"} | 2024-08-28 | one-time |\n| `A/79/248` | Eradicating rural poverty to implement the 2030 Agenda for Sustainable Development : | {\"General Assembly\"} | 2024-08-05 | multiple-per-year |\n| `E/2024/55` | Long-term impacts of current trends on the realization of the Sustainable Development Goals : | {\"Economic and Social Council\"} | 2024-05-03 | one-time |\n| `E/CN.3/2024/20` | Climate change statistics : | {\"Economic and Social Council\"} | 2023-12-18 | biennial |\n| `A/78/339` | Oceans and the law of the sea : | {\"General Assembly\"} | 2023-09-01 | multiple-per-year |\n| `A/HRC/53/47` | Adverse impact of climate change on the full realization of the right to food : | {\"General Assembly\",\"Human Rights Bodies\"} | 2023-06-19 | one-time |\n| `A/78/67` | Oceans and the law of the sea : | {\"General Assembly\"} | 2023-03-14 | multiple-per-year |"
+        }
+      ],
+      "toolCalls": [
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT s.symbol, s.proper_title, s.title, s.un_body, s.publication_date, rf.calculated_frequency\nFROM sg_reports s\nLEFT JOIN report_frequencies rf ON rf.proper_title = s.proper_title\nWHERE 'CLIMATE CHANGE' = ANY(s.subject_terms)\nORDER BY s.publication_date DESC;",
+            "explanation": "List Secretary-General reports tagged with the subject term 'CLIMATE CHANGE', including publication date, UN body, and frequency."
+          },
+          "result": "Schema-prefixed table 's.symbol' is not allowed. Use table names directly: documents, sg_reports, latest_versions, report_entity_suggestions, report_entity_confirmations, report_frequency_confirmations, report_frequencies, survey_responses. Please retry with a corrected query.",
+          "success": false
+        },
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT sg_reports.symbol, sg_reports.proper_title, sg_reports.title, sg_reports.un_body, sg_reports.publication_date, report_frequencies.calculated_frequency\nFROM sg_reports\nLEFT JOIN report_frequencies ON report_frequencies.proper_title = sg_reports.proper_title\nWHERE 'CLIMATE CHANGE' = ANY(sg_reports.subject_terms)\nORDER BY sg_reports.publication_date DESC;",
+            "explanation": "List SG reports tagged 'CLIMATE CHANGE' with publication date, UN body, and frequency."
+          },
+          "result": {
+            "explanation": "List SG reports tagged 'CLIMATE CHANGE' with publication date, UN body, and frequency.",
+            "rowCount": 19,
+            "rows": [
+              {
+                "symbol": "A/81/61",
+                "proper_title": "Follow-up to the 30th anniversary of the International Year of the Family and beyond :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\",\"General Assembly\"}",
+                "publication_date": "2025-12-31",
+                "calculated_frequency": "one-time"
+              },
+              {
+                "symbol": "E/2026/47",
+                "proper_title": "Follow-up to the 30th anniversary of the International Year of the Family and beyond :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\",\"General Assembly\"}",
+                "publication_date": "2025-12-31",
+                "calculated_frequency": "one-time"
+              },
+              {
+                "symbol": "E/CN.3/2026/10",
+                "proper_title": "Environment and climate change statistics :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\"}",
+                "publication_date": "2025-12-11",
+                "calculated_frequency": "one-time"
+              },
+              {
+                "symbol": "A/80/390",
+                "proper_title": "International cooperation on humanitarian assistance in the field of natural disasters, from relief to development :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2025-09-22",
+                "calculated_frequency": "multiple-per-year"
+              },
+              {
+                "symbol": "A/80/364",
+                "proper_title": "Oceans and the law of the sea :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2025-09-04",
+                "calculated_frequency": "multiple-per-year"
+              },
+              {
+                "symbol": "A/HRC/60/52",
+                "proper_title": "Synthesis report on opportunities, best practices, actionable solutions, challenges and barriers relevant to just transition and the full realization of human rights for all people :",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Human Rights Bodies\"}",
+                "publication_date": "2025-09-01",
+                "calculated_frequency": "one-time"
+              },
+              {
+                "symbol": "A/80/345",
+                "proper_title": "Safety of journalists and the issue of impunity :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2025-08-21",
+                "calculated_frequency": "biennial"
+              },
+              {
+                "symbol": "A/80/255",
+                "proper_title": "Sustainable mountain development :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2025-07-24",
+                "calculated_frequency": "triennial"
+              },
+              {
+                "symbol": "E/CN.5/2025/4",
+                "proper_title": "Policies and programmes involving youth :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\"}",
+                "publication_date": "2025-01-10",
+                "calculated_frequency": "multiple-per-year"
+              },
+              {
+                "symbol": "A/80/61",
+                "proper_title": "Preparations for and observance of the 30th anniversary of the International Year of the Family :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\",\"General Assembly\"}",
+                "publication_date": "2024-12-24",
+                "calculated_frequency": "multiple-per-year"
+              },
+              {
+                "symbol": "E/2025/11",
+                "proper_title": "Preparations for and observance of the 30th anniversary of the International Year of the Family :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\",\"General Assembly\"}",
+                "publication_date": "2024-12-24",
+                "calculated_frequency": "multiple-per-year"
+              },
+              {
+                "symbol": "A/79/340",
+                "proper_title": "Oceans and the law of the sea :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-09-06",
+                "calculated_frequency": "multiple-per-year"
+              },
+              {
+                "symbol": "A/HRC/57/30",
+                "proper_title": "Analytical study on the impact of loss and damage from the adverse effects of climate change on the full enjoyment of human rights, exploring equity-based approaches and solutions to addressing the same :",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Human Rights Bodies\"}",
+                "publication_date": "2024-08-28",
+                "calculated_frequency": "one-time"
+              },
+              {
+                "symbol": "A/79/248",
+                "proper_title": "Eradicating rural poverty to implement the 2030 Agenda for Sustainable Development :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2024-08-05",
+                "calculated_frequency": "multiple-per-year"
+              },
+              {
+                "symbol": "E/2024/55",
+                "proper_title": "Long-term impacts of current trends on the realization of the Sustainable Development Goals :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\"}",
+                "publication_date": "2024-05-03",
+                "calculated_frequency": "one-time"
+              },
+              {
+                "symbol": "E/CN.3/2024/20",
+                "proper_title": "Climate change statistics :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\"}",
+                "publication_date": "2023-12-18",
+                "calculated_frequency": "biennial"
+              },
+              {
+                "symbol": "A/78/339",
+                "proper_title": "Oceans and the law of the sea :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2023-09-01",
+                "calculated_frequency": "multiple-per-year"
+              },
+              {
+                "symbol": "A/HRC/53/47",
+                "proper_title": "Adverse impact of climate change on the full realization of the right to food :",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Human Rights Bodies\"}",
+                "publication_date": "2023-06-19",
+                "calculated_frequency": "one-time"
+              },
+              {
+                "symbol": "A/78/67",
+                "proper_title": "Oceans and the law of the sea :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2023-03-14",
+                "calculated_frequency": "multiple-per-year"
+              }
+            ]
+          },
+          "success": true
+        }
+      ],
+      "finalResponse": "## Key findings\n- 19 SG reports tagged with “CLIMATE CHANGE” (2023–2025), largely from the General Assembly and ECOSOC.\n- Recurring series: Oceans and the law of the sea; climate change statistics; several human rights-focused analyses.\n\n| Symbol | Proper title | UN body | Publication date | Frequency |\n|---|---|---|---|---|\n| `A/81/61` | Follow-up to the 30th anniversary of the International Year of the Family and beyond : | {\"Economic and Social Council\",\"General Assembly\"} | 2025-12-31 | one-time |\n| `E/2026/47` | Follow-up to the 30th anniversary of the International Year of the Family and beyond : | {\"Economic and Social Council\",\"General Assembly\"} | 2025-12-31 | one-time |\n| `E/CN.3/2026/10` | Environment and climate change statistics : | {\"Economic and Social Council\"} | 2025-12-11 | one-time |\n| `A/80/390` | International cooperation on humanitarian assistance in the field of natural disasters, from relief to development : | {\"General Assembly\"} | 2025-09-22 | multiple-per-year |\n| `A/80/364` | Oceans and the law of the sea : | {\"General Assembly\"} | 2025-09-04 | multiple-per-year |\n| `A/HRC/60/52` | Synthesis report on opportunities, best practices, actionable solutions, challenges and barriers relevant to just transition and the full realization of human rights for all people : | {\"General Assembly\",\"Human Rights Bodies\"} | 2025-09-01 | one-time |\n| `A/80/345` | Safety of journalists and the issue of impunity : | {\"General Assembly\"} | 2025-08-21 | biennial |\n| `A/80/255` | Sustainable mountain development : | {\"General Assembly\"} | 2025-07-24 | triennial |\n| `E/CN.5/2025/4` | Policies and programmes involving youth : | {\"Economic and Social Council\"} | 2025-01-10 | multiple-per-year |\n| `A/80/61` | Preparations for and observance of the 30th anniversary of the International Year of the Family : | {\"Economic and Social Council\",\"General Assembly\"} | 2024-12-24 | multiple-per-year |\n| `E/2025/11` | Preparations for and observance of the 30th anniversary of the International Year of the Family : | {\"Economic and Social Council\",\"General Assembly\"} | 2024-12-24 | multiple-per-year |\n| `A/79/340` | Oceans and the law of the sea : | {\"General Assembly\"} | 2024-09-06 | multiple-per-year |\n| `A/HRC/57/30` | Analytical study on the impact of loss and damage from the adverse effects of climate change on the full enjoyment of human rights, exploring equity-based approaches and solutions to addressing the same : | {\"General Assembly\",\"Human Rights Bodies\"} | 2024-08-28 | one-time |\n| `A/79/248` | Eradicating rural poverty to implement the 2030 Agenda for Sustainable Development : | {\"General Assembly\"} | 2024-08-05 | multiple-per-year |\n| `E/2024/55` | Long-term impacts of current trends on the realization of the Sustainable Development Goals : | {\"Economic and Social Council\"} | 2024-05-03 | one-time |\n| `E/CN.3/2024/20` | Climate change statistics : | {\"Economic and Social Council\"} | 2023-12-18 | biennial |\n| `A/78/339` | Oceans and the law of the sea : | {\"General Assembly\"} | 2023-09-01 | multiple-per-year |\n| `A/HRC/53/47` | Adverse impact of climate change on the full realization of the right to food : | {\"General Assembly\",\"Human Rights Bodies\"} | 2023-06-19 | one-time |\n| `A/78/67` | Oceans and the law of the sea : | {\"General Assembly\"} | 2023-03-14 | multiple-per-year |",
+      "sqlQueries": [
+        "SELECT s.symbol, s.proper_title, s.title, s.un_body, s.publication_date, rf.calculated_frequency\nFROM sg_reports s\nLEFT JOIN report_frequencies rf ON rf.proper_title = s.proper_title\nWHERE 'CLIMATE CHANGE' = ANY(s.subject_terms)\nORDER BY s.publication_date DESC;",
+        "SELECT sg_reports.symbol, sg_reports.proper_title, sg_reports.title, sg_reports.un_body, sg_reports.publication_date, report_frequencies.calculated_frequency\nFROM sg_reports\nLEFT JOIN report_frequencies ON report_frequencies.proper_title = sg_reports.proper_title\nWHERE 'CLIMATE CHANGE' = ANY(sg_reports.subject_terms)\nORDER BY sg_reports.publication_date DESC;"
+      ],
+      "errors": [
+        "Tool query_database failed: Schema-prefixed table 's.symbol' is not allowed. Use table names directly: documents, sg_reports, latest_versions, report_entity_suggestions, report_entity_confirmations, report_frequency_confirmations, report_frequencies, survey_responses. Please retry with a corrected query."
+      ],
+      "iterations": 3
+    },
+    {
+      "testCase": {
+        "id": 3,
+        "prompt": "Show me reports with frequency 'annual'",
+        "expectedBehavior": "Should join with report_frequencies table"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "Show me reports with frequency 'annual'"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT rf.proper_title, lv.symbol, lv.entity, lv.effective_year FROM report_frequencies rf\\nJOIN latest_versions lv ON rf.proper_title = lv.proper_title\\nWHERE rf.calculated_frequency = 'annual'\\nORDER BY rf.proper_title;\",\"explanation\":\"List all reports marked as annual, showing their latest symbol, entity, and effective year.\"}",
+                "name": "query_database"
+              },
+              "id": "call_t5vz4P5WYXB465mn4uuLCDyo",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_t5vz4P5WYXB465mn4uuLCDyo",
+          "content": "{\"error\":\"Schema-prefixed table 'rf.proper_title' is not allowed. Use table names directly: documents, sg_reports, latest_versions, report_entity_suggestions, report_entity_confirmations, report_frequency_confirmations, report_frequencies, survey_responses. Please retry with a corrected query.\"}"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT report_frequencies.proper_title, latest_versions.symbol, latest_versions.entity, latest_versions.effective_year\\nFROM report_frequencies\\nJOIN latest_versions ON report_frequencies.proper_title = latest_versions.proper_title\\nWHERE report_frequencies.calculated_frequency = 'annual'\\nORDER BY report_frequencies.proper_title;\",\"explanation\":\"List all reports marked as annual, showing their latest symbol, entity, and effective year.\"}",
+                "name": "query_database"
+              },
+              "id": "call_UjQZAEzr3hQ8jt6POg5XIh8h",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_UjQZAEzr3hQ8jt6POg5XIh8h",
+          "content": "{\"explanation\":\"List all reports marked as annual, showing their latest symbol, entity, and effective year.\",\"rowCount\":100,\"rows\":[{\"proper_title\":\"Activities of the Department of Global Communications : outreach and knowledge services :\",\"symbol\":\"A/AC.198/2025/4\",\"entity\":\"DGC\",\"effective_year\":2025},{\"proper_title\":\"Activities of the Office of the United Nations Ombudsman and Mediation Services :\",\"symbol\":\"A/80/135\",\"entity\":\"EOSG\",\"effective_year\":2025},{\"proper_title\":\"Addressing the legacy of nuclear weapons : providing victim assistance and environmental remediation to Member States affected by the use or testing of nuclear weapons :\",\"symbol\":\"A/79/91\",\"entity\":\"ODA\",\"effective_year\":2024},{\"proper_title\":\"Administration of justice at the United Nations :\",\"symbol\":\"A/80/136\",\"entity\":\"OAJ\",\"effective_year\":2025},{\"proper_title\":\"Advisory opinion of the International Court of Justice on the legal consequences arising from the policies and practices of Israel in the Occupied Palestinian Territory, including East Jerusalem, and from the illegality of the continued presence of Israel in the Occupied Palestinian Territory :\",\"symbol\":\"A/79/588\",\"entity\":null,\"effective_year\":2024},{\"proper_title\":\"Artificial intelligence in the military domain and its implications for international peace and security :\",\"symbol\":\"A/80/78\",\"entity\":\"ODA\",\"effective_year\":2025},{\"proper_title\":\"Assessment of progress achieved on the key benchmarks established in paragraph 2 of resolution 2577 (2021) :\",\"symbol\":\"S/2025/231\",\"entity\":\"DPO\",\"effective_year\":2025},{\"proper_title\":\"Assistance to refugees, returnees and displaced persons in Africa :\",\"symbol\":\"A/79/326\",\"entity\":\"OCHA\",\"effective_year\":2024},{\"proper_title\":\"Assistance to States for curbing the illicit traffic in small arms and light weapons and collecting them and the illicit trade in small arms and light weapons in all its aspects :\",\"symbol\":\"A/80/111\",\"entity\":\"ODA\",\"effective_year\":2025},{\"proper_title\":\"Central Emergency Response Fund :\",\"symbol\":\"A/80/384\",\"entity\":\"OCHA\",\"effective_year\":2025},{\"proper_title\":\"Collection of contributions :\",\"symbol\":\"A/CN.2/R.839\",\"entity\":null,\"effective_year\":2024},{\"proper_title\":\"Combating intolerance, negative stereotyping, stigmatization, discrimination, incitement to violence and violence against persons, based on religion or belief :\",\"symbol\":\"A/80/287\",\"entity\":\"OHCHR\",\"effective_year\":2025},{\"proper_title\":\"Composition of the Secretariat : staff demographics :\",\"symbol\":\"A/80/508\",\"entity\":\"ACABQ\",\"effective_year\":2025},{\"proper_title\":\"Comprehensive study of the question of nuclear-weapon-free zones in all its aspects :\",\"symbol\":\"A/79/950\",\"entity\":\"ODA\",\"effective_year\":2025},{\"proper_title\":\"Conclusions and recommendations of special procedures :\",\"symbol\":\"A/HRC/58/20\",\"entity\":\"OHCHR\",\"effective_year\":2024},{\"proper_title\":\"Conference on the Establishment of a Middle East Zone Free of Nuclear Weapons and Other Weapons of Mass Destruction :\",\"symbol\":\"A/80/68\",\"entity\":\"ODA\",\"effective_year\":2025},{\"proper_title\":\"Conflict-related sexual violence :\",\"symbol\":\"S/2025/389\",\"entity\":\"SRSG-SVC\",\"effective_year\":2025},{\"proper_title\":\"Contingency fund : consolidated statement of programme budget implications and revised estimates :\",\"symbol\":\"A/C.5/80/15\",\"entity\":\"DMSPC\",\"effective_year\":2025},{\"proper_title\":\"Conventional arms control at the regional and subregional levels :\",\"symbol\":\"A/80/160\",\"entity\":\"ODA\",\"effective_year\":2025},{\"proper_title\":\"Cooperation with the United Nations, its representatives and mechanisms in the field of human rights :\",\"symbol\":\"A/HRC/60/62\",\"entity\":\"OHCHR\",\"effective_year\":2025},{\"proper_title\":\"Current developments in science and technology and their potential impact on international security and disarmament efforts :\",\"symbol\":\"A/80/237\",\"entity\":\"ODA\",\"effective_year\":2025},{\"proper_title\":\"Data on system-wide compensation costs :\",\"symbol\":\"A/80/310\",\"entity\":\"CEB\",\"effective_year\":2025},{\"proper_title\":\"Developments in the field of information and telecommunications in the context of international security :\",\"symbol\":\"A/79/81\",\"entity\":\"ODA\",\"effective_year\":2024},{\"proper_title\":\"Disability inclusion in the United Nations System :\",\"symbol\":\"A/80/361\",\"entity\":\"EOSG\",\"effective_year\":2025},{\"proper_title\":\"Education for democracy :\",\"symbol\":\"A/79/344\",\"entity\":\"DESA\",\"effective_year\":2024},{\"proper_title\":\"Establishment of a nuclear-weapon-free zone in the region of the Middle East :\",\"symbol\":\"A/80/130 (PART I)\",\"entity\":\"ODA\",\"effective_year\":2025},{\"proper_title\":\"Expenses incurred and reimbursement received by the United Nations in connection with assistance provided to the International Criminal Court :\",\"symbol\":\"A/80/343\",\"entity\":\"OLA\",\"effective_year\":2025},{\"proper_title\":\"Final performance report of the African Union-United Nations Hybrid Operation in Darfur :\",\"symbol\":\"A/79/621\",\"entity\":\"DMSPC\",\"effective_year\":2025},{\"proper_title\":\"Follow-up to and implementation of the SIDS Accelerated Modalities of Action (SAMOA) Pathway and the Mauritius Strategy for the Further Implementation of the Programme of Action for the Sustainable Development of Small Island Developing States :\",\"symbol\":\"A/79/527\",\"entity\":null,\"effective_year\":2024},{\"proper_title\":\"Follow-up to the 14th United Nations Congress on Crime Prevention and Criminal Justice and Preparations for the 15th United Nations Congress on Crime Prevention and Criminal Justice :\",\"symbol\":\"A/80/223\",\"entity\":null,\"effective_year\":2025},{\"proper_title\":\"Follow-up to the International Year of Older Persons : 2nd World Assembly on Ageing :\",\"symbol\":\"A/80/147\",\"entity\":\"DESA\",\"effective_year\":2025},{\"proper_title\":\"Fostering social development and social justice through social policies to accelerate progress on the implementation of the 2030 Agenda for Sustainable Development and to achieve the overarching goal of poverty eradication :\",\"symbol\":\"E/CN.5/2024/3\",\"entity\":\"DESA\",\"effective_year\":2023},{\"proper_title\":\"Fundamental Principles of Official Statistics :\",\"symbol\":\"E/CN.3/2025/5\",\"entity\":\"DESA\",\"effective_year\":2024},{\"proper_title\":\"Group of Scientific and Technical Experts on Nuclear Disarmament Verification :\",\"symbol\":\"A/80/93\",\"entity\":\"ODA\",\"effective_year\":2025},{\"proper_title\":\"Human rights in the occupied Syrian Golan :\",\"symbol\":\"A/HRC/58/72\",\"entity\":\"OHCHR\",\"effective_year\":2025},{\"proper_title\":\"Implementation of integrated, coherent and coordinated support for South Sudan and the Sahel region by the United Nations System :\",\"symbol\":\"E/2025/76\",\"entity\":\"DESA\",\"effective_year\":2025},{\"proper_title\":\"Implementation of resolution 2684 (2023) :\",\"symbol\":\"S/2024/352\",\"entity\":\"DPPA\",\"effective_year\":2024},{\"proper_title\":\"Implementation of resolution 2733 (2024) :\",\"symbol\":\"S/2025/257\",\"entity\":\"DPPA\",\"effective_year\":2025},{\"proper_title\":\"Implementation of the mandates of the United Nations Crime Prevention and Criminal Justice Programme, with particular reference to the technical cooperation activities of the United Nations Office on Drugs and Crime :\",\"symbol\":\"A/80/157\",\"entity\":\"UNODC\",\"effective_year\":2025},{\"proper_title\":\"Implementation of the outcome of the World Summit for Social Development and of the 24th special session of the General Assembly :\",\"symbol\":\"A/78/211\",\"entity\":\"DESA\",\"effective_year\":2023},{\"proper_title\":\"Implementation of the resolution establishing the Independent Institution on Missing Persons in the Syrian Arab Republic :\",\"symbol\":\"A/80/359\",\"entity\":\"IIMP\",\"effective_year\":2025},{\"proper_title\":\"Implementation of the Sendai Framework for Disaster Risk Reduction 2015-2030 :\",\"symbol\":\"A/80/333\",\"entity\":\"UNDRR\",\"effective_year\":2025},{\"proper_title\":\"Implementation of the Vienna Programme of Action for Landlocked Developing Countries for the Decade 2014-2024 :\",\"symbol\":\"A/79/237\",\"entity\":\"UN-OHRLLS\",\"effective_year\":2024},{\"proper_title\":\"Information from Non-Self-Governing Territories transmitted under Article 73 e of the Charter of the United Nations :\",\"symbol\":\"A/80/63\",\"entity\":\"DPPA\",\"effective_year\":2025},{\"proper_title\":\"Information relevant to the implementation of article 3 of the Relationship Agreement between the United Nations and the International Criminal Court :\",\"symbol\":\"A/80/344\",\"entity\":\"OLA\",\"effective_year\":2025},{\"proper_title\":\"International coordination and cooperation to combat illicit financial flows :\",\"symbol\":\"A/80/224\",\"entity\":\"DESA\",\"effective_year\":2025},{\"proper_title\":\"Israeli practices affecting the human rights of the Palestinian people in the Occupied Palestinian Territory, including East Jerusalem :\",\"symbol\":\"A/78/502\",\"entity\":\"OHCHR\",\"effective_year\":2023},{\"proper_title\":\"Lethal autonomous weapons systems :\",\"symbol\":\"A/79/88\",\"entity\":\"ODA\",\"effective_year\":2024},{\"proper_title\":\"Measures taken to implement Human Rights Council resolution 9/8 and obstacles to its implementation, including recommendations for further improving the effectiveness of, harmonizing and reforming the treaty body system :\",\"symbol\":\"A/HRC/58/25\",\"entity\":\"OHCHR\",\"effective_year\":2024},{\"proper_title\":\"Multi-year payment plans :\",\"symbol\":\"A/80/72\",\"entity\":\"DMSPC\",\"effective_year\":2025},{\"proper_title\":\"National institutions for the promotion and protection of human rights :\",\"symbol\":\"A/80/286\",\"entity\":\"OHCHR\",\"effective_year\":2025},{\"proper_title\":\"Nuclear disarmament; follow-up to the advisory opinion of the International Court of Justice on the legality of the threat or use of nuclear weapons; reducing nuclear danger :\",\"symbol\":\"A/80/163\",\"entity\":\"ODA\",\"effective_year\":2025},{\"proper_title\":\"Objective information on military matters, including transparency of military expenditures :\",\"symbol\":\"A/80/225\",\"entity\":\"ODA\",\"effective_year\":2025},{\"proper_title\":\"Observance of environmental norms in the drafting and implementation of agreements on disarmament and arms control :\",\"symbol\":\"A/80/124\",\"entity\":\"ODA\",\"effective_year\":2025},{\"proper_title\":\"Outreach programme on the 1994 genocide against the Tutsi in Rwanda and the United Nations :\",\"symbol\":\"A/80/291\",\"entity\":null,\"effective_year\":2025},{\"proper_title\":\"Overall policy matters pertaining to special political missions :\",\"symbol\":\"A/80/322\",\"entity\":\"DPPA\",\"effective_year\":2025},{\"proper_title\":\"Palestine refugees' properties and their revenues :\",\"symbol\":\"A/80/311\",\"entity\":\"DPPA\",\"effective_year\":2025},{\"proper_title\":\"Pattern of conferences :\",\"symbol\":\"A/80/94\",\"entity\":\"DGACM\",\"effective_year\":2025},{\"proper_title\":\"Peacebuilding Fund :\",\"symbol\":\"A/79/790\",\"entity\":\"PBSO\",\"effective_year\":2025},{\"proper_title\":\"Policy decisions of the General Assembly and the Economic and Social Council that are relevant to the work of the Statistical Commission :\",\"symbol\":\"E/CN.3/2026/32\",\"entity\":\"DESA\",\"effective_year\":2025},{\"proper_title\":\"Practice of the Secretary-General in disciplinary matters and cases of possible criminal behaviour, 1 January to 31 December 2022 :\",\"symbol\":\"A/78/603\",\"entity\":null,\"effective_year\":2023},{\"proper_title\":\"Practice of the Secretary-General in disciplinary matters and cases of possible criminal behaviour, 1 January to 31 December 2023 :\",\"symbol\":\"A/79/749\",\"entity\":\"DMSPC\",\"effective_year\":2025},{\"proper_title\":\"Prevention of genocide :\",\"symbol\":\"A/HRC/53/45\",\"entity\":\"OHCHR\",\"effective_year\":2023},{\"proper_title\":\"Programme of action to advance responsible State behaviour in the use of information and communications technologies in the context of international security :\",\"symbol\":\"A/78/76\",\"entity\":\"ODA\",\"effective_year\":2023},{\"proper_title\":\"Programme of activities for the implementation of the International Decade for People of African Descent :\",\"symbol\":\"A/80/325\",\"entity\":\"OHCHR\",\"effective_year\":2025},{\"proper_title\":\"Progress in the renovation of Africa Hall at the Economic Commission for Africa in Addis Ababa :\",\"symbol\":\"A/80/190\",\"entity\":\"DMSPC\",\"effective_year\":2025},{\"proper_title\":\"Progress on the functioning and development of the Umoja system :\",\"symbol\":\"A/80/417\",\"entity\":\"DMSPC\",\"effective_year\":2025},{\"proper_title\":\"Progress on the renovation of the North Building at the Economic Commission for Latin America and the Caribbean in Santiago :\",\"symbol\":\"A/80/209\",\"entity\":\"DMSPC\",\"effective_year\":2025},{\"proper_title\":\"Progress on the replacement of office blocks A-J at the United Nations Office at Nairobi :\",\"symbol\":\"A/80/202\",\"entity\":\"DMSPC\",\"effective_year\":2025},{\"proper_title\":\"Promotion of inclusive and effective international tax cooperation at the United Nations :\",\"symbol\":\"A/78/235\",\"entity\":\"DESA\",\"effective_year\":2023},{\"proper_title\":\"Protection of civilians in armed conflict :\",\"symbol\":\"S/2025/271\",\"entity\":\"DPPA\",\"effective_year\":2025},{\"proper_title\":\"Question of the death penalty :\",\"symbol\":\"A/HRC/60/47\",\"entity\":\"OHCHR\",\"effective_year\":2025},{\"proper_title\":\"Question of Western Sahara :\",\"symbol\":\"A/80/290\",\"entity\":\"DPPA\",\"effective_year\":2025},{\"proper_title\":\"Questions relating to information :\",\"symbol\":\"A/80/323\",\"entity\":\"DGC\",\"effective_year\":2025},{\"proper_title\":\"Regional confidence-building measures : activities of the United Nations Standing Advisory Committee on Security Questions in Central Africa :\",\"symbol\":\"A/80/227\",\"entity\":\"DPPA\",\"effective_year\":2025},{\"proper_title\":\"Repertory of Practice of United Nations Organs and Repertoire of the Practice of the Security Council :\",\"symbol\":\"A/80/210\",\"entity\":\"OLA\",\"effective_year\":2025},{\"proper_title\":\"Report of the Secretary-General on the work of the Organization\",\"symbol\":\"A/80/1\",\"entity\":null,\"effective_year\":2025},{\"proper_title\":\"Report on the use of the commitment authority and request for a subvention to the Extraordinary Chambers in the Courts of Cambodia :\",\"symbol\":\"A/80/441\",\"entity\":\"DMSPC\",\"effective_year\":2025},{\"proper_title\":\"Report on the use of the commitment authority and request for a subvention to the Residual Special Court for Sierra Leone :\",\"symbol\":\"A/80/420\",\"entity\":\"DMSPC\",\"effective_year\":2025},{\"proper_title\":\"Review and appraisal of the implementation of the Beijing Declaration and Platform for Action and the outcomes of the 23rd special session of the General Assembly :\",\"symbol\":\"E/CN.6/2025/3\",\"entity\":null,\"effective_year\":2024},{\"proper_title\":\"Revised estimates : effect of changes in rates of exchange and inflation :\",\"symbol\":\"A/80/480\",\"entity\":\"DMSPC\",\"effective_year\":2025},{\"proper_title\":\"Right of peoples to self-determination :\",\"symbol\":\"A/80/335\",\"entity\":\"OHCHR\",\"effective_year\":2025},{\"proper_title\":\"Right to development :\",\"symbol\":\"A/HRC/60/40\",\"entity\":\"OHCHR\",\"effective_year\":2025},{\"proper_title\":\"Role and achievements of the Office of the United Nations High Commissioner for Human Rights in assisting the Government and people of Cambodia in the promotion and protection of human rights :\",\"symbol\":\"A/HRC/60/87\",\"entity\":\"OHCHR\",\"effective_year\":2025},{\"proper_title\":\"Secretary-General's Trust Fund to Assist States in the Settlement of Disputes through the International Court of Justice :\",\"symbol\":\"A/80/338\",\"entity\":\"OLA\",\"effective_year\":2025},{\"proper_title\":\"Seismic mitigation retrofit and life-cycle replacements project at the Economic and Social Commission for Asia and the Pacific premises in Bangkok :\",\"symbol\":\"A/80/201\",\"entity\":\"DMSPC\",\"effective_year\":2025},{\"proper_title\":\"Situation concerning Western Sahara :\",\"symbol\":\"S/2025/612\",\"entity\":\"DPPA\",\"effective_year\":2025},{\"proper_title\":\"Social dimensions of the New Partnership for Africa's Development :\",\"symbol\":\"E/CN.5/2026/2\",\"entity\":\"DESA\",\"effective_year\":2025},{\"proper_title\":\"Special Fund Established by the Optional Protocol to the Convention against Torture and Other Cruel, Inhuman or Degrading Treatment or Punishment :\",\"symbol\":\"A/HRC/58/32\",\"entity\":\"OHCHR\",\"effective_year\":2024},{\"proper_title\":\"Special measures for protection from sexual exploitation and abuse :\",\"symbol\":\"A/79/789\",\"entity\":\"DMSPC\",\"effective_year\":2024},{\"proper_title\":\"State of South-South cooperation :\",\"symbol\":\"A/80/256\",\"entity\":\"DESA\",\"effective_year\":2025},{\"proper_title\":\"Strengthening and coordinating United Nations rule of law activities :\",\"symbol\":\"A/80/99\",\"entity\":\"EOSG\",\"effective_year\":2025},{\"proper_title\":\"Strengthening the partnership between the United Nations and the African Union on issues of peace and security in Africa, including the work of the United Nations Office to the African Union :\",\"symbol\":\"S/2024/629\",\"entity\":\"DPPA\",\"effective_year\":2024},{\"proper_title\":\"Tackling illicit trafficking in wildlife :\",\"symbol\":\"A/79/699\",\"entity\":\"UNODC\",\"effective_year\":2024},{\"proper_title\":\"The situation in the Middle East :\",\"symbol\":\"A/80/327\",\"entity\":\"DPPA\",\"effective_year\":2025},{\"proper_title\":\"Through-life conventional ammunition management :\",\"symbol\":\"A/80/238\",\"entity\":\"ODA\",\"effective_year\":2025},{\"proper_title\":\"Towards the achievement of sustainable development : implementation of the 2030 Agenda for Sustainable Development, including through sustainable consumption and production, building on Agenda 21 :\",\"symbol\":\"A/80/372\",\"entity\":\"DESA\",\"effective_year\":2025},{\"proper_title\":\"Transparency and confidence-building measures in outer space activities :\",\"symbol\":\"A/78/75\",\"entity\":\"ODA\",\"effective_year\":2023},{\"proper_title\":\"United Nations Office for Partnerships :\",\"symbol\":\"A/80/189\",\"entity\":\"UNOP\",\"effective_year\":2025},{\"proper_title\":\"United Nations Regional Centre for Peace and Disarmament in Africa :\",\"symbol\":\"A/80/128\",\"entity\":\"ODA\",\"effective_year\":2025}]}"
+        },
+        {
+          "role": "assistant",
+          "content": "## Annual reports\nFound 100 reports marked as annual. Below are the first 25; ask for the full list or filter by year/entity.\n\n| Proper title | Symbol | Entity | Effective year |\n|---|---|---|---:|\n| Activities of the Department of Global Communications : outreach and knowledge services : | A/AC.198/2025/4 | DGC | 2025 |\n| Activities of the Office of the United Nations Ombudsman and Mediation Services : | A/80/135 | EOSG | 2025 |\n| Addressing the legacy of nuclear weapons : providing victim assistance and environmental remediation to Member States affected by the use or testing of nuclear weapons : | A/79/91 | ODA | 2024 |\n| Administration of justice at the United Nations : | A/80/136 | OAJ | 2025 |\n| Advisory opinion of the International Court of Justice on the legal consequences arising from the policies and practices of Israel in the Occupied Palestinian Territory, including East Jerusalem, and from the illegality of the continued presence of Israel in the Occupied Palestinian Territory : | A/79/588 |  | 2024 |\n| Artificial intelligence in the military domain and its implications for international peace and security : | A/80/78 | ODA | 2025 |\n| Assessment of progress achieved on the key benchmarks established in paragraph 2 of resolution 2577 (2021) : | S/2025/231 | DPO | 2025 |\n| Assistance to refugees, returnees and displaced persons in Africa : | A/79/326 | OCHA | 2024 |\n| Assistance to States for curbing the illicit traffic in small arms and light weapons and collecting them and the illicit trade in small arms and light weapons in all its aspects : | A/80/111 | ODA | 2025 |\n| Central Emergency Response Fund : | A/80/384 | OCHA | 2025 |\n| Collection of contributions : | A/CN.2/R.839 |  | 2024 |\n| Combating intolerance, negative stereotyping, stigmatization, discrimination, incitement to violence and violence against persons, based on religion or belief : | A/80/287 | OHCHR | 2025 |\n| Composition of the Secretariat : staff demographics : | A/80/508 | ACABQ | 2025 |\n| Comprehensive study of the question of nuclear-weapon-free zones in all its aspects : | A/79/950 | ODA | 2025 |\n| Conclusions and recommendations of special procedures : | A/HRC/58/20 | OHCHR | 2024 |\n| Conference on the Establishment of a Middle East Zone Free of Nuclear Weapons and Other Weapons of Mass Destruction : | A/80/68 | ODA | 2025 |\n| Conflict-related sexual violence : | S/2025/389 | SRSG-SVC | 2025 |\n| Contingency fund : consolidated statement of programme budget implications and revised estimates : | A/C.5/80/15 | DMSPC | 2025 |\n| Conventional arms control at the regional and subregional levels : | A/80/160 | ODA | 2025 |\n| Cooperation with the United Nations, its representatives and mechanisms in the field of human rights : | A/HRC/60/62 | OHCHR | 2025 |\n| Current developments in science and technology and their potential impact on international security and disarmament efforts : | A/80/237 | ODA | 2025 |\n| Data on system-wide compensation costs : | A/80/310 | CEB | 2025 |\n| Developments in the field of information and telecommunications in the context of international security : | A/79/81 | ODA | 2024 |\n| Disability inclusion in the United Nations System : | A/80/361 | EOSG | 2025 |\n| Education for democracy : | A/79/344 | DESA | 2024 |"
+        }
+      ],
+      "toolCalls": [
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT rf.proper_title, lv.symbol, lv.entity, lv.effective_year FROM report_frequencies rf\nJOIN latest_versions lv ON rf.proper_title = lv.proper_title\nWHERE rf.calculated_frequency = 'annual'\nORDER BY rf.proper_title;",
+            "explanation": "List all reports marked as annual, showing their latest symbol, entity, and effective year."
+          },
+          "result": "Schema-prefixed table 'rf.proper_title' is not allowed. Use table names directly: documents, sg_reports, latest_versions, report_entity_suggestions, report_entity_confirmations, report_frequency_confirmations, report_frequencies, survey_responses. Please retry with a corrected query.",
+          "success": false
+        },
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT report_frequencies.proper_title, latest_versions.symbol, latest_versions.entity, latest_versions.effective_year\nFROM report_frequencies\nJOIN latest_versions ON report_frequencies.proper_title = latest_versions.proper_title\nWHERE report_frequencies.calculated_frequency = 'annual'\nORDER BY report_frequencies.proper_title;",
+            "explanation": "List all reports marked as annual, showing their latest symbol, entity, and effective year."
+          },
+          "result": {
+            "explanation": "List all reports marked as annual, showing their latest symbol, entity, and effective year.",
+            "rowCount": 100,
+            "rows": [
+              {
+                "proper_title": "Activities of the Department of Global Communications : outreach and knowledge services :",
+                "symbol": "A/AC.198/2025/4",
+                "entity": "DGC",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Activities of the Office of the United Nations Ombudsman and Mediation Services :",
+                "symbol": "A/80/135",
+                "entity": "EOSG",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Addressing the legacy of nuclear weapons : providing victim assistance and environmental remediation to Member States affected by the use or testing of nuclear weapons :",
+                "symbol": "A/79/91",
+                "entity": "ODA",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Administration of justice at the United Nations :",
+                "symbol": "A/80/136",
+                "entity": "OAJ",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Advisory opinion of the International Court of Justice on the legal consequences arising from the policies and practices of Israel in the Occupied Palestinian Territory, including East Jerusalem, and from the illegality of the continued presence of Israel in the Occupied Palestinian Territory :",
+                "symbol": "A/79/588",
+                "entity": null,
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Artificial intelligence in the military domain and its implications for international peace and security :",
+                "symbol": "A/80/78",
+                "entity": "ODA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Assessment of progress achieved on the key benchmarks established in paragraph 2 of resolution 2577 (2021) :",
+                "symbol": "S/2025/231",
+                "entity": "DPO",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Assistance to refugees, returnees and displaced persons in Africa :",
+                "symbol": "A/79/326",
+                "entity": "OCHA",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Assistance to States for curbing the illicit traffic in small arms and light weapons and collecting them and the illicit trade in small arms and light weapons in all its aspects :",
+                "symbol": "A/80/111",
+                "entity": "ODA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Central Emergency Response Fund :",
+                "symbol": "A/80/384",
+                "entity": "OCHA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Collection of contributions :",
+                "symbol": "A/CN.2/R.839",
+                "entity": null,
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Combating intolerance, negative stereotyping, stigmatization, discrimination, incitement to violence and violence against persons, based on religion or belief :",
+                "symbol": "A/80/287",
+                "entity": "OHCHR",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Composition of the Secretariat : staff demographics :",
+                "symbol": "A/80/508",
+                "entity": "ACABQ",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Comprehensive study of the question of nuclear-weapon-free zones in all its aspects :",
+                "symbol": "A/79/950",
+                "entity": "ODA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Conclusions and recommendations of special procedures :",
+                "symbol": "A/HRC/58/20",
+                "entity": "OHCHR",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Conference on the Establishment of a Middle East Zone Free of Nuclear Weapons and Other Weapons of Mass Destruction :",
+                "symbol": "A/80/68",
+                "entity": "ODA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Conflict-related sexual violence :",
+                "symbol": "S/2025/389",
+                "entity": "SRSG-SVC",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Contingency fund : consolidated statement of programme budget implications and revised estimates :",
+                "symbol": "A/C.5/80/15",
+                "entity": "DMSPC",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Conventional arms control at the regional and subregional levels :",
+                "symbol": "A/80/160",
+                "entity": "ODA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Cooperation with the United Nations, its representatives and mechanisms in the field of human rights :",
+                "symbol": "A/HRC/60/62",
+                "entity": "OHCHR",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Current developments in science and technology and their potential impact on international security and disarmament efforts :",
+                "symbol": "A/80/237",
+                "entity": "ODA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Data on system-wide compensation costs :",
+                "symbol": "A/80/310",
+                "entity": "CEB",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Developments in the field of information and telecommunications in the context of international security :",
+                "symbol": "A/79/81",
+                "entity": "ODA",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Disability inclusion in the United Nations System :",
+                "symbol": "A/80/361",
+                "entity": "EOSG",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Education for democracy :",
+                "symbol": "A/79/344",
+                "entity": "DESA",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Establishment of a nuclear-weapon-free zone in the region of the Middle East :",
+                "symbol": "A/80/130 (PART I)",
+                "entity": "ODA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Expenses incurred and reimbursement received by the United Nations in connection with assistance provided to the International Criminal Court :",
+                "symbol": "A/80/343",
+                "entity": "OLA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Final performance report of the African Union-United Nations Hybrid Operation in Darfur :",
+                "symbol": "A/79/621",
+                "entity": "DMSPC",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Follow-up to and implementation of the SIDS Accelerated Modalities of Action (SAMOA) Pathway and the Mauritius Strategy for the Further Implementation of the Programme of Action for the Sustainable Development of Small Island Developing States :",
+                "symbol": "A/79/527",
+                "entity": null,
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Follow-up to the 14th United Nations Congress on Crime Prevention and Criminal Justice and Preparations for the 15th United Nations Congress on Crime Prevention and Criminal Justice :",
+                "symbol": "A/80/223",
+                "entity": null,
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Follow-up to the International Year of Older Persons : 2nd World Assembly on Ageing :",
+                "symbol": "A/80/147",
+                "entity": "DESA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Fostering social development and social justice through social policies to accelerate progress on the implementation of the 2030 Agenda for Sustainable Development and to achieve the overarching goal of poverty eradication :",
+                "symbol": "E/CN.5/2024/3",
+                "entity": "DESA",
+                "effective_year": 2023
+              },
+              {
+                "proper_title": "Fundamental Principles of Official Statistics :",
+                "symbol": "E/CN.3/2025/5",
+                "entity": "DESA",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Group of Scientific and Technical Experts on Nuclear Disarmament Verification :",
+                "symbol": "A/80/93",
+                "entity": "ODA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Human rights in the occupied Syrian Golan :",
+                "symbol": "A/HRC/58/72",
+                "entity": "OHCHR",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Implementation of integrated, coherent and coordinated support for South Sudan and the Sahel region by the United Nations System :",
+                "symbol": "E/2025/76",
+                "entity": "DESA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Implementation of resolution 2684 (2023) :",
+                "symbol": "S/2024/352",
+                "entity": "DPPA",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Implementation of resolution 2733 (2024) :",
+                "symbol": "S/2025/257",
+                "entity": "DPPA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Implementation of the mandates of the United Nations Crime Prevention and Criminal Justice Programme, with particular reference to the technical cooperation activities of the United Nations Office on Drugs and Crime :",
+                "symbol": "A/80/157",
+                "entity": "UNODC",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Implementation of the outcome of the World Summit for Social Development and of the 24th special session of the General Assembly :",
+                "symbol": "A/78/211",
+                "entity": "DESA",
+                "effective_year": 2023
+              },
+              {
+                "proper_title": "Implementation of the resolution establishing the Independent Institution on Missing Persons in the Syrian Arab Republic :",
+                "symbol": "A/80/359",
+                "entity": "IIMP",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Implementation of the Sendai Framework for Disaster Risk Reduction 2015-2030 :",
+                "symbol": "A/80/333",
+                "entity": "UNDRR",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Implementation of the Vienna Programme of Action for Landlocked Developing Countries for the Decade 2014-2024 :",
+                "symbol": "A/79/237",
+                "entity": "UN-OHRLLS",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Information from Non-Self-Governing Territories transmitted under Article 73 e of the Charter of the United Nations :",
+                "symbol": "A/80/63",
+                "entity": "DPPA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Information relevant to the implementation of article 3 of the Relationship Agreement between the United Nations and the International Criminal Court :",
+                "symbol": "A/80/344",
+                "entity": "OLA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "International coordination and cooperation to combat illicit financial flows :",
+                "symbol": "A/80/224",
+                "entity": "DESA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Israeli practices affecting the human rights of the Palestinian people in the Occupied Palestinian Territory, including East Jerusalem :",
+                "symbol": "A/78/502",
+                "entity": "OHCHR",
+                "effective_year": 2023
+              },
+              {
+                "proper_title": "Lethal autonomous weapons systems :",
+                "symbol": "A/79/88",
+                "entity": "ODA",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Measures taken to implement Human Rights Council resolution 9/8 and obstacles to its implementation, including recommendations for further improving the effectiveness of, harmonizing and reforming the treaty body system :",
+                "symbol": "A/HRC/58/25",
+                "entity": "OHCHR",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Multi-year payment plans :",
+                "symbol": "A/80/72",
+                "entity": "DMSPC",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "National institutions for the promotion and protection of human rights :",
+                "symbol": "A/80/286",
+                "entity": "OHCHR",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Nuclear disarmament; follow-up to the advisory opinion of the International Court of Justice on the legality of the threat or use of nuclear weapons; reducing nuclear danger :",
+                "symbol": "A/80/163",
+                "entity": "ODA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Objective information on military matters, including transparency of military expenditures :",
+                "symbol": "A/80/225",
+                "entity": "ODA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Observance of environmental norms in the drafting and implementation of agreements on disarmament and arms control :",
+                "symbol": "A/80/124",
+                "entity": "ODA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Outreach programme on the 1994 genocide against the Tutsi in Rwanda and the United Nations :",
+                "symbol": "A/80/291",
+                "entity": null,
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Overall policy matters pertaining to special political missions :",
+                "symbol": "A/80/322",
+                "entity": "DPPA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Palestine refugees' properties and their revenues :",
+                "symbol": "A/80/311",
+                "entity": "DPPA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Pattern of conferences :",
+                "symbol": "A/80/94",
+                "entity": "DGACM",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Peacebuilding Fund :",
+                "symbol": "A/79/790",
+                "entity": "PBSO",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Policy decisions of the General Assembly and the Economic and Social Council that are relevant to the work of the Statistical Commission :",
+                "symbol": "E/CN.3/2026/32",
+                "entity": "DESA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Practice of the Secretary-General in disciplinary matters and cases of possible criminal behaviour, 1 January to 31 December 2022 :",
+                "symbol": "A/78/603",
+                "entity": null,
+                "effective_year": 2023
+              },
+              {
+                "proper_title": "Practice of the Secretary-General in disciplinary matters and cases of possible criminal behaviour, 1 January to 31 December 2023 :",
+                "symbol": "A/79/749",
+                "entity": "DMSPC",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Prevention of genocide :",
+                "symbol": "A/HRC/53/45",
+                "entity": "OHCHR",
+                "effective_year": 2023
+              },
+              {
+                "proper_title": "Programme of action to advance responsible State behaviour in the use of information and communications technologies in the context of international security :",
+                "symbol": "A/78/76",
+                "entity": "ODA",
+                "effective_year": 2023
+              },
+              {
+                "proper_title": "Programme of activities for the implementation of the International Decade for People of African Descent :",
+                "symbol": "A/80/325",
+                "entity": "OHCHR",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Progress in the renovation of Africa Hall at the Economic Commission for Africa in Addis Ababa :",
+                "symbol": "A/80/190",
+                "entity": "DMSPC",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Progress on the functioning and development of the Umoja system :",
+                "symbol": "A/80/417",
+                "entity": "DMSPC",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Progress on the renovation of the North Building at the Economic Commission for Latin America and the Caribbean in Santiago :",
+                "symbol": "A/80/209",
+                "entity": "DMSPC",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Progress on the replacement of office blocks A-J at the United Nations Office at Nairobi :",
+                "symbol": "A/80/202",
+                "entity": "DMSPC",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Promotion of inclusive and effective international tax cooperation at the United Nations :",
+                "symbol": "A/78/235",
+                "entity": "DESA",
+                "effective_year": 2023
+              },
+              {
+                "proper_title": "Protection of civilians in armed conflict :",
+                "symbol": "S/2025/271",
+                "entity": "DPPA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Question of the death penalty :",
+                "symbol": "A/HRC/60/47",
+                "entity": "OHCHR",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Question of Western Sahara :",
+                "symbol": "A/80/290",
+                "entity": "DPPA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Questions relating to information :",
+                "symbol": "A/80/323",
+                "entity": "DGC",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Regional confidence-building measures : activities of the United Nations Standing Advisory Committee on Security Questions in Central Africa :",
+                "symbol": "A/80/227",
+                "entity": "DPPA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Repertory of Practice of United Nations Organs and Repertoire of the Practice of the Security Council :",
+                "symbol": "A/80/210",
+                "entity": "OLA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Report of the Secretary-General on the work of the Organization",
+                "symbol": "A/80/1",
+                "entity": null,
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Report on the use of the commitment authority and request for a subvention to the Extraordinary Chambers in the Courts of Cambodia :",
+                "symbol": "A/80/441",
+                "entity": "DMSPC",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Report on the use of the commitment authority and request for a subvention to the Residual Special Court for Sierra Leone :",
+                "symbol": "A/80/420",
+                "entity": "DMSPC",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Review and appraisal of the implementation of the Beijing Declaration and Platform for Action and the outcomes of the 23rd special session of the General Assembly :",
+                "symbol": "E/CN.6/2025/3",
+                "entity": null,
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Revised estimates : effect of changes in rates of exchange and inflation :",
+                "symbol": "A/80/480",
+                "entity": "DMSPC",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Right of peoples to self-determination :",
+                "symbol": "A/80/335",
+                "entity": "OHCHR",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Right to development :",
+                "symbol": "A/HRC/60/40",
+                "entity": "OHCHR",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Role and achievements of the Office of the United Nations High Commissioner for Human Rights in assisting the Government and people of Cambodia in the promotion and protection of human rights :",
+                "symbol": "A/HRC/60/87",
+                "entity": "OHCHR",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Secretary-General's Trust Fund to Assist States in the Settlement of Disputes through the International Court of Justice :",
+                "symbol": "A/80/338",
+                "entity": "OLA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Seismic mitigation retrofit and life-cycle replacements project at the Economic and Social Commission for Asia and the Pacific premises in Bangkok :",
+                "symbol": "A/80/201",
+                "entity": "DMSPC",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Situation concerning Western Sahara :",
+                "symbol": "S/2025/612",
+                "entity": "DPPA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Social dimensions of the New Partnership for Africa's Development :",
+                "symbol": "E/CN.5/2026/2",
+                "entity": "DESA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Special Fund Established by the Optional Protocol to the Convention against Torture and Other Cruel, Inhuman or Degrading Treatment or Punishment :",
+                "symbol": "A/HRC/58/32",
+                "entity": "OHCHR",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Special measures for protection from sexual exploitation and abuse :",
+                "symbol": "A/79/789",
+                "entity": "DMSPC",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "State of South-South cooperation :",
+                "symbol": "A/80/256",
+                "entity": "DESA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Strengthening and coordinating United Nations rule of law activities :",
+                "symbol": "A/80/99",
+                "entity": "EOSG",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Strengthening the partnership between the United Nations and the African Union on issues of peace and security in Africa, including the work of the United Nations Office to the African Union :",
+                "symbol": "S/2024/629",
+                "entity": "DPPA",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Tackling illicit trafficking in wildlife :",
+                "symbol": "A/79/699",
+                "entity": "UNODC",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "The situation in the Middle East :",
+                "symbol": "A/80/327",
+                "entity": "DPPA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Through-life conventional ammunition management :",
+                "symbol": "A/80/238",
+                "entity": "ODA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Towards the achievement of sustainable development : implementation of the 2030 Agenda for Sustainable Development, including through sustainable consumption and production, building on Agenda 21 :",
+                "symbol": "A/80/372",
+                "entity": "DESA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Transparency and confidence-building measures in outer space activities :",
+                "symbol": "A/78/75",
+                "entity": "ODA",
+                "effective_year": 2023
+              },
+              {
+                "proper_title": "United Nations Office for Partnerships :",
+                "symbol": "A/80/189",
+                "entity": "UNOP",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "United Nations Regional Centre for Peace and Disarmament in Africa :",
+                "symbol": "A/80/128",
+                "entity": "ODA",
+                "effective_year": 2025
+              }
+            ]
+          },
+          "success": true
+        }
+      ],
+      "finalResponse": "## Annual reports\nFound 100 reports marked as annual. Below are the first 25; ask for the full list or filter by year/entity.\n\n| Proper title | Symbol | Entity | Effective year |\n|---|---|---|---:|\n| Activities of the Department of Global Communications : outreach and knowledge services : | A/AC.198/2025/4 | DGC | 2025 |\n| Activities of the Office of the United Nations Ombudsman and Mediation Services : | A/80/135 | EOSG | 2025 |\n| Addressing the legacy of nuclear weapons : providing victim assistance and environmental remediation to Member States affected by the use or testing of nuclear weapons : | A/79/91 | ODA | 2024 |\n| Administration of justice at the United Nations : | A/80/136 | OAJ | 2025 |\n| Advisory opinion of the International Court of Justice on the legal consequences arising from the policies and practices of Israel in the Occupied Palestinian Territory, including East Jerusalem, and from the illegality of the continued presence of Israel in the Occupied Palestinian Territory : | A/79/588 |  | 2024 |\n| Artificial intelligence in the military domain and its implications for international peace and security : | A/80/78 | ODA | 2025 |\n| Assessment of progress achieved on the key benchmarks established in paragraph 2 of resolution 2577 (2021) : | S/2025/231 | DPO | 2025 |\n| Assistance to refugees, returnees and displaced persons in Africa : | A/79/326 | OCHA | 2024 |\n| Assistance to States for curbing the illicit traffic in small arms and light weapons and collecting them and the illicit trade in small arms and light weapons in all its aspects : | A/80/111 | ODA | 2025 |\n| Central Emergency Response Fund : | A/80/384 | OCHA | 2025 |\n| Collection of contributions : | A/CN.2/R.839 |  | 2024 |\n| Combating intolerance, negative stereotyping, stigmatization, discrimination, incitement to violence and violence against persons, based on religion or belief : | A/80/287 | OHCHR | 2025 |\n| Composition of the Secretariat : staff demographics : | A/80/508 | ACABQ | 2025 |\n| Comprehensive study of the question of nuclear-weapon-free zones in all its aspects : | A/79/950 | ODA | 2025 |\n| Conclusions and recommendations of special procedures : | A/HRC/58/20 | OHCHR | 2024 |\n| Conference on the Establishment of a Middle East Zone Free of Nuclear Weapons and Other Weapons of Mass Destruction : | A/80/68 | ODA | 2025 |\n| Conflict-related sexual violence : | S/2025/389 | SRSG-SVC | 2025 |\n| Contingency fund : consolidated statement of programme budget implications and revised estimates : | A/C.5/80/15 | DMSPC | 2025 |\n| Conventional arms control at the regional and subregional levels : | A/80/160 | ODA | 2025 |\n| Cooperation with the United Nations, its representatives and mechanisms in the field of human rights : | A/HRC/60/62 | OHCHR | 2025 |\n| Current developments in science and technology and their potential impact on international security and disarmament efforts : | A/80/237 | ODA | 2025 |\n| Data on system-wide compensation costs : | A/80/310 | CEB | 2025 |\n| Developments in the field of information and telecommunications in the context of international security : | A/79/81 | ODA | 2024 |\n| Disability inclusion in the United Nations System : | A/80/361 | EOSG | 2025 |\n| Education for democracy : | A/79/344 | DESA | 2024 |",
+      "sqlQueries": [
+        "SELECT rf.proper_title, lv.symbol, lv.entity, lv.effective_year FROM report_frequencies rf\nJOIN latest_versions lv ON rf.proper_title = lv.proper_title\nWHERE rf.calculated_frequency = 'annual'\nORDER BY rf.proper_title;",
+        "SELECT report_frequencies.proper_title, latest_versions.symbol, latest_versions.entity, latest_versions.effective_year\nFROM report_frequencies\nJOIN latest_versions ON report_frequencies.proper_title = latest_versions.proper_title\nWHERE report_frequencies.calculated_frequency = 'annual'\nORDER BY report_frequencies.proper_title;"
+      ],
+      "errors": [
+        "Tool query_database failed: Schema-prefixed table 'rf.proper_title' is not allowed. Use table names directly: documents, sg_reports, latest_versions, report_entity_suggestions, report_entity_confirmations, report_frequency_confirmations, report_frequencies, survey_responses. Please retry with a corrected query."
+      ],
+      "iterations": 3
+    },
+    {
+      "testCase": {
+        "id": 4,
+        "prompt": "What reports were published in 2023 about disarmament?",
+        "expectedBehavior": "Should use publication_date for year and subject_terms for topic"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "What reports were published in 2023 about disarmament?"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT symbol, proper_title, title, un_body, publication_date FROM sg_reports \\nWHERE SUBSTRING(publication_date, 1, 4) = '2023'\\n  AND (\\n    'DISARMAMENT' = ANY(subject_terms)\\n    OR title ILIKE '%disarmament%'\\n  )\\nORDER BY publication_date;\",\"explanation\":\"Find SG reports from 2023 tagged with disarmament or with disarmament in the title.\"}",
+                "name": "query_database"
+              },
+              "id": "call_MUOt4ZSHOrIiAh50ckvSiUXT",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_MUOt4ZSHOrIiAh50ckvSiUXT",
+          "content": "{\"explanation\":\"Find SG reports from 2023 tagged with disarmament or with disarmament in the title.\",\"rowCount\":11,\"rows\":[{\"symbol\":\"A/78/1\",\"proper_title\":\"Report of the Secretary-General on the work of the Organization\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2023\"},{\"symbol\":\"(A/78/1) COLOUR PUBLICATION\",\"proper_title\":\"Determined : report of the Secretary-General on the work of the Organization :\",\"title\":null,\"un_body\":\"{Secretariat}\",\"publication_date\":\"2023\"},{\"symbol\":\"S/2023/184\",\"proper_title\":\"Implementation of Security Council resolution 1701 (2006) during the period from 3 November 2022 to 20 February 2023 :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2023-03-10\"},{\"symbol\":\"A/78/117\",\"proper_title\":\"Promotion of multilateralism in the area of disarmament and non-proliferation :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2023-06-21\"},{\"symbol\":\"A/78/128\",\"proper_title\":\"Relationship between disarmament and development :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2023-06-30\"},{\"symbol\":\"A/78/164\",\"proper_title\":\"Youth, disarmament and non-proliferation :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\",\\\"Research and Training Institutions\\\"}\",\"publication_date\":\"2023-07-12\"},{\"symbol\":\"S/2023/522\",\"proper_title\":\"Implementation of Security Council resolution 1701 (2006) during the period from 21 February to 20 June 2023 :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2023-07-13\"},{\"symbol\":\"A/78/287\",\"proper_title\":\"Work of the Advisory Board on Disarmament Matters :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2023-07-31\"},{\"symbol\":\"A/78/268\",\"proper_title\":\"Current developments in science and technology and their potential impact on international security and disarmament efforts :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2023-08-01\"},{\"symbol\":\"A/78/266\",\"proper_title\":\"Regional confidence-building measures : activities of the United Nations Standing Advisory Committee on Security Questions in Central Africa :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2023-08-01\"},{\"symbol\":\"S/2023/879\",\"proper_title\":\"Implementation of Security Council resolution 1701 (2006) during the period from 21 June to 20 October 2023 :\",\"title\":null,\"un_body\":\"{\\\"Security Council\\\"}\",\"publication_date\":\"2023-11-16\"}]}"
+        },
+        {
+          "role": "assistant",
+          "content": "## Key findings\nIn 2023, the Secretary-General issued multiple General Assembly reports focused on disarmament (multilateralism, development linkages, youth, science/tech impacts, advisory board work, and regional confidence-building), plus periodic Security Council updates under resolution 1701 and the annual report on the UN’s work.\n\n### 2023 disarmament-related SG reports\n| Symbol | Title | UN Body | Publication Date |\n|---|---|---|---|\n| `A/78/1` | Report of the Secretary-General on the work of the Organization | {\"General Assembly\"} | 2023 |\n| `(A/78/1) COLOUR PUBLICATION` | Determined : report of the Secretary-General on the work of the Organization : | {Secretariat} | 2023 |\n| `S/2023/184` | Implementation of Security Council resolution 1701 (2006) during the period from 3 November 2022 to 20 February 2023 : | {\"Security Council\"} | 2023-03-10 |\n| `A/78/117` | Promotion of multilateralism in the area of disarmament and non-proliferation : | {\"General Assembly\"} | 2023-06-21 |\n| `A/78/128` | Relationship between disarmament and development : | {\"General Assembly\"} | 2023-06-30 |\n| `A/78/164` | Youth, disarmament and non-proliferation : | {\"General Assembly\",\"Research and Training Institutions\"} | 2023-07-12 |\n| `S/2023/522` | Implementation of Security Council resolution 1701 (2006) during the period from 21 February to 20 June 2023 : | {\"Security Council\"} | 2023-07-13 |\n| `A/78/287` | Work of the Advisory Board on Disarmament Matters : | {\"General Assembly\"} | 2023-07-31 |\n| `A/78/268` | Current developments in science and technology and their potential impact on international security and disarmament efforts : | {\"General Assembly\"} | 2023-08-01 |\n| `A/78/266` | Regional confidence-building measures : activities of the United Nations Standing Advisory Committee on Security Questions in Central Africa : | {\"General Assembly\"} | 2023-08-01 |\n| `S/2023/879` | Implementation of Security Council resolution 1701 (2006) during the period from 21 June to 20 October 2023 : | {\"Security Council\"} | 2023-11-16 |"
+        }
+      ],
+      "toolCalls": [
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT symbol, proper_title, title, un_body, publication_date FROM sg_reports \nWHERE SUBSTRING(publication_date, 1, 4) = '2023'\n  AND (\n    'DISARMAMENT' = ANY(subject_terms)\n    OR title ILIKE '%disarmament%'\n  )\nORDER BY publication_date;",
+            "explanation": "Find SG reports from 2023 tagged with disarmament or with disarmament in the title."
+          },
+          "result": {
+            "explanation": "Find SG reports from 2023 tagged with disarmament or with disarmament in the title.",
+            "rowCount": 11,
+            "rows": [
+              {
+                "symbol": "A/78/1",
+                "proper_title": "Report of the Secretary-General on the work of the Organization",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2023"
+              },
+              {
+                "symbol": "(A/78/1) COLOUR PUBLICATION",
+                "proper_title": "Determined : report of the Secretary-General on the work of the Organization :",
+                "title": null,
+                "un_body": "{Secretariat}",
+                "publication_date": "2023"
+              },
+              {
+                "symbol": "S/2023/184",
+                "proper_title": "Implementation of Security Council resolution 1701 (2006) during the period from 3 November 2022 to 20 February 2023 :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2023-03-10"
+              },
+              {
+                "symbol": "A/78/117",
+                "proper_title": "Promotion of multilateralism in the area of disarmament and non-proliferation :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2023-06-21"
+              },
+              {
+                "symbol": "A/78/128",
+                "proper_title": "Relationship between disarmament and development :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2023-06-30"
+              },
+              {
+                "symbol": "A/78/164",
+                "proper_title": "Youth, disarmament and non-proliferation :",
+                "title": null,
+                "un_body": "{\"General Assembly\",\"Research and Training Institutions\"}",
+                "publication_date": "2023-07-12"
+              },
+              {
+                "symbol": "S/2023/522",
+                "proper_title": "Implementation of Security Council resolution 1701 (2006) during the period from 21 February to 20 June 2023 :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2023-07-13"
+              },
+              {
+                "symbol": "A/78/287",
+                "proper_title": "Work of the Advisory Board on Disarmament Matters :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2023-07-31"
+              },
+              {
+                "symbol": "A/78/268",
+                "proper_title": "Current developments in science and technology and their potential impact on international security and disarmament efforts :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2023-08-01"
+              },
+              {
+                "symbol": "A/78/266",
+                "proper_title": "Regional confidence-building measures : activities of the United Nations Standing Advisory Committee on Security Questions in Central Africa :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2023-08-01"
+              },
+              {
+                "symbol": "S/2023/879",
+                "proper_title": "Implementation of Security Council resolution 1701 (2006) during the period from 21 June to 20 October 2023 :",
+                "title": null,
+                "un_body": "{\"Security Council\"}",
+                "publication_date": "2023-11-16"
+              }
+            ]
+          },
+          "success": true
+        }
+      ],
+      "finalResponse": "## Key findings\nIn 2023, the Secretary-General issued multiple General Assembly reports focused on disarmament (multilateralism, development linkages, youth, science/tech impacts, advisory board work, and regional confidence-building), plus periodic Security Council updates under resolution 1701 and the annual report on the UN’s work.\n\n### 2023 disarmament-related SG reports\n| Symbol | Title | UN Body | Publication Date |\n|---|---|---|---|\n| `A/78/1` | Report of the Secretary-General on the work of the Organization | {\"General Assembly\"} | 2023 |\n| `(A/78/1) COLOUR PUBLICATION` | Determined : report of the Secretary-General on the work of the Organization : | {Secretariat} | 2023 |\n| `S/2023/184` | Implementation of Security Council resolution 1701 (2006) during the period from 3 November 2022 to 20 February 2023 : | {\"Security Council\"} | 2023-03-10 |\n| `A/78/117` | Promotion of multilateralism in the area of disarmament and non-proliferation : | {\"General Assembly\"} | 2023-06-21 |\n| `A/78/128` | Relationship between disarmament and development : | {\"General Assembly\"} | 2023-06-30 |\n| `A/78/164` | Youth, disarmament and non-proliferation : | {\"General Assembly\",\"Research and Training Institutions\"} | 2023-07-12 |\n| `S/2023/522` | Implementation of Security Council resolution 1701 (2006) during the period from 21 February to 20 June 2023 : | {\"Security Council\"} | 2023-07-13 |\n| `A/78/287` | Work of the Advisory Board on Disarmament Matters : | {\"General Assembly\"} | 2023-07-31 |\n| `A/78/268` | Current developments in science and technology and their potential impact on international security and disarmament efforts : | {\"General Assembly\"} | 2023-08-01 |\n| `A/78/266` | Regional confidence-building measures : activities of the United Nations Standing Advisory Committee on Security Questions in Central Africa : | {\"General Assembly\"} | 2023-08-01 |\n| `S/2023/879` | Implementation of Security Council resolution 1701 (2006) during the period from 21 June to 20 October 2023 : | {\"Security Council\"} | 2023-11-16 |",
+      "sqlQueries": [
+        "SELECT symbol, proper_title, title, un_body, publication_date FROM sg_reports \nWHERE SUBSTRING(publication_date, 1, 4) = '2023'\n  AND (\n    'DISARMAMENT' = ANY(subject_terms)\n    OR title ILIKE '%disarmament%'\n  )\nORDER BY publication_date;"
+      ],
+      "errors": [],
+      "iterations": 2
+    },
+    {
+      "testCase": {
+        "id": 5,
+        "prompt": "Find the latest version of the SDG progress report",
+        "expectedBehavior": "Should use latest_versions view or search by proper_title"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "Find the latest version of the SDG progress report"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT symbol, proper_title, title, un_body, publication_date, effective_year FROM latest_versions \\nWHERE proper_title ILIKE '%Sustainable Development Goals%' OR title ILIKE '%Sustainable Development Goals%' OR title ILIKE '%SDG%' OR proper_title ILIKE '%SDG%'\\nORDER BY effective_year DESC;\", \"explanation\":\"Find latest-version records whose proper_title or title mentions Sustainable Development Goals (SDGs).\"}",
+                "name": "query_database"
+              },
+              "id": "call_fzlWoMiRA56iipyRIiW0coiu",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_fzlWoMiRA56iipyRIiW0coiu",
+          "content": "{\"explanation\":\"Find latest-version records whose proper_title or title mentions Sustainable Development Goals (SDGs).\",\"rowCount\":13,\"rows\":[{\"symbol\":\"E/2025/62\",\"proper_title\":\"Progress towards the Sustainable Development Goals :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\",\\\"General Assembly\\\"}\",\"publication_date\":\"2025-04-29\",\"effective_year\":2025},{\"symbol\":\"E/2025/69\",\"proper_title\":\"Advancing sustainable, inclusive, science- and evidence-based solutions for the 2030 Agenda for Sustainable Development and its Sustainable Development Goals for leaving no one behind :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\"}\",\"publication_date\":\"2025-05-09\",\"effective_year\":2025},{\"symbol\":\"A/79/961\",\"proper_title\":\"Impact of rapid technological change on the achievement of the Sustainable Development Goals and targets :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2025-06-30\",\"effective_year\":2025},{\"symbol\":\"A/79/968\",\"proper_title\":\"Recommendations on how engagement with local and regional authorities could advance the 2030 Agenda for Sustainable Development, in particular the localization of the Sustainable Development Goals :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2025-07-08\",\"effective_year\":2025},{\"symbol\":\"E/2025/68\",\"proper_title\":\"Long-term impact of current trends on the realization of the Sustainable Development Goals :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\"}\",\"publication_date\":\"2025-05-09\",\"effective_year\":2025},{\"symbol\":\"E/2024/12/ADD.2\",\"proper_title\":\"Implementation of General Assembly resolution 75/233 on the quadrennial comprehensive policy review of operational activities for development of the United Nations System : funding compact for United Nations support to the Sustainable Development Goals :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\",\\\"General Assembly\\\"}\",\"publication_date\":\"2024-04-09\",\"effective_year\":2024},{\"symbol\":\"E/CN.3/2025/8\",\"proper_title\":\"Work for the review of progress towards the Sustainable Development Goals :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\"}\",\"publication_date\":\"2024-12-12\",\"effective_year\":2024},{\"symbol\":\"E/2024/55\",\"proper_title\":\"Long-term impacts of current trends on the realization of the Sustainable Development Goals :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\"}\",\"publication_date\":\"2024-05-03\",\"effective_year\":2024},{\"symbol\":\"SSC/21/2\",\"proper_title\":\"Measures taken by United Nations organizations to implement decision 20/1 of the High-level Committee on South-South Cooperation through support for South-South and triangular cooperation to bolster human solidarity and accelerate implementation of the Sustainable Development Goals in the Global South and beyond :\",\"title\":null,\"un_body\":null,\"publication_date\":\"2023-05-11\",\"effective_year\":2023},{\"symbol\":\"E/CN.3/2024/19\",\"proper_title\":\"Work on the review of progress towards the Sustainable Development Goals :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\"}\",\"publication_date\":\"2023-12-13\",\"effective_year\":2023},{\"symbol\":\"A/77/877\",\"proper_title\":\"Ensuring an equitable response to end the AIDS pandemic and accelerate progress for global health and the Sustainable Development Goals :\",\"title\":null,\"un_body\":\"{\\\"General Assembly\\\"}\",\"publication_date\":\"2023-05-08\",\"effective_year\":2023},{\"symbol\":\"E/2023/64\",\"proper_title\":\"Progress towards the Sustainable Development Goals : towards a rescue plan for people and planet :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\",\\\"General Assembly\\\"}\",\"publication_date\":\"2023-04-27\",\"effective_year\":2023},{\"symbol\":\"E/2023/89\",\"proper_title\":\"Long-term future trends and scenarios : impacts on the realization of the Sustainable Development Goals :\",\"title\":null,\"un_body\":\"{\\\"Economic and Social Council\\\"}\",\"publication_date\":\"2023-06-05\",\"effective_year\":2023}]}"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT symbol, proper_title, publication_date, un_body FROM sg_reports \\nWHERE symbol = 'E/2025/62'\",\"explanation\":\"Confirm E/2025/62 is in the SG reports view (i.e., a Secretary-General report).\"}",
+                "name": "query_database"
+              },
+              "id": "call_5ylYmS8TR0MFcDRsl9kB2lxW",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_5ylYmS8TR0MFcDRsl9kB2lxW",
+          "content": "{\"explanation\":\"Confirm E/2025/62 is in the SG reports view (i.e., a Secretary-General report).\",\"rowCount\":1,\"rows\":[{\"symbol\":\"E/2025/62\",\"proper_title\":\"Progress towards the Sustainable Development Goals :\",\"publication_date\":\"2025-04-29\",\"un_body\":\"{\\\"Economic and Social Council\\\",\\\"General Assembly\\\"}\"}]}"
+        },
+        {
+          "role": "assistant",
+          "content": "## Latest SDG progress report\nThe most recent SDG progress report is E/2025/62 (Progress towards the Sustainable Development Goals), issued on 2025-04-29 under ECOSOC/General Assembly.\n\n| Symbol | Proper title | Publication date | UN body |\n|---|---|---|---|\n| `E/2025/62` | Progress towards the Sustainable Development Goals : | 2025-04-29 | Economic and Social Council; General Assembly |\n\nWant a brief summary of key findings from E/2025/62?"
+        }
+      ],
+      "toolCalls": [
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT symbol, proper_title, title, un_body, publication_date, effective_year FROM latest_versions \nWHERE proper_title ILIKE '%Sustainable Development Goals%' OR title ILIKE '%Sustainable Development Goals%' OR title ILIKE '%SDG%' OR proper_title ILIKE '%SDG%'\nORDER BY effective_year DESC;",
+            "explanation": "Find latest-version records whose proper_title or title mentions Sustainable Development Goals (SDGs)."
+          },
+          "result": {
+            "explanation": "Find latest-version records whose proper_title or title mentions Sustainable Development Goals (SDGs).",
+            "rowCount": 13,
+            "rows": [
+              {
+                "symbol": "E/2025/62",
+                "proper_title": "Progress towards the Sustainable Development Goals :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\",\"General Assembly\"}",
+                "publication_date": "2025-04-29",
+                "effective_year": 2025
+              },
+              {
+                "symbol": "E/2025/69",
+                "proper_title": "Advancing sustainable, inclusive, science- and evidence-based solutions for the 2030 Agenda for Sustainable Development and its Sustainable Development Goals for leaving no one behind :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\"}",
+                "publication_date": "2025-05-09",
+                "effective_year": 2025
+              },
+              {
+                "symbol": "A/79/961",
+                "proper_title": "Impact of rapid technological change on the achievement of the Sustainable Development Goals and targets :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2025-06-30",
+                "effective_year": 2025
+              },
+              {
+                "symbol": "A/79/968",
+                "proper_title": "Recommendations on how engagement with local and regional authorities could advance the 2030 Agenda for Sustainable Development, in particular the localization of the Sustainable Development Goals :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2025-07-08",
+                "effective_year": 2025
+              },
+              {
+                "symbol": "E/2025/68",
+                "proper_title": "Long-term impact of current trends on the realization of the Sustainable Development Goals :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\"}",
+                "publication_date": "2025-05-09",
+                "effective_year": 2025
+              },
+              {
+                "symbol": "E/2024/12/ADD.2",
+                "proper_title": "Implementation of General Assembly resolution 75/233 on the quadrennial comprehensive policy review of operational activities for development of the United Nations System : funding compact for United Nations support to the Sustainable Development Goals :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\",\"General Assembly\"}",
+                "publication_date": "2024-04-09",
+                "effective_year": 2024
+              },
+              {
+                "symbol": "E/CN.3/2025/8",
+                "proper_title": "Work for the review of progress towards the Sustainable Development Goals :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\"}",
+                "publication_date": "2024-12-12",
+                "effective_year": 2024
+              },
+              {
+                "symbol": "E/2024/55",
+                "proper_title": "Long-term impacts of current trends on the realization of the Sustainable Development Goals :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\"}",
+                "publication_date": "2024-05-03",
+                "effective_year": 2024
+              },
+              {
+                "symbol": "SSC/21/2",
+                "proper_title": "Measures taken by United Nations organizations to implement decision 20/1 of the High-level Committee on South-South Cooperation through support for South-South and triangular cooperation to bolster human solidarity and accelerate implementation of the Sustainable Development Goals in the Global South and beyond :",
+                "title": null,
+                "un_body": null,
+                "publication_date": "2023-05-11",
+                "effective_year": 2023
+              },
+              {
+                "symbol": "E/CN.3/2024/19",
+                "proper_title": "Work on the review of progress towards the Sustainable Development Goals :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\"}",
+                "publication_date": "2023-12-13",
+                "effective_year": 2023
+              },
+              {
+                "symbol": "A/77/877",
+                "proper_title": "Ensuring an equitable response to end the AIDS pandemic and accelerate progress for global health and the Sustainable Development Goals :",
+                "title": null,
+                "un_body": "{\"General Assembly\"}",
+                "publication_date": "2023-05-08",
+                "effective_year": 2023
+              },
+              {
+                "symbol": "E/2023/64",
+                "proper_title": "Progress towards the Sustainable Development Goals : towards a rescue plan for people and planet :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\",\"General Assembly\"}",
+                "publication_date": "2023-04-27",
+                "effective_year": 2023
+              },
+              {
+                "symbol": "E/2023/89",
+                "proper_title": "Long-term future trends and scenarios : impacts on the realization of the Sustainable Development Goals :",
+                "title": null,
+                "un_body": "{\"Economic and Social Council\"}",
+                "publication_date": "2023-06-05",
+                "effective_year": 2023
+              }
+            ]
+          },
+          "success": true
+        },
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT symbol, proper_title, publication_date, un_body FROM sg_reports \nWHERE symbol = 'E/2025/62'",
+            "explanation": "Confirm E/2025/62 is in the SG reports view (i.e., a Secretary-General report)."
+          },
+          "result": {
+            "explanation": "Confirm E/2025/62 is in the SG reports view (i.e., a Secretary-General report).",
+            "rowCount": 1,
+            "rows": [
+              {
+                "symbol": "E/2025/62",
+                "proper_title": "Progress towards the Sustainable Development Goals :",
+                "publication_date": "2025-04-29",
+                "un_body": "{\"Economic and Social Council\",\"General Assembly\"}"
+              }
+            ]
+          },
+          "success": true
+        }
+      ],
+      "finalResponse": "## Latest SDG progress report\nThe most recent SDG progress report is E/2025/62 (Progress towards the Sustainable Development Goals), issued on 2025-04-29 under ECOSOC/General Assembly.\n\n| Symbol | Proper title | Publication date | UN body |\n|---|---|---|---|\n| `E/2025/62` | Progress towards the Sustainable Development Goals : | 2025-04-29 | Economic and Social Council; General Assembly |\n\nWant a brief summary of key findings from E/2025/62?",
+      "sqlQueries": [
+        "SELECT symbol, proper_title, title, un_body, publication_date, effective_year FROM latest_versions \nWHERE proper_title ILIKE '%Sustainable Development Goals%' OR title ILIKE '%Sustainable Development Goals%' OR title ILIKE '%SDG%' OR proper_title ILIKE '%SDG%'\nORDER BY effective_year DESC;",
+        "SELECT symbol, proper_title, publication_date, un_body FROM sg_reports \nWHERE symbol = 'E/2025/62'"
+      ],
+      "errors": [],
+      "iterations": 3
+    },
+    {
+      "testCase": {
+        "id": 6,
+        "prompt": "How many reports does each UN body submit?",
+        "expectedBehavior": "Should GROUP BY un_body and COUNT"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "How many reports does each UN body submit?"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT un_body, COUNT(*) AS report_count FROM latest_versions GROUP BY un_body ORDER BY report_count DESC;\",\"explanation\":\"Count reports by UN body using the most recent version per report series.\"}",
+                "name": "query_database"
+              },
+              "id": "call_h0iLLkZRftkKsJpfG5fb88Il",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_h0iLLkZRftkKsJpfG5fb88Il",
+          "content": "{\"explanation\":\"Count reports by UN body using the most recent version per report series.\",\"rowCount\":15,\"rows\":[{\"un_body\":\"{\\\"General Assembly\\\"}\",\"report_count\":\"430\"},{\"un_body\":\"{\\\"Security Council\\\"}\",\"report_count\":\"92\"},{\"un_body\":\"{\\\"Economic and Social Council\\\"}\",\"report_count\":\"58\"},{\"un_body\":\"{\\\"General Assembly\\\",\\\"Human Rights Bodies\\\"}\",\"report_count\":\"17\"},{\"un_body\":\"{\\\"Economic and Social Council\\\",\\\"General Assembly\\\"}\",\"report_count\":\"13\"},{\"un_body\":\"{\\\"General Assembly\\\",\\\"Security Council\\\"}\",\"report_count\":\"9\"},{\"un_body\":\"{\\\"General Assembly\\\",\\\"Research and Training Institutions\\\"}\",\"report_count\":\"4\"},{\"un_body\":null,\"report_count\":\"3\"},{\"un_body\":\"{\\\"General Assembly\\\",\\\"Other UN Bodies and Entities\\\"}\",\"report_count\":\"3\"},{\"un_body\":\"{Secretariat}\",\"report_count\":\"2\"},{\"un_body\":\"{\\\"Economic and Social Council\\\",\\\"General Assembly\\\",\\\"Other UN Bodies and Entities\\\"}\",\"report_count\":\"2\"},{\"un_body\":\"{\\\"General Assembly\\\",\\\"Programmes and Funds\\\"}\",\"report_count\":\"1\"},{\"un_body\":\"{\\\"General Assembly\\\",\\\"Human Rights Bodies\\\",\\\"Human Rights Bodies\\\"}\",\"report_count\":\"1\"},{\"un_body\":\"{\\\"Human Rights Bodies\\\"}\",\"report_count\":\"1\"},{\"un_body\":\"{\\\"General Assembly\\\",\\\"Economic Commissions\\\",\\\"Programmes and Funds\\\"}\",\"report_count\":\"1\"}]}"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT 'General Assembly' AS un_body, COUNT(*) AS report_count FROM latest_versions WHERE un_body ILIKE '%General Assembly%'\\nUNION ALL\\nSELECT 'Security Council' AS un_body, COUNT(*) FROM latest_versions WHERE un_body ILIKE '%Security Council%'\\nUNION ALL\\nSELECT 'Economic and Social Council' AS un_body, COUNT(*) FROM latest_versions WHERE un_body ILIKE '%Economic and Social Council%'\\nUNION ALL\\nSELECT 'Human Rights Bodies' AS un_body, COUNT(*) FROM latest_versions WHERE un_body ILIKE '%Human Rights Bodies%'\\nUNION ALL\\nSELECT 'Research and Training Institutions' AS un_body, COUNT(*) FROM latest_versions WHERE un_body ILIKE '%Research and Training Institutions%'\\nUNION ALL\\nSELECT 'Other UN Bodies and Entities' AS un_body, COUNT(*) FROM latest_versions WHERE un_body ILIKE '%Other UN Bodies and Entities%'\\nUNION ALL\\nSELECT 'Programmes and Funds' AS un_body, COUNT(*) FROM latest_versions WHERE un_body ILIKE '%Programmes and Funds%'\\nUNION ALL\\nSELECT 'Secretariat' AS un_body, COUNT(*) FROM latest_versions WHERE un_body ILIKE '%Secretariat%'\\nUNION ALL\\nSELECT 'Economic Commissions' AS un_body, COUNT(*) FROM latest_versions WHERE un_body ILIKE '%Economic Commissions%'\\nUNION ALL\\nSELECT 'Unspecified' AS un_body, COUNT(*) FROM latest_versions WHERE un_body IS NULL;\",\"explanation\":\"Count reports attributed to each UN body, counting multi-body submissions for every body they are submitted to; also include unspecified.\"}",
+                "name": "query_database"
+              },
+              "id": "call_K0PmUdQP52OsenYvT7zW7Jwd",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_K0PmUdQP52OsenYvT7zW7Jwd",
+          "content": "{\"explanation\":\"Count reports attributed to each UN body, counting multi-body submissions for every body they are submitted to; also include unspecified.\",\"rowCount\":10,\"rows\":[{\"un_body\":\"General Assembly\",\"report_count\":\"481\"},{\"un_body\":\"Security Council\",\"report_count\":\"101\"},{\"un_body\":\"Economic and Social Council\",\"report_count\":\"73\"},{\"un_body\":\"Human Rights Bodies\",\"report_count\":\"19\"},{\"un_body\":\"Research and Training Institutions\",\"report_count\":\"4\"},{\"un_body\":\"Other UN Bodies and Entities\",\"report_count\":\"5\"},{\"un_body\":\"Programmes and Funds\",\"report_count\":\"2\"},{\"un_body\":\"Secretariat\",\"report_count\":\"2\"},{\"un_body\":\"Economic Commissions\",\"report_count\":\"1\"},{\"un_body\":\"Unspecified\",\"report_count\":\"3\"}]}"
+        },
+        {
+          "role": "assistant",
+          "content": "## Summary\nGeneral Assembly submits the most reports (481), followed by the Security Council (101) and ECOSOC (73). Counts include reports submitted to multiple bodies, counted for each relevant body.\n\n## Reports by UN body (latest versions)\n| UN body | Report count |\n|---|---:|\n| General Assembly | 481 |\n| Security Council | 101 |\n| Economic and Social Council | 73 |\n| Human Rights Bodies | 19 |\n| Research and Training Institutions | 4 |\n| Other UN Bodies and Entities | 5 |\n| Programmes and Funds | 2 |\n| Secretariat | 2 |\n| Economic Commissions | 1 |\n| Unspecified | 3 |"
+        }
+      ],
+      "toolCalls": [
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT un_body, COUNT(*) AS report_count FROM latest_versions GROUP BY un_body ORDER BY report_count DESC;",
+            "explanation": "Count reports by UN body using the most recent version per report series."
+          },
+          "result": {
+            "explanation": "Count reports by UN body using the most recent version per report series.",
+            "rowCount": 15,
+            "rows": [
+              {
+                "un_body": "{\"General Assembly\"}",
+                "report_count": "430"
+              },
+              {
+                "un_body": "{\"Security Council\"}",
+                "report_count": "92"
+              },
+              {
+                "un_body": "{\"Economic and Social Council\"}",
+                "report_count": "58"
+              },
+              {
+                "un_body": "{\"General Assembly\",\"Human Rights Bodies\"}",
+                "report_count": "17"
+              },
+              {
+                "un_body": "{\"Economic and Social Council\",\"General Assembly\"}",
+                "report_count": "13"
+              },
+              {
+                "un_body": "{\"General Assembly\",\"Security Council\"}",
+                "report_count": "9"
+              },
+              {
+                "un_body": "{\"General Assembly\",\"Research and Training Institutions\"}",
+                "report_count": "4"
+              },
+              {
+                "un_body": null,
+                "report_count": "3"
+              },
+              {
+                "un_body": "{\"General Assembly\",\"Other UN Bodies and Entities\"}",
+                "report_count": "3"
+              },
+              {
+                "un_body": "{Secretariat}",
+                "report_count": "2"
+              },
+              {
+                "un_body": "{\"Economic and Social Council\",\"General Assembly\",\"Other UN Bodies and Entities\"}",
+                "report_count": "2"
+              },
+              {
+                "un_body": "{\"General Assembly\",\"Programmes and Funds\"}",
+                "report_count": "1"
+              },
+              {
+                "un_body": "{\"General Assembly\",\"Human Rights Bodies\",\"Human Rights Bodies\"}",
+                "report_count": "1"
+              },
+              {
+                "un_body": "{\"Human Rights Bodies\"}",
+                "report_count": "1"
+              },
+              {
+                "un_body": "{\"General Assembly\",\"Economic Commissions\",\"Programmes and Funds\"}",
+                "report_count": "1"
+              }
+            ]
+          },
+          "success": true
+        },
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT 'General Assembly' AS un_body, COUNT(*) AS report_count FROM latest_versions WHERE un_body ILIKE '%General Assembly%'\nUNION ALL\nSELECT 'Security Council' AS un_body, COUNT(*) FROM latest_versions WHERE un_body ILIKE '%Security Council%'\nUNION ALL\nSELECT 'Economic and Social Council' AS un_body, COUNT(*) FROM latest_versions WHERE un_body ILIKE '%Economic and Social Council%'\nUNION ALL\nSELECT 'Human Rights Bodies' AS un_body, COUNT(*) FROM latest_versions WHERE un_body ILIKE '%Human Rights Bodies%'\nUNION ALL\nSELECT 'Research and Training Institutions' AS un_body, COUNT(*) FROM latest_versions WHERE un_body ILIKE '%Research and Training Institutions%'\nUNION ALL\nSELECT 'Other UN Bodies and Entities' AS un_body, COUNT(*) FROM latest_versions WHERE un_body ILIKE '%Other UN Bodies and Entities%'\nUNION ALL\nSELECT 'Programmes and Funds' AS un_body, COUNT(*) FROM latest_versions WHERE un_body ILIKE '%Programmes and Funds%'\nUNION ALL\nSELECT 'Secretariat' AS un_body, COUNT(*) FROM latest_versions WHERE un_body ILIKE '%Secretariat%'\nUNION ALL\nSELECT 'Economic Commissions' AS un_body, COUNT(*) FROM latest_versions WHERE un_body ILIKE '%Economic Commissions%'\nUNION ALL\nSELECT 'Unspecified' AS un_body, COUNT(*) FROM latest_versions WHERE un_body IS NULL;",
+            "explanation": "Count reports attributed to each UN body, counting multi-body submissions for every body they are submitted to; also include unspecified."
+          },
+          "result": {
+            "explanation": "Count reports attributed to each UN body, counting multi-body submissions for every body they are submitted to; also include unspecified.",
+            "rowCount": 10,
+            "rows": [
+              {
+                "un_body": "General Assembly",
+                "report_count": "481"
+              },
+              {
+                "un_body": "Security Council",
+                "report_count": "101"
+              },
+              {
+                "un_body": "Economic and Social Council",
+                "report_count": "73"
+              },
+              {
+                "un_body": "Human Rights Bodies",
+                "report_count": "19"
+              },
+              {
+                "un_body": "Research and Training Institutions",
+                "report_count": "4"
+              },
+              {
+                "un_body": "Other UN Bodies and Entities",
+                "report_count": "5"
+              },
+              {
+                "un_body": "Programmes and Funds",
+                "report_count": "2"
+              },
+              {
+                "un_body": "Secretariat",
+                "report_count": "2"
+              },
+              {
+                "un_body": "Economic Commissions",
+                "report_count": "1"
+              },
+              {
+                "un_body": "Unspecified",
+                "report_count": "3"
+              }
+            ]
+          },
+          "success": true
+        }
+      ],
+      "finalResponse": "## Summary\nGeneral Assembly submits the most reports (481), followed by the Security Council (101) and ECOSOC (73). Counts include reports submitted to multiple bodies, counted for each relevant body.\n\n## Reports by UN body (latest versions)\n| UN body | Report count |\n|---|---:|\n| General Assembly | 481 |\n| Security Council | 101 |\n| Economic and Social Council | 73 |\n| Human Rights Bodies | 19 |\n| Research and Training Institutions | 4 |\n| Other UN Bodies and Entities | 5 |\n| Programmes and Funds | 2 |\n| Secretariat | 2 |\n| Economic Commissions | 1 |\n| Unspecified | 3 |",
+      "sqlQueries": [
+        "SELECT un_body, COUNT(*) AS report_count FROM latest_versions GROUP BY un_body ORDER BY report_count DESC;",
+        "SELECT 'General Assembly' AS un_body, COUNT(*) AS report_count FROM latest_versions WHERE un_body ILIKE '%General Assembly%'\nUNION ALL\nSELECT 'Security Council' AS un_body, COUNT(*) FROM latest_versions WHERE un_body ILIKE '%Security Council%'\nUNION ALL\nSELECT 'Economic and Social Council' AS un_body, COUNT(*) FROM latest_versions WHERE un_body ILIKE '%Economic and Social Council%'\nUNION ALL\nSELECT 'Human Rights Bodies' AS un_body, COUNT(*) FROM latest_versions WHERE un_body ILIKE '%Human Rights Bodies%'\nUNION ALL\nSELECT 'Research and Training Institutions' AS un_body, COUNT(*) FROM latest_versions WHERE un_body ILIKE '%Research and Training Institutions%'\nUNION ALL\nSELECT 'Other UN Bodies and Entities' AS un_body, COUNT(*) FROM latest_versions WHERE un_body ILIKE '%Other UN Bodies and Entities%'\nUNION ALL\nSELECT 'Programmes and Funds' AS un_body, COUNT(*) FROM latest_versions WHERE un_body ILIKE '%Programmes and Funds%'\nUNION ALL\nSELECT 'Secretariat' AS un_body, COUNT(*) FROM latest_versions WHERE un_body ILIKE '%Secretariat%'\nUNION ALL\nSELECT 'Economic Commissions' AS un_body, COUNT(*) FROM latest_versions WHERE un_body ILIKE '%Economic Commissions%'\nUNION ALL\nSELECT 'Unspecified' AS un_body, COUNT(*) FROM latest_versions WHERE un_body IS NULL;"
+      ],
+      "errors": [],
+      "iterations": 3
+    },
+    {
+      "testCase": {
+        "id": 7,
+        "prompt": "What subject terms are most common in SG reports?",
+        "expectedBehavior": "Should unnest subject_terms array and count"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "What subject terms are most common in SG reports?"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"WITH total AS (\\n  SELECT COUNT(*) AS n FROM sg_reports\\n)\\nSELECT term, COUNT(*) AS report_count,\\n       ROUND(100.0 * COUNT(*) / total.n, 1) AS pct\\nFROM (\\n  SELECT UNNEST(subject_terms) AS term\\n  FROM sg_reports\\n) s\\nCROSS JOIN total\\nGROUP BY term, total.n\\nORDER BY report_count DESC\\nLIMIT 15;\",\"explanation\":\"Identify the most frequent subject terms across all Secretary-General reports (2023+), including their counts and percentage of reports.\"}",
+                "name": "query_database"
+              },
+              "id": "call_WmKq7Z9ok6616ZqPTj0uL1Yq",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_WmKq7Z9ok6616ZqPTj0uL1Yq",
+          "content": "{\"error\":\"Only SELECT queries are allowed. Please retry with a corrected query.\"}"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT term,\\n       COUNT(*) AS report_count,\\n       ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM sg_reports), 1) AS pct\\nFROM (\\n  SELECT UNNEST(subject_terms) AS term\\n  FROM sg_reports\\n) s\\nGROUP BY term\\nORDER BY report_count DESC\\nLIMIT 15;\",\"explanation\":\"Most frequent subject terms across SG reports (2023+), with counts and percentage of reports.\"}",
+                "name": "query_database"
+              },
+              "id": "call_hFSOyaqGnydLY1n6CFFAUYRT",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_hFSOyaqGnydLY1n6CFFAUYRT",
+          "content": "{\"explanation\":\"Most frequent subject terms across SG reports (2023+), with counts and percentage of reports.\",\"rowCount\":15,\"rows\":[{\"term\":\"PEACEKEEPING OPERATIONS\",\"report_count\":\"215\",\"pct\":\"18.3\"},{\"term\":\"HUMANITARIAN ASSISTANCE\",\"report_count\":\"157\",\"pct\":\"13.4\"},{\"term\":\"INTERNAL SECURITY\",\"report_count\":\"141\",\"pct\":\"12.0\"},{\"term\":\"SUSTAINABLE DEVELOPMENT\",\"report_count\":\"140\",\"pct\":\"11.9\"},{\"term\":\"POLITICAL CONDITIONS\",\"report_count\":\"130\",\"pct\":\"11.1\"},{\"term\":\"HUMAN RIGHTS\",\"report_count\":\"121\",\"pct\":\"10.3\"},{\"term\":\"FINANCIAL RESOURCES\",\"report_count\":\"111\",\"pct\":\"9.5\"},{\"term\":\"PROGRAMME BUDGETING\",\"report_count\":\"82\",\"pct\":\"7.0\"},{\"term\":\"PEACEBUILDING\",\"report_count\":\"80\",\"pct\":\"6.8\"},{\"term\":\"RULE OF LAW\",\"report_count\":\"78\",\"pct\":\"6.6\"},{\"term\":\"COORDINATION WITHIN UN SYSTEM\",\"report_count\":\"76\",\"pct\":\"6.5\"},{\"term\":\"HUMAN RIGHTS IN ARMED CONFLICTS\",\"report_count\":\"73\",\"pct\":\"6.2\"},{\"term\":\"REGIONAL SECURITY\",\"report_count\":\"72\",\"pct\":\"6.1\"},{\"term\":\"ANALYSIS OF VARIANCE\",\"report_count\":\"69\",\"pct\":\"5.9\"},{\"term\":\"MAPS\",\"report_count\":\"65\",\"pct\":\"5.5\"}]}"
+        },
+        {
+          "role": "assistant",
+          "content": "## Top subject terms in SG reports (2023+)\n\nKey finding: Peacekeeping, humanitarian assistance, and security-related topics dominate SG reports.\n\n| Subject term | Report count | % of reports |\n|---|---:|---:|\n| PEACEKEEPING OPERATIONS | 215 | 18.3 |\n| HUMANITARIAN ASSISTANCE | 157 | 13.4 |\n| INTERNAL SECURITY | 141 | 12.0 |\n| SUSTAINABLE DEVELOPMENT | 140 | 11.9 |\n| POLITICAL CONDITIONS | 130 | 11.1 |\n| HUMAN RIGHTS | 121 | 10.3 |\n| FINANCIAL RESOURCES | 111 | 9.5 |\n| PROGRAMME BUDGETING | 82 | 7.0 |\n| PEACEBUILDING | 80 | 6.8 |\n| RULE OF LAW | 78 | 6.6 |\n| COORDINATION WITHIN UN SYSTEM | 76 | 6.5 |\n| HUMAN RIGHTS IN ARMED CONFLICTS | 73 | 6.2 |\n| REGIONAL SECURITY | 72 | 6.1 |\n| ANALYSIS OF VARIANCE | 69 | 5.9 |\n| MAPS | 65 | 5.5 |"
+        }
+      ],
+      "toolCalls": [
+        {
+          "name": "query_database",
+          "args": {
+            "query": "WITH total AS (\n  SELECT COUNT(*) AS n FROM sg_reports\n)\nSELECT term, COUNT(*) AS report_count,\n       ROUND(100.0 * COUNT(*) / total.n, 1) AS pct\nFROM (\n  SELECT UNNEST(subject_terms) AS term\n  FROM sg_reports\n) s\nCROSS JOIN total\nGROUP BY term, total.n\nORDER BY report_count DESC\nLIMIT 15;",
+            "explanation": "Identify the most frequent subject terms across all Secretary-General reports (2023+), including their counts and percentage of reports."
+          },
+          "result": "Only SELECT queries are allowed. Please retry with a corrected query.",
+          "success": false
+        },
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT term,\n       COUNT(*) AS report_count,\n       ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM sg_reports), 1) AS pct\nFROM (\n  SELECT UNNEST(subject_terms) AS term\n  FROM sg_reports\n) s\nGROUP BY term\nORDER BY report_count DESC\nLIMIT 15;",
+            "explanation": "Most frequent subject terms across SG reports (2023+), with counts and percentage of reports."
+          },
+          "result": {
+            "explanation": "Most frequent subject terms across SG reports (2023+), with counts and percentage of reports.",
+            "rowCount": 15,
+            "rows": [
+              {
+                "term": "PEACEKEEPING OPERATIONS",
+                "report_count": "215",
+                "pct": "18.3"
+              },
+              {
+                "term": "HUMANITARIAN ASSISTANCE",
+                "report_count": "157",
+                "pct": "13.4"
+              },
+              {
+                "term": "INTERNAL SECURITY",
+                "report_count": "141",
+                "pct": "12.0"
+              },
+              {
+                "term": "SUSTAINABLE DEVELOPMENT",
+                "report_count": "140",
+                "pct": "11.9"
+              },
+              {
+                "term": "POLITICAL CONDITIONS",
+                "report_count": "130",
+                "pct": "11.1"
+              },
+              {
+                "term": "HUMAN RIGHTS",
+                "report_count": "121",
+                "pct": "10.3"
+              },
+              {
+                "term": "FINANCIAL RESOURCES",
+                "report_count": "111",
+                "pct": "9.5"
+              },
+              {
+                "term": "PROGRAMME BUDGETING",
+                "report_count": "82",
+                "pct": "7.0"
+              },
+              {
+                "term": "PEACEBUILDING",
+                "report_count": "80",
+                "pct": "6.8"
+              },
+              {
+                "term": "RULE OF LAW",
+                "report_count": "78",
+                "pct": "6.6"
+              },
+              {
+                "term": "COORDINATION WITHIN UN SYSTEM",
+                "report_count": "76",
+                "pct": "6.5"
+              },
+              {
+                "term": "HUMAN RIGHTS IN ARMED CONFLICTS",
+                "report_count": "73",
+                "pct": "6.2"
+              },
+              {
+                "term": "REGIONAL SECURITY",
+                "report_count": "72",
+                "pct": "6.1"
+              },
+              {
+                "term": "ANALYSIS OF VARIANCE",
+                "report_count": "69",
+                "pct": "5.9"
+              },
+              {
+                "term": "MAPS",
+                "report_count": "65",
+                "pct": "5.5"
+              }
+            ]
+          },
+          "success": true
+        }
+      ],
+      "finalResponse": "## Top subject terms in SG reports (2023+)\n\nKey finding: Peacekeeping, humanitarian assistance, and security-related topics dominate SG reports.\n\n| Subject term | Report count | % of reports |\n|---|---:|---:|\n| PEACEKEEPING OPERATIONS | 215 | 18.3 |\n| HUMANITARIAN ASSISTANCE | 157 | 13.4 |\n| INTERNAL SECURITY | 141 | 12.0 |\n| SUSTAINABLE DEVELOPMENT | 140 | 11.9 |\n| POLITICAL CONDITIONS | 130 | 11.1 |\n| HUMAN RIGHTS | 121 | 10.3 |\n| FINANCIAL RESOURCES | 111 | 9.5 |\n| PROGRAMME BUDGETING | 82 | 7.0 |\n| PEACEBUILDING | 80 | 6.8 |\n| RULE OF LAW | 78 | 6.6 |\n| COORDINATION WITHIN UN SYSTEM | 76 | 6.5 |\n| HUMAN RIGHTS IN ARMED CONFLICTS | 73 | 6.2 |\n| REGIONAL SECURITY | 72 | 6.1 |\n| ANALYSIS OF VARIANCE | 69 | 5.9 |\n| MAPS | 65 | 5.5 |",
+      "sqlQueries": [
+        "WITH total AS (\n  SELECT COUNT(*) AS n FROM sg_reports\n)\nSELECT term, COUNT(*) AS report_count,\n       ROUND(100.0 * COUNT(*) / total.n, 1) AS pct\nFROM (\n  SELECT UNNEST(subject_terms) AS term\n  FROM sg_reports\n) s\nCROSS JOIN total\nGROUP BY term, total.n\nORDER BY report_count DESC\nLIMIT 15;",
+        "SELECT term,\n       COUNT(*) AS report_count,\n       ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM sg_reports), 1) AS pct\nFROM (\n  SELECT UNNEST(subject_terms) AS term\n  FROM sg_reports\n) s\nGROUP BY term\nORDER BY report_count DESC\nLIMIT 15;"
+      ],
+      "errors": [
+        "Tool query_database failed: Only SELECT queries are allowed. Please retry with a corrected query."
+      ],
+      "iterations": 3
+    },
+    {
+      "testCase": {
+        "id": 8,
+        "prompt": "List reports that have survey responses with status 'continue'",
+        "expectedBehavior": "Should join sg_reports with survey_responses"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "List reports that have survey responses with status 'continue'"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT sr.proper_title, lv.symbol, lv.un_body, lv.effective_year, sr.user_entity, sr.frequency, sr.format\\nFROM survey_responses sr\\nLEFT JOIN latest_versions lv ON sr.proper_title = lv.proper_title\\nWHERE sr.status = 'continue'\\nORDER BY sr.proper_title;\",\"explanation\":\"List all survey responses marked 'continue' and show the latest report symbol and year for each.\"}",
+                "name": "query_database"
+              },
+              "id": "call_nL1AMy5RgYHPl1ewWRvAz8ae",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_nL1AMy5RgYHPl1ewWRvAz8ae",
+          "content": "{\"error\":\"Schema-prefixed table 'sr.proper_title' is not allowed. Use table names directly: documents, sg_reports, latest_versions, report_entity_suggestions, report_entity_confirmations, report_frequency_confirmations, report_frequencies, survey_responses. Please retry with a corrected query.\"}"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT survey_responses.proper_title, latest_versions.symbol, latest_versions.un_body, latest_versions.effective_year, survey_responses.user_entity, survey_responses.frequency, survey_responses.format\\nFROM survey_responses\\nLEFT JOIN latest_versions ON survey_responses.proper_title = latest_versions.proper_title\\nWHERE survey_responses.status = 'continue'\\nORDER BY survey_responses.proper_title;\",\"explanation\":\"List all survey responses marked 'continue' and show the latest report symbol and year for each.\"}",
+                "name": "query_database"
+              },
+              "id": "call_dbX6bZvY5wN2gfcJdkK2eo6H",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_dbX6bZvY5wN2gfcJdkK2eo6H",
+          "content": "{\"explanation\":\"List all survey responses marked 'continue' and show the latest report symbol and year for each.\",\"rowCount\":0,\"rows\":[]}"
+        },
+        {
+          "role": "assistant",
+          "content": "## Summary\nNo reports have survey responses marked with status 'continue'.\n\n## Results\n| proper_title | symbol | un_body | effective_year | user_entity | frequency | format |\n|---|---|---|---|---|---|---|\n|  |  |  |  |  |  |  |\n\nNo records found."
+        }
+      ],
+      "toolCalls": [
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT sr.proper_title, lv.symbol, lv.un_body, lv.effective_year, sr.user_entity, sr.frequency, sr.format\nFROM survey_responses sr\nLEFT JOIN latest_versions lv ON sr.proper_title = lv.proper_title\nWHERE sr.status = 'continue'\nORDER BY sr.proper_title;",
+            "explanation": "List all survey responses marked 'continue' and show the latest report symbol and year for each."
+          },
+          "result": "Schema-prefixed table 'sr.proper_title' is not allowed. Use table names directly: documents, sg_reports, latest_versions, report_entity_suggestions, report_entity_confirmations, report_frequency_confirmations, report_frequencies, survey_responses. Please retry with a corrected query.",
+          "success": false
+        },
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT survey_responses.proper_title, latest_versions.symbol, latest_versions.un_body, latest_versions.effective_year, survey_responses.user_entity, survey_responses.frequency, survey_responses.format\nFROM survey_responses\nLEFT JOIN latest_versions ON survey_responses.proper_title = latest_versions.proper_title\nWHERE survey_responses.status = 'continue'\nORDER BY survey_responses.proper_title;",
+            "explanation": "List all survey responses marked 'continue' and show the latest report symbol and year for each."
+          },
+          "result": {
+            "explanation": "List all survey responses marked 'continue' and show the latest report symbol and year for each.",
+            "rowCount": 0,
+            "rows": []
+          },
+          "success": true
+        }
+      ],
+      "finalResponse": "## Summary\nNo reports have survey responses marked with status 'continue'.\n\n## Results\n| proper_title | symbol | un_body | effective_year | user_entity | frequency | format |\n|---|---|---|---|---|---|---|\n|  |  |  |  |  |  |  |\n\nNo records found.",
+      "sqlQueries": [
+        "SELECT sr.proper_title, lv.symbol, lv.un_body, lv.effective_year, sr.user_entity, sr.frequency, sr.format\nFROM survey_responses sr\nLEFT JOIN latest_versions lv ON sr.proper_title = lv.proper_title\nWHERE sr.status = 'continue'\nORDER BY sr.proper_title;",
+        "SELECT survey_responses.proper_title, latest_versions.symbol, latest_versions.un_body, latest_versions.effective_year, survey_responses.user_entity, survey_responses.frequency, survey_responses.format\nFROM survey_responses\nLEFT JOIN latest_versions ON survey_responses.proper_title = latest_versions.proper_title\nWHERE survey_responses.status = 'continue'\nORDER BY survey_responses.proper_title;"
+      ],
+      "errors": [
+        "Tool query_database failed: Schema-prefixed table 'sr.proper_title' is not allowed. Use table names directly: documents, sg_reports, latest_versions, report_entity_suggestions, report_entity_confirmations, report_frequency_confirmations, report_frequencies, survey_responses. Please retry with a corrected query."
+      ],
+      "iterations": 3
+    },
+    {
+      "testCase": {
+        "id": 9,
+        "prompt": "Show reports with biennial frequency",
+        "expectedBehavior": "Should use report_frequencies table"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "Show reports with biennial frequency"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT rf.proper_title, lv.symbol, lv.entity, lv.effective_year FROM report_frequencies rf\\nJOIN latest_versions lv ON rf.proper_title = lv.proper_title\\nWHERE rf.calculated_frequency = 'biennial'\\nORDER BY rf.proper_title;\",\"explanation\":\"List all reports marked as biennial, showing latest symbol and entity.\"}",
+                "name": "query_database"
+              },
+              "id": "call_nLW9HriBHuC6eJmY2PzJLErM",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_nLW9HriBHuC6eJmY2PzJLErM",
+          "content": "{\"error\":\"Schema-prefixed table 'rf.proper_title' is not allowed. Use table names directly: documents, sg_reports, latest_versions, report_entity_suggestions, report_entity_confirmations, report_frequency_confirmations, report_frequencies, survey_responses. Please retry with a corrected query.\"}"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT report_frequencies.proper_title, latest_versions.symbol, latest_versions.entity, latest_versions.effective_year\\nFROM report_frequencies\\nJOIN latest_versions ON report_frequencies.proper_title = latest_versions.proper_title\\nWHERE report_frequencies.calculated_frequency = 'biennial'\\nORDER BY report_frequencies.proper_title;\",\"explanation\":\"List all reports marked as biennial with latest symbol, entity, and year.\"}",
+                "name": "query_database"
+              },
+              "id": "call_Hvzqlv2LNKyUkBnuYJuZpgnE",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_Hvzqlv2LNKyUkBnuYJuZpgnE",
+          "content": "{\"explanation\":\"List all reports marked as biennial with latest symbol, entity, and year.\",\"rowCount\":67,\"rows\":[{\"proper_title\":\"Addressing and countering the world drug problem through a comprehensive, integrated and balanced approach :\",\"symbol\":\"A/79/120\",\"entity\":\"UNODC\",\"effective_year\":2024},{\"proper_title\":\"Addressing the deteriorating conditions and limited capacity of the conference services facilities at the United Nations Office at Nairobi :\",\"symbol\":\"A/80/281\",\"entity\":\"DMSPC\",\"effective_year\":2025},{\"proper_title\":\"Agricultural technology for sustainable development :\",\"symbol\":\"A/80/377\",\"entity\":\"DESA\",\"effective_year\":2025},{\"proper_title\":\"Assistance in mine action :\",\"symbol\":\"A/80/272\",\"entity\":\"DPO\",\"effective_year\":2025},{\"proper_title\":\"Children and armed conflict in Afghanistan :\",\"symbol\":\"S/2023/893\",\"entity\":\"SRSG-CAAC\",\"effective_year\":2023},{\"proper_title\":\"Children and armed conflict in South Sudan :\",\"symbol\":\"S/2025/317\",\"entity\":\"SRSG-CAAC\",\"effective_year\":2025},{\"proper_title\":\"Children and armed conflict in the Philippines :\",\"symbol\":\"S/2024/626\",\"entity\":\"DPPA\",\"effective_year\":2024},{\"proper_title\":\"Children and armed conflict in the Syrian Arab Republic :\",\"symbol\":\"S/2025/535\",\"entity\":\"DPPA\",\"effective_year\":2025},{\"proper_title\":\"Climate change statistics :\",\"symbol\":\"E/CN.3/2024/20\",\"entity\":\"DESA\",\"effective_year\":2023},{\"proper_title\":\"Consideration of effective measures to enhance the protection, security and safety of diplomatic and consular missions and representatives :\",\"symbol\":\"A/79/143\",\"entity\":\"OLA\",\"effective_year\":2024},{\"proper_title\":\"Cooperatives in social development :\",\"symbol\":\"A/80/168\",\"entity\":\"DESA\",\"effective_year\":2025},{\"proper_title\":\"Countering the threat posed by improvised explosive devices :\",\"symbol\":\"A/79/211\",\"entity\":\"ODA\",\"effective_year\":2024},{\"proper_title\":\"Development cooperation with middle-income countries :\",\"symbol\":\"A/80/418\",\"entity\":\"DESA\",\"effective_year\":2025},{\"proper_title\":\"Disability statistics :\",\"symbol\":\"E/CN.3/2026/25\",\"entity\":\"DESA\",\"effective_year\":2025},{\"proper_title\":\"Effective promotion of the Declaration on the Rights of Persons Belonging to National or Ethnic, Religious and Linguistic Minorities :\",\"symbol\":\"A/80/288\",\"entity\":\"OHCHR\",\"effective_year\":2025},{\"proper_title\":\"Effects of the use of armaments and ammunitions containing depleted uranium :\",\"symbol\":\"A/79/96\",\"entity\":\"ODA\",\"effective_year\":2024},{\"proper_title\":\"Entrepreneurship for sustainable development :\",\"symbol\":\"A/79/208\",\"entity\":\"DESA\",\"effective_year\":2024},{\"proper_title\":\"Extraordinary Chambers in the Courts of Cambodia - residual functions :\",\"symbol\":\"A/79/827\",\"entity\":\"DMSPC\",\"effective_year\":2025},{\"proper_title\":\"Fulfilling the promise of globalization : advancing sustainable development in an interconnected world :\",\"symbol\":\"A/79/321\",\"entity\":\"DESA\",\"effective_year\":2024},{\"proper_title\":\"Gender statistics :\",\"symbol\":\"E/CN.3/2026/24\",\"entity\":\"DESA\",\"effective_year\":2025},{\"proper_title\":\"Harmony with nature :\",\"symbol\":\"A/79/253\",\"entity\":\"DESA\",\"effective_year\":2024},{\"proper_title\":\"Human resources development :\",\"symbol\":\"A/79/257\",\"entity\":\"DESA\",\"effective_year\":2024},{\"proper_title\":\"Human rights in the administration of justice :\",\"symbol\":\"A/79/296\",\"entity\":\"OHCHR\",\"effective_year\":2024},{\"proper_title\":\"Impact of rapid technological change on the achievement of the Sustainable Development Goals and targets :\",\"symbol\":\"A/79/961\",\"entity\":\"EOSG\",\"effective_year\":2025},{\"proper_title\":\"Implementation of the provisions of the Charter of the United Nations related to assistance to 3rd States affected by the application of sanctions :\",\"symbol\":\"A/80/151\",\"entity\":\"OLA\",\"effective_year\":2025},{\"proper_title\":\"Improvement in the status of women in the United Nations System :\",\"symbol\":\"A/80/260\",\"entity\":\"DMSPC\",\"effective_year\":2025},{\"proper_title\":\"Improvement of the situation of women and girls in rural areas :\",\"symbol\":\"A/80/262\",\"entity\":\"DESA\",\"effective_year\":2025},{\"proper_title\":\"Improving the coordination of efforts against trafficking in persons :\",\"symbol\":\"A/80/234\",\"entity\":\"UNODC\",\"effective_year\":2025},{\"proper_title\":\"Inclusive policies and programmes to address homelessness :\",\"symbol\":\"A/80/316\",\"entity\":\"DESA\",\"effective_year\":2025},{\"proper_title\":\"Intensifying global efforts for the elimination of female genital mutilation :\",\"symbol\":\"A/79/514\",\"entity\":null,\"effective_year\":2024},{\"proper_title\":\"International Convention for the Protection of All Persons from Enforced Disappearance :\",\"symbol\":\"A/80/298\",\"entity\":\"OHCHR\",\"effective_year\":2025},{\"proper_title\":\"International migration and development :\",\"symbol\":\"A/79/323\",\"entity\":\"DESA\",\"effective_year\":2024},{\"proper_title\":\"Measures taken and progress achieved in follow-up to and implementation of the Beijing Declaration and Platform for Action and the outcome of the 23rd special session of the General Assembly :\",\"symbol\":\"A/80/261\",\"entity\":null,\"effective_year\":2025},{\"proper_title\":\"Missing persons :\",\"symbol\":\"A/79/282\",\"entity\":null,\"effective_year\":2024},{\"proper_title\":\"Mongolia's international security and nuclear-weapon-free status :\",\"symbol\":\"A/79/148\",\"entity\":\"ODA\",\"effective_year\":2024},{\"proper_title\":\"Moratorium on the use of the death penalty :\",\"symbol\":\"A/79/276\",\"entity\":\"OHCHR\",\"effective_year\":2024},{\"proper_title\":\"Multilingualism :\",\"symbol\":\"A/78/790\",\"entity\":null,\"effective_year\":2024},{\"proper_title\":\"Promoting social integration through social inclusion :\",\"symbol\":\"A/80/155\",\"entity\":\"DESA\",\"effective_year\":2025},{\"proper_title\":\"Promotion of equitable geographical distribution in the membership of the human rights treaty bodies :\",\"symbol\":\"A/80/299\",\"entity\":\"OHCHR\",\"effective_year\":2025},{\"proper_title\":\"Question of the realization in all countries of economic, social and cultural rights :\",\"symbol\":\"A/HRC/58/37\",\"entity\":\"OHCHR\",\"effective_year\":2025},{\"proper_title\":\"Safety of journalists and the issue of impunity :\",\"symbol\":\"A/80/345\",\"entity\":\"OHCHR\",\"effective_year\":2025},{\"proper_title\":\"Science, technology and innovation for sustainable development :\",\"symbol\":\"A/80/221\",\"entity\":\"DESA\",\"effective_year\":2025},{\"proper_title\":\"Small arms and light weapons :\",\"symbol\":\"S/2025/670\",\"entity\":\"DPPA\",\"effective_year\":2025},{\"proper_title\":\"Status of the Convention on the Rights of the Child :\",\"symbol\":\"A/80/296\",\"entity\":\"OHCHR\",\"effective_year\":2025},{\"proper_title\":\"Strengthening cooperation for integrated coastal zone management for achieving sustainable development :\",\"symbol\":\"A/80/330\",\"entity\":\"UNEP\",\"effective_year\":2025},{\"proper_title\":\"Strengthening the role of the United Nations in enhancing periodic and genuine elections and the promotion of democratization :\",\"symbol\":\"A/80/277\",\"entity\":\"DPPA\",\"effective_year\":2025},{\"proper_title\":\"Strengthening United Nations action in the field of human rights through the promotion of international cooperation and the importance of non-selectivity, impartiality and objectivity :\",\"symbol\":\"A/80/304\",\"entity\":\"OHCHR\",\"effective_year\":2025},{\"proper_title\":\"Subregional Centre for Human Rights and Democracy in Central Africa :\",\"symbol\":\"A/80/297\",\"entity\":\"OHCHR\",\"effective_year\":2025},{\"proper_title\":\"Supply chain activities in the United Nations Secretariat :\",\"symbol\":\"A/80/467\",\"entity\":\"DOS\",\"effective_year\":2025},{\"proper_title\":\"Sustainable and resilient tourism and sustainable development in Central America and the Dominican Republic :\",\"symbol\":\"A/80/267\",\"entity\":\"DESA\",\"effective_year\":2025},{\"proper_title\":\"Sustainable tourism and sustainable development in Central America :\",\"symbol\":\"A/78/210\",\"entity\":\"DESA\",\"effective_year\":2023},{\"proper_title\":\"Terrorism and human rights :\",\"symbol\":\"A/80/380\",\"entity\":\"OHCHR\",\"effective_year\":2025},{\"proper_title\":\"Towards a new international economic order :\",\"symbol\":\"A/79/320\",\"entity\":\"DESA\",\"effective_year\":2024},{\"proper_title\":\"Towards the sustainable development of the Caribbean Sea for present and future generations :\",\"symbol\":\"A/79/399\",\"entity\":\"DESA\",\"effective_year\":2024},{\"proper_title\":\"Unilateral economic measures as a means of political and economic coercion against developing countries :\",\"symbol\":\"A/80/415\",\"entity\":\"DESA\",\"effective_year\":2025},{\"proper_title\":\"United Nations African Institute for the Prevention of Crime and the Treatment of Offenders :\",\"symbol\":\"A/79/247\",\"entity\":\"UNODC\",\"effective_year\":2024},{\"proper_title\":\"United Nations Disarmament Information Programme :\",\"symbol\":\"A/79/98\",\"entity\":\"ODA\",\"effective_year\":2024},{\"proper_title\":\"United Nations Human Rights Training and Documentation Centre for South-West Asia and the Arab Region :\",\"symbol\":\"A/80/305\",\"entity\":\"OHCHR\",\"effective_year\":2025},{\"proper_title\":\"United Nations Institute for Training and Research :\",\"symbol\":\"E/2025/50\",\"entity\":\"DESA\",\"effective_year\":2025},{\"proper_title\":\"United Nations System Staff College :\",\"symbol\":\"E/2025/52\",\"entity\":\"DESA\",\"effective_year\":2025},{\"proper_title\":\"Universal health coverage :\",\"symbol\":\"A/79/956\",\"entity\":\"DESA\",\"effective_year\":2025},{\"proper_title\":\"Violence against women migrant workers :\",\"symbol\":\"A/80/317\",\"entity\":\"DESA\",\"effective_year\":2025},{\"proper_title\":\"Women, disarmament, non-proliferation and arms control :\",\"symbol\":\"A/79/217\",\"entity\":\"ODA\",\"effective_year\":2024},{\"proper_title\":\"Women in development :\",\"symbol\":\"A/79/210\",\"entity\":\"DESA\",\"effective_year\":2024},{\"proper_title\":\"Work of the Committee of Experts on the Transport of Dangerous Goods and on the Globally Harmonized System of Classification and Labelling of Chemicals :\",\"symbol\":\"E/2025/72\",\"entity\":\"DESA\",\"effective_year\":2025},{\"proper_title\":\"World commodity trends and prospects :\",\"symbol\":\"A/80/120\",\"entity\":\"UNCTAD\",\"effective_year\":2025},{\"proper_title\":\"Youth, disarmament and non-proliferation :\",\"symbol\":\"A/80/165\",\"entity\":\"ODA\",\"effective_year\":2025}]}"
+        },
+        {
+          "role": "assistant",
+          "content": "## Biennial reports (latest versions)\n- 67 reports identified; latest versions span 2023–2025.\n- Main entities include DESA, OHCHR, ODA, DPPA, UNODC, DMSPC, and others.\n\n| Proper title | Symbol | Entity | Latest year |\n|---|---|---|---|\n| Addressing and countering the world drug problem through a comprehensive, integrated and balanced approach : | `A/79/120` | UNODC | 2024 |\n| Addressing the deteriorating conditions and limited capacity of the conference services facilities at the United Nations Office at Nairobi : | `A/80/281` | DMSPC | 2025 |\n| Agricultural technology for sustainable development : | `A/80/377` | DESA | 2025 |\n| Assistance in mine action : | `A/80/272` | DPO | 2025 |\n| Children and armed conflict in Afghanistan : | `S/2023/893` | SRSG-CAAC | 2023 |\n| Children and armed conflict in South Sudan : | `S/2025/317` | SRSG-CAAC | 2025 |\n| Children and armed conflict in the Philippines : | `S/2024/626` | DPPA | 2024 |\n| Children and armed conflict in the Syrian Arab Republic : | `S/2025/535` | DPPA | 2025 |\n| Climate change statistics : | `E/CN.3/2024/20` | DESA | 2023 |\n| Consideration of effective measures to enhance the protection, security and safety of diplomatic and consular missions and representatives : | `A/79/143` | OLA | 2024 |\n| Cooperatives in social development : | `A/80/168` | DESA | 2025 |\n| Countering the threat posed by improvised explosive devices : | `A/79/211` | ODA | 2024 |\n| Development cooperation with middle-income countries : | `A/80/418` | DESA | 2025 |\n| Disability statistics : | `E/CN.3/2026/25` | DESA | 2025 |\n| Effective promotion of the Declaration on the Rights of Persons Belonging to National or Ethnic, Religious and Linguistic Minorities : | `A/80/288` | OHCHR | 2025 |\n| Effects of the use of armaments and ammunitions containing depleted uranium : | `A/79/96` | ODA | 2024 |\n| Entrepreneurship for sustainable development : | `A/79/208` | DESA | 2024 |\n| Extraordinary Chambers in the Courts of Cambodia - residual functions : | `A/79/827` | DMSPC | 2025 |\n| Fulfilling the promise of globalization : advancing sustainable development in an interconnected world : | `A/79/321` | DESA | 2024 |\n| Gender statistics : | `E/CN.3/2026/24` | DESA | 2025 |\n| Harmony with nature : | `A/79/253` | DESA | 2024 |\n| Human resources development : | `A/79/257` | DESA | 2024 |\n| Human rights in the administration of justice : | `A/79/296` | OHCHR | 2024 |\n| Impact of rapid technological change on the achievement of the Sustainable Development Goals and targets : | `A/79/961` | EOSG | 2025 |\n| Implementation of the provisions of the Charter of the United Nations related to assistance to 3rd States affected by the application of sanctions : | `A/80/151` | OLA | 2025 |\n| Improvement in the status of women in the United Nations System : | `A/80/260` | DMSPC | 2025 |\n| Improvement of the situation of women and girls in rural areas : | `A/80/262` | DESA | 2025 |\n| Improving the coordination of efforts against trafficking in persons : | `A/80/234` | UNODC | 2025 |\n| Inclusive policies and programmes to address homelessness : | `A/80/316` | DESA | 2025 |\n| Intensifying global efforts for the elimination of female genital mutilation : | `A/79/514` |  | 2024 |\n| International Convention for the Protection of All Persons from Enforced Disappearance : | `A/80/298` | OHCHR | 2025 |\n| International migration and development : | `A/79/323` | DESA | 2024 |\n| Measures taken and progress achieved in follow-up to and implementation of the Beijing Declaration and Platform for Action and the outcome of the 23rd special session of the General Assembly : | `A/80/261` |  | 2025 |\n| Missing persons : | `A/79/282` |  | 2024 |\n| Mongolia's international security and nuclear-weapon-free status : | `A/79/148` | ODA | 2024 |\n| Moratorium on the use of the death penalty : | `A/79/276` | OHCHR | 2024 |\n| Multilingualism : | `A/78/790` |  | 2024 |\n| Promoting social integration through social inclusion : | `A/80/155` | DESA | 2025 |\n| Promotion of equitable geographical distribution in the membership of the human rights treaty bodies : | `A/80/299` | OHCHR | 2025 |\n| Question of the realization in all countries of economic, social and cultural rights : | `A/HRC/58/37` | OHCHR | 2025 |\n| Safety of journalists and the issue of impunity : | `A/80/345` | OHCHR | 2025 |\n| Science, technology and innovation for sustainable development : | `A/80/221` | DESA | 2025 |\n| Small arms and light weapons : | `S/2025/670` | DPPA | 2025 |\n| Status of the Convention on the Rights of the Child : | `A/80/296` | OHCHR | 2025 |\n| Strengthening cooperation for integrated coastal zone management for achieving sustainable development : | `A/80/330` | UNEP | 2025 |\n| Strengthening the role of the United Nations in enhancing periodic and genuine elections and the promotion of democratization : | `A/80/277` | DPPA | 2025 |\n| Strengthening United Nations action in the field of human rights through the promotion of international cooperation and the importance of non-selectivity, impartiality and objectivity : | `A/80/304` | OHCHR | 2025 |\n| Subregional Centre for Human Rights and Democracy in Central Africa : | `A/80/297` | OHCHR | 2025 |\n| Supply chain activities in the United Nations Secretariat : | `A/80/467` | DOS | 2025 |\n| Sustainable and resilient tourism and sustainable development in Central America and the Dominican Republic : | `A/80/267` | DESA | 2025 |\n| Sustainable tourism and sustainable development in Central America : | `A/78/210` | DESA | 2023 |\n| Terrorism and human rights : | `A/80/380` | OHCHR | 2025 |\n| Towards a new international economic order : | `A/79/320` | DESA | 2024 |\n| Towards the sustainable development of the Caribbean Sea for present and future generations : | `A/79/399` | DESA | 2024 |\n| Unilateral economic measures as a means of political and economic coercion against developing countries : | `A/80/415` | DESA | 2025 |\n| United Nations African Institute for the Prevention of Crime and the Treatment of Offenders : | `A/79/247` | UNODC | 2024 |\n| United Nations Disarmament Information Programme : | `A/79/98` | ODA | 2024 |\n| United Nations Human Rights Training and Documentation Centre for South-West Asia and the Arab Region : | `A/80/305` | OHCHR | 2025 |\n| United Nations Institute for Training and Research : | `E/2025/50` | DESA | 2025 |\n| United Nations System Staff College : | `E/2025/52` | DESA | 2025 |\n| Universal health coverage : | `A/79/956` | DESA | 2025 |\n| Violence against women migrant workers : | `A/80/317` | DESA | 2025 |\n| Women, disarmament, non-proliferation and arms control : | `A/79/217` | ODA | 2024 |\n| Women in development : | `A/79/210` | DESA | 2024 |\n| Work of the Committee of Experts on the Transport of Dangerous Goods and on the Globally Harmonized System of Classification and Labelling of Chemicals : | `E/2025/72` | DESA | 2025 |\n| World commodity trends and prospects : | `A/80/120` | UNCTAD | 2025 |\n| Youth, disarmament and non-proliferation : | `A/80/165` | ODA | 2025 |"
+        }
+      ],
+      "toolCalls": [
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT rf.proper_title, lv.symbol, lv.entity, lv.effective_year FROM report_frequencies rf\nJOIN latest_versions lv ON rf.proper_title = lv.proper_title\nWHERE rf.calculated_frequency = 'biennial'\nORDER BY rf.proper_title;",
+            "explanation": "List all reports marked as biennial, showing latest symbol and entity."
+          },
+          "result": "Schema-prefixed table 'rf.proper_title' is not allowed. Use table names directly: documents, sg_reports, latest_versions, report_entity_suggestions, report_entity_confirmations, report_frequency_confirmations, report_frequencies, survey_responses. Please retry with a corrected query.",
+          "success": false
+        },
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT report_frequencies.proper_title, latest_versions.symbol, latest_versions.entity, latest_versions.effective_year\nFROM report_frequencies\nJOIN latest_versions ON report_frequencies.proper_title = latest_versions.proper_title\nWHERE report_frequencies.calculated_frequency = 'biennial'\nORDER BY report_frequencies.proper_title;",
+            "explanation": "List all reports marked as biennial with latest symbol, entity, and year."
+          },
+          "result": {
+            "explanation": "List all reports marked as biennial with latest symbol, entity, and year.",
+            "rowCount": 67,
+            "rows": [
+              {
+                "proper_title": "Addressing and countering the world drug problem through a comprehensive, integrated and balanced approach :",
+                "symbol": "A/79/120",
+                "entity": "UNODC",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Addressing the deteriorating conditions and limited capacity of the conference services facilities at the United Nations Office at Nairobi :",
+                "symbol": "A/80/281",
+                "entity": "DMSPC",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Agricultural technology for sustainable development :",
+                "symbol": "A/80/377",
+                "entity": "DESA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Assistance in mine action :",
+                "symbol": "A/80/272",
+                "entity": "DPO",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Children and armed conflict in Afghanistan :",
+                "symbol": "S/2023/893",
+                "entity": "SRSG-CAAC",
+                "effective_year": 2023
+              },
+              {
+                "proper_title": "Children and armed conflict in South Sudan :",
+                "symbol": "S/2025/317",
+                "entity": "SRSG-CAAC",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Children and armed conflict in the Philippines :",
+                "symbol": "S/2024/626",
+                "entity": "DPPA",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Children and armed conflict in the Syrian Arab Republic :",
+                "symbol": "S/2025/535",
+                "entity": "DPPA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Climate change statistics :",
+                "symbol": "E/CN.3/2024/20",
+                "entity": "DESA",
+                "effective_year": 2023
+              },
+              {
+                "proper_title": "Consideration of effective measures to enhance the protection, security and safety of diplomatic and consular missions and representatives :",
+                "symbol": "A/79/143",
+                "entity": "OLA",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Cooperatives in social development :",
+                "symbol": "A/80/168",
+                "entity": "DESA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Countering the threat posed by improvised explosive devices :",
+                "symbol": "A/79/211",
+                "entity": "ODA",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Development cooperation with middle-income countries :",
+                "symbol": "A/80/418",
+                "entity": "DESA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Disability statistics :",
+                "symbol": "E/CN.3/2026/25",
+                "entity": "DESA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Effective promotion of the Declaration on the Rights of Persons Belonging to National or Ethnic, Religious and Linguistic Minorities :",
+                "symbol": "A/80/288",
+                "entity": "OHCHR",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Effects of the use of armaments and ammunitions containing depleted uranium :",
+                "symbol": "A/79/96",
+                "entity": "ODA",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Entrepreneurship for sustainable development :",
+                "symbol": "A/79/208",
+                "entity": "DESA",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Extraordinary Chambers in the Courts of Cambodia - residual functions :",
+                "symbol": "A/79/827",
+                "entity": "DMSPC",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Fulfilling the promise of globalization : advancing sustainable development in an interconnected world :",
+                "symbol": "A/79/321",
+                "entity": "DESA",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Gender statistics :",
+                "symbol": "E/CN.3/2026/24",
+                "entity": "DESA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Harmony with nature :",
+                "symbol": "A/79/253",
+                "entity": "DESA",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Human resources development :",
+                "symbol": "A/79/257",
+                "entity": "DESA",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Human rights in the administration of justice :",
+                "symbol": "A/79/296",
+                "entity": "OHCHR",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Impact of rapid technological change on the achievement of the Sustainable Development Goals and targets :",
+                "symbol": "A/79/961",
+                "entity": "EOSG",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Implementation of the provisions of the Charter of the United Nations related to assistance to 3rd States affected by the application of sanctions :",
+                "symbol": "A/80/151",
+                "entity": "OLA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Improvement in the status of women in the United Nations System :",
+                "symbol": "A/80/260",
+                "entity": "DMSPC",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Improvement of the situation of women and girls in rural areas :",
+                "symbol": "A/80/262",
+                "entity": "DESA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Improving the coordination of efforts against trafficking in persons :",
+                "symbol": "A/80/234",
+                "entity": "UNODC",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Inclusive policies and programmes to address homelessness :",
+                "symbol": "A/80/316",
+                "entity": "DESA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Intensifying global efforts for the elimination of female genital mutilation :",
+                "symbol": "A/79/514",
+                "entity": null,
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "International Convention for the Protection of All Persons from Enforced Disappearance :",
+                "symbol": "A/80/298",
+                "entity": "OHCHR",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "International migration and development :",
+                "symbol": "A/79/323",
+                "entity": "DESA",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Measures taken and progress achieved in follow-up to and implementation of the Beijing Declaration and Platform for Action and the outcome of the 23rd special session of the General Assembly :",
+                "symbol": "A/80/261",
+                "entity": null,
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Missing persons :",
+                "symbol": "A/79/282",
+                "entity": null,
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Mongolia's international security and nuclear-weapon-free status :",
+                "symbol": "A/79/148",
+                "entity": "ODA",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Moratorium on the use of the death penalty :",
+                "symbol": "A/79/276",
+                "entity": "OHCHR",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Multilingualism :",
+                "symbol": "A/78/790",
+                "entity": null,
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Promoting social integration through social inclusion :",
+                "symbol": "A/80/155",
+                "entity": "DESA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Promotion of equitable geographical distribution in the membership of the human rights treaty bodies :",
+                "symbol": "A/80/299",
+                "entity": "OHCHR",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Question of the realization in all countries of economic, social and cultural rights :",
+                "symbol": "A/HRC/58/37",
+                "entity": "OHCHR",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Safety of journalists and the issue of impunity :",
+                "symbol": "A/80/345",
+                "entity": "OHCHR",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Science, technology and innovation for sustainable development :",
+                "symbol": "A/80/221",
+                "entity": "DESA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Small arms and light weapons :",
+                "symbol": "S/2025/670",
+                "entity": "DPPA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Status of the Convention on the Rights of the Child :",
+                "symbol": "A/80/296",
+                "entity": "OHCHR",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Strengthening cooperation for integrated coastal zone management for achieving sustainable development :",
+                "symbol": "A/80/330",
+                "entity": "UNEP",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Strengthening the role of the United Nations in enhancing periodic and genuine elections and the promotion of democratization :",
+                "symbol": "A/80/277",
+                "entity": "DPPA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Strengthening United Nations action in the field of human rights through the promotion of international cooperation and the importance of non-selectivity, impartiality and objectivity :",
+                "symbol": "A/80/304",
+                "entity": "OHCHR",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Subregional Centre for Human Rights and Democracy in Central Africa :",
+                "symbol": "A/80/297",
+                "entity": "OHCHR",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Supply chain activities in the United Nations Secretariat :",
+                "symbol": "A/80/467",
+                "entity": "DOS",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Sustainable and resilient tourism and sustainable development in Central America and the Dominican Republic :",
+                "symbol": "A/80/267",
+                "entity": "DESA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Sustainable tourism and sustainable development in Central America :",
+                "symbol": "A/78/210",
+                "entity": "DESA",
+                "effective_year": 2023
+              },
+              {
+                "proper_title": "Terrorism and human rights :",
+                "symbol": "A/80/380",
+                "entity": "OHCHR",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Towards a new international economic order :",
+                "symbol": "A/79/320",
+                "entity": "DESA",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Towards the sustainable development of the Caribbean Sea for present and future generations :",
+                "symbol": "A/79/399",
+                "entity": "DESA",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Unilateral economic measures as a means of political and economic coercion against developing countries :",
+                "symbol": "A/80/415",
+                "entity": "DESA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "United Nations African Institute for the Prevention of Crime and the Treatment of Offenders :",
+                "symbol": "A/79/247",
+                "entity": "UNODC",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "United Nations Disarmament Information Programme :",
+                "symbol": "A/79/98",
+                "entity": "ODA",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "United Nations Human Rights Training and Documentation Centre for South-West Asia and the Arab Region :",
+                "symbol": "A/80/305",
+                "entity": "OHCHR",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "United Nations Institute for Training and Research :",
+                "symbol": "E/2025/50",
+                "entity": "DESA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "United Nations System Staff College :",
+                "symbol": "E/2025/52",
+                "entity": "DESA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Universal health coverage :",
+                "symbol": "A/79/956",
+                "entity": "DESA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Violence against women migrant workers :",
+                "symbol": "A/80/317",
+                "entity": "DESA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Women, disarmament, non-proliferation and arms control :",
+                "symbol": "A/79/217",
+                "entity": "ODA",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Women in development :",
+                "symbol": "A/79/210",
+                "entity": "DESA",
+                "effective_year": 2024
+              },
+              {
+                "proper_title": "Work of the Committee of Experts on the Transport of Dangerous Goods and on the Globally Harmonized System of Classification and Labelling of Chemicals :",
+                "symbol": "E/2025/72",
+                "entity": "DESA",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "World commodity trends and prospects :",
+                "symbol": "A/80/120",
+                "entity": "UNCTAD",
+                "effective_year": 2025
+              },
+              {
+                "proper_title": "Youth, disarmament and non-proliferation :",
+                "symbol": "A/80/165",
+                "entity": "ODA",
+                "effective_year": 2025
+              }
+            ]
+          },
+          "success": true
+        }
+      ],
+      "finalResponse": "## Biennial reports (latest versions)\n- 67 reports identified; latest versions span 2023–2025.\n- Main entities include DESA, OHCHR, ODA, DPPA, UNODC, DMSPC, and others.\n\n| Proper title | Symbol | Entity | Latest year |\n|---|---|---|---|\n| Addressing and countering the world drug problem through a comprehensive, integrated and balanced approach : | `A/79/120` | UNODC | 2024 |\n| Addressing the deteriorating conditions and limited capacity of the conference services facilities at the United Nations Office at Nairobi : | `A/80/281` | DMSPC | 2025 |\n| Agricultural technology for sustainable development : | `A/80/377` | DESA | 2025 |\n| Assistance in mine action : | `A/80/272` | DPO | 2025 |\n| Children and armed conflict in Afghanistan : | `S/2023/893` | SRSG-CAAC | 2023 |\n| Children and armed conflict in South Sudan : | `S/2025/317` | SRSG-CAAC | 2025 |\n| Children and armed conflict in the Philippines : | `S/2024/626` | DPPA | 2024 |\n| Children and armed conflict in the Syrian Arab Republic : | `S/2025/535` | DPPA | 2025 |\n| Climate change statistics : | `E/CN.3/2024/20` | DESA | 2023 |\n| Consideration of effective measures to enhance the protection, security and safety of diplomatic and consular missions and representatives : | `A/79/143` | OLA | 2024 |\n| Cooperatives in social development : | `A/80/168` | DESA | 2025 |\n| Countering the threat posed by improvised explosive devices : | `A/79/211` | ODA | 2024 |\n| Development cooperation with middle-income countries : | `A/80/418` | DESA | 2025 |\n| Disability statistics : | `E/CN.3/2026/25` | DESA | 2025 |\n| Effective promotion of the Declaration on the Rights of Persons Belonging to National or Ethnic, Religious and Linguistic Minorities : | `A/80/288` | OHCHR | 2025 |\n| Effects of the use of armaments and ammunitions containing depleted uranium : | `A/79/96` | ODA | 2024 |\n| Entrepreneurship for sustainable development : | `A/79/208` | DESA | 2024 |\n| Extraordinary Chambers in the Courts of Cambodia - residual functions : | `A/79/827` | DMSPC | 2025 |\n| Fulfilling the promise of globalization : advancing sustainable development in an interconnected world : | `A/79/321` | DESA | 2024 |\n| Gender statistics : | `E/CN.3/2026/24` | DESA | 2025 |\n| Harmony with nature : | `A/79/253` | DESA | 2024 |\n| Human resources development : | `A/79/257` | DESA | 2024 |\n| Human rights in the administration of justice : | `A/79/296` | OHCHR | 2024 |\n| Impact of rapid technological change on the achievement of the Sustainable Development Goals and targets : | `A/79/961` | EOSG | 2025 |\n| Implementation of the provisions of the Charter of the United Nations related to assistance to 3rd States affected by the application of sanctions : | `A/80/151` | OLA | 2025 |\n| Improvement in the status of women in the United Nations System : | `A/80/260` | DMSPC | 2025 |\n| Improvement of the situation of women and girls in rural areas : | `A/80/262` | DESA | 2025 |\n| Improving the coordination of efforts against trafficking in persons : | `A/80/234` | UNODC | 2025 |\n| Inclusive policies and programmes to address homelessness : | `A/80/316` | DESA | 2025 |\n| Intensifying global efforts for the elimination of female genital mutilation : | `A/79/514` |  | 2024 |\n| International Convention for the Protection of All Persons from Enforced Disappearance : | `A/80/298` | OHCHR | 2025 |\n| International migration and development : | `A/79/323` | DESA | 2024 |\n| Measures taken and progress achieved in follow-up to and implementation of the Beijing Declaration and Platform for Action and the outcome of the 23rd special session of the General Assembly : | `A/80/261` |  | 2025 |\n| Missing persons : | `A/79/282` |  | 2024 |\n| Mongolia's international security and nuclear-weapon-free status : | `A/79/148` | ODA | 2024 |\n| Moratorium on the use of the death penalty : | `A/79/276` | OHCHR | 2024 |\n| Multilingualism : | `A/78/790` |  | 2024 |\n| Promoting social integration through social inclusion : | `A/80/155` | DESA | 2025 |\n| Promotion of equitable geographical distribution in the membership of the human rights treaty bodies : | `A/80/299` | OHCHR | 2025 |\n| Question of the realization in all countries of economic, social and cultural rights : | `A/HRC/58/37` | OHCHR | 2025 |\n| Safety of journalists and the issue of impunity : | `A/80/345` | OHCHR | 2025 |\n| Science, technology and innovation for sustainable development : | `A/80/221` | DESA | 2025 |\n| Small arms and light weapons : | `S/2025/670` | DPPA | 2025 |\n| Status of the Convention on the Rights of the Child : | `A/80/296` | OHCHR | 2025 |\n| Strengthening cooperation for integrated coastal zone management for achieving sustainable development : | `A/80/330` | UNEP | 2025 |\n| Strengthening the role of the United Nations in enhancing periodic and genuine elections and the promotion of democratization : | `A/80/277` | DPPA | 2025 |\n| Strengthening United Nations action in the field of human rights through the promotion of international cooperation and the importance of non-selectivity, impartiality and objectivity : | `A/80/304` | OHCHR | 2025 |\n| Subregional Centre for Human Rights and Democracy in Central Africa : | `A/80/297` | OHCHR | 2025 |\n| Supply chain activities in the United Nations Secretariat : | `A/80/467` | DOS | 2025 |\n| Sustainable and resilient tourism and sustainable development in Central America and the Dominican Republic : | `A/80/267` | DESA | 2025 |\n| Sustainable tourism and sustainable development in Central America : | `A/78/210` | DESA | 2023 |\n| Terrorism and human rights : | `A/80/380` | OHCHR | 2025 |\n| Towards a new international economic order : | `A/79/320` | DESA | 2024 |\n| Towards the sustainable development of the Caribbean Sea for present and future generations : | `A/79/399` | DESA | 2024 |\n| Unilateral economic measures as a means of political and economic coercion against developing countries : | `A/80/415` | DESA | 2025 |\n| United Nations African Institute for the Prevention of Crime and the Treatment of Offenders : | `A/79/247` | UNODC | 2024 |\n| United Nations Disarmament Information Programme : | `A/79/98` | ODA | 2024 |\n| United Nations Human Rights Training and Documentation Centre for South-West Asia and the Arab Region : | `A/80/305` | OHCHR | 2025 |\n| United Nations Institute for Training and Research : | `E/2025/50` | DESA | 2025 |\n| United Nations System Staff College : | `E/2025/52` | DESA | 2025 |\n| Universal health coverage : | `A/79/956` | DESA | 2025 |\n| Violence against women migrant workers : | `A/80/317` | DESA | 2025 |\n| Women, disarmament, non-proliferation and arms control : | `A/79/217` | ODA | 2024 |\n| Women in development : | `A/79/210` | DESA | 2024 |\n| Work of the Committee of Experts on the Transport of Dangerous Goods and on the Globally Harmonized System of Classification and Labelling of Chemicals : | `E/2025/72` | DESA | 2025 |\n| World commodity trends and prospects : | `A/80/120` | UNCTAD | 2025 |\n| Youth, disarmament and non-proliferation : | `A/80/165` | ODA | 2025 |",
+      "sqlQueries": [
+        "SELECT rf.proper_title, lv.symbol, lv.entity, lv.effective_year FROM report_frequencies rf\nJOIN latest_versions lv ON rf.proper_title = lv.proper_title\nWHERE rf.calculated_frequency = 'biennial'\nORDER BY rf.proper_title;",
+        "SELECT report_frequencies.proper_title, latest_versions.symbol, latest_versions.entity, latest_versions.effective_year\nFROM report_frequencies\nJOIN latest_versions ON report_frequencies.proper_title = latest_versions.proper_title\nWHERE report_frequencies.calculated_frequency = 'biennial'\nORDER BY report_frequencies.proper_title;"
+      ],
+      "errors": [
+        "Tool query_database failed: Schema-prefixed table 'rf.proper_title' is not allowed. Use table names directly: documents, sg_reports, latest_versions, report_entity_suggestions, report_entity_confirmations, report_frequency_confirmations, report_frequencies, survey_responses. Please retry with a corrected query."
+      ],
+      "iterations": 3
+    },
+    {
+      "testCase": {
+        "id": 10,
+        "prompt": "How many reports were published each year?",
+        "expectedBehavior": "Should extract year from publication_date, not use date_year"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "How many reports were published each year?"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT effective_year, COUNT(*) AS report_count FROM latest_versions GROUP BY effective_year ORDER BY effective_year;\",\"explanation\":\"Count SG report latest versions by year using the pre-computed effective_year.\"}",
+                "name": "query_database"
+              },
+              "id": "call_c2EgfcuR9X8M4nw3vFJ1jpzO",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_c2EgfcuR9X8M4nw3vFJ1jpzO",
+          "content": "{\"explanation\":\"Count SG report latest versions by year using the pre-computed effective_year.\",\"rowCount\":4,\"rows\":[{\"effective_year\":2023,\"report_count\":\"133\"},{\"effective_year\":2024,\"report_count\":\"192\"},{\"effective_year\":2025,\"report_count\":\"310\"},{\"effective_year\":2026,\"report_count\":\"2\"}]}"
+        },
+        {
+          "role": "assistant",
+          "content": "## Reports per year (latest versions)\n\n| Year | Count |\n|---|---:|\n| 2023 | 133 |\n| 2024 | 192 |\n| 2025 | 310 |\n| 2026 | 2 |"
+        }
+      ],
+      "toolCalls": [
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT effective_year, COUNT(*) AS report_count FROM latest_versions GROUP BY effective_year ORDER BY effective_year;",
+            "explanation": "Count SG report latest versions by year using the pre-computed effective_year."
+          },
+          "result": {
+            "explanation": "Count SG report latest versions by year using the pre-computed effective_year.",
+            "rowCount": 4,
+            "rows": [
+              {
+                "effective_year": 2023,
+                "report_count": "133"
+              },
+              {
+                "effective_year": 2024,
+                "report_count": "192"
+              },
+              {
+                "effective_year": 2025,
+                "report_count": "310"
+              },
+              {
+                "effective_year": 2026,
+                "report_count": "2"
+              }
+            ]
+          },
+          "success": true
+        }
+      ],
+      "finalResponse": "## Reports per year (latest versions)\n\n| Year | Count |\n|---|---:|\n| 2023 | 133 |\n| 2024 | 192 |\n| 2025 | 310 |\n| 2026 | 2 |",
+      "sqlQueries": [
+        "SELECT effective_year, COUNT(*) AS report_count FROM latest_versions GROUP BY effective_year ORDER BY effective_year;"
+      ],
+      "errors": [],
+      "iterations": 2
+    }
+  ]
+}

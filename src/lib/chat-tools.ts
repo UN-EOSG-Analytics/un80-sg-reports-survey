@@ -130,8 +130,8 @@ const FORBIDDEN_TABLES = [
 function isQuerySafe(sql: string): { safe: boolean; error?: string } {
   const normalized = sql.trim().toLowerCase();
 
-  // Must start with SELECT
-  if (!normalized.startsWith("select")) {
+  // Must start with SELECT or WITH (for CTEs)
+  if (!normalized.startsWith("select") && !normalized.startsWith("with")) {
     return { safe: false, error: "Only SELECT queries are allowed" };
   }
 
@@ -171,14 +171,70 @@ function isQuerySafe(sql: string): { safe: boolean; error?: string } {
 
   // Check that query only references allowed tables
   // Extract potential table names from FROM and JOIN clauses
-  const tablePattern = /\b(?:from|join)\s+([a-z_][a-z0-9_]*)/gi;
+  // This regex is more careful to avoid matching:
+  // - EXTRACT(... FROM column) - the FROM inside EXTRACT
+  // - Function calls like FROM unnest(...) 
+  // - SQL keywords like LATERAL
+  // - Table aliases
+
+  // Common SQL keywords and functions that aren't table names
+  const sqlKeywords = new Set([
+    "select", "where", "and", "or", "not", "in", "between", "like", "ilike",
+    "is", "null", "true", "false", "as", "on", "using", "order", "by", "group",
+    "having", "limit", "offset", "union", "intersect", "except", "all", "distinct",
+    "case", "when", "then", "else", "end", "cast", "coalesce", "nullif",
+    "lateral", "cross", "inner", "outer", "left", "right", "full", "natural",
+    "unnest", "array", "any", "some", "exists", "with", "recursive"
+  ]);
+
+  // Match FROM/JOIN followed by table name, handling subqueries and functions
+  const tablePattern = /\b(?:from|join)\s+(?:lateral\s+)?([a-z_][a-z0-9_]*)/gi;
   let match;
   while ((match = tablePattern.exec(sql)) !== null) {
     const tableName = match[1].toLowerCase();
+    
+    // Skip if it's a SQL keyword/function
+    if (sqlKeywords.has(tableName)) {
+      continue;
+    }
+    
+    // Skip if followed by an open parenthesis (it's a function call like unnest())
+    const afterMatch = sql.slice(match.index + match[0].length).trimStart();
+    if (afterMatch.startsWith("(")) {
+      continue;
+    }
+    
     if (!ALLOWED_TABLES.includes(tableName)) {
       return { 
         safe: false, 
         error: `Table '${tableName}' is not allowed. Allowed tables: ${ALLOWED_TABLES.join(", ")}` 
+      };
+    }
+  }
+
+  // Also check for schema-prefixed tables like public.tablename or schema.tablename
+  // Skip short aliases (1-3 chars) as they're typically table aliases, not schemas
+  const schemaTablePattern = /\b([a-z_][a-z0-9_]*)\.([a-z_][a-z0-9_]*)\b/gi;
+  while ((match = schemaTablePattern.exec(sql)) !== null) {
+    const schema = match[1].toLowerCase();
+    const table = match[2].toLowerCase();
+    
+    // Skip column references like table.column within allowed tables
+    if (ALLOWED_TABLES.includes(schema)) {
+      continue; // It's table.column, not schema.table
+    }
+    
+    // Skip short aliases (1-3 chars) - these are table aliases like rf, sr, lv, d, s
+    if (schema.length <= 3) {
+      continue;
+    }
+    
+    // If it looks like schema.table format and schema isn't an allowed table,
+    // check if the table part is allowed
+    if (!ALLOWED_TABLES.includes(table) && !sqlKeywords.has(schema)) {
+      return { 
+        safe: false, 
+        error: `Schema-prefixed table '${schema}.${table}' is not allowed. Use table names directly: ${ALLOWED_TABLES.join(", ")}` 
       };
     }
   }

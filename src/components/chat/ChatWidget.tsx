@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useEffect } from "react";
-import { Sparkles, X, Trash2 } from "lucide-react";
+import { useRef, useEffect, useState } from "react";
+import { Sparkles, X, Trash2, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useChatContext } from "./ChatContext";
 import { ChatPanelWidget } from "./ChatPanelWidget";
@@ -9,6 +9,7 @@ import { ChatPanelWidget } from "./ChatPanelWidget";
 export function ChatWidget() {
   const { isOpen, setIsOpen, messages, clearMessages, isStreaming } = useChatContext();
   const panelRef = useRef<HTMLDivElement>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Close on click outside
   useEffect(() => {
@@ -40,14 +41,18 @@ export function ChatWidget() {
 
   return (
     <>
-      {/* Chat popup panel - LEFT side, larger size */}
+      {/* Chat popup panel - LEFT side, larger size, expandable */}
       {isOpen && (
         <div
           ref={panelRef}
-          className="fixed bottom-16 left-4 z-50 w-[440px] h-[600px] animate-in slide-in-from-bottom-4 fade-in duration-200"
+          className={`fixed z-50 animate-in slide-in-from-bottom-4 fade-in duration-200 ${
+            isExpanded 
+              ? "top-4 left-4 right-4 bottom-16" // Expanded: padding on top/left/right, keep bottom-16
+              : "bottom-16 left-4 w-[440px] h-[600px]" // Normal size
+          }`}
         >
           <div className="flex flex-col h-full overflow-hidden rounded-xl shadow-2xl border border-gray-200 bg-white">
-            {/* Compact header with clear button */}
+            {/* Compact header with expand, clear, and close buttons */}
             <div className="flex-shrink-0 border-b border-gray-100 py-2.5 px-3 flex items-center justify-between bg-gray-50/80">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-un-blue" />
@@ -64,6 +69,18 @@ export function ChatWidget() {
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 )}
+                {/* Expand/unexpand button */}
+                <button
+                  onClick={() => setIsExpanded(!isExpanded)}
+                  className="p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
+                  title={isExpanded ? "Restore size" : "Expand"}
+                >
+                  {isExpanded ? (
+                    <Minimize2 className="h-3.5 w-3.5" />
+                  ) : (
+                    <Maximize2 className="h-3.5 w-3.5" />
+                  )}
+                </button>
                 <button
                   onClick={() => setIsOpen(false)}
                   className="p-1 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"

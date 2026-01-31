@@ -80,6 +80,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Session tracking for logging
+  const sessionIdRef = useRef<string>(`session-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
+  const interactionIndexRef = useRef<number>(0);
 
   // Generate unique ID
   const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -128,13 +132,22 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       content: m.content,
     }));
 
+    // Prepare logging data
+    const currentInteractionIndex = interactionIndexRef.current;
+    interactionIndexRef.current += 1;
+
     try {
       abortControllerRef.current = new AbortController();
 
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: apiMessages }),
+        body: JSON.stringify({ 
+          messages: apiMessages,
+          sessionId: sessionIdRef.current,
+          interactionIndex: currentInteractionIndex,
+          // userId can be added here if available from auth context
+        }),
         signal: abortControllerRef.current.signal,
       });
 
@@ -267,6 +280,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const clearMessages = useCallback(() => {
     setMessages([]);
     setError(null);
+    // Start a new session when clearing
+    sessionIdRef.current = `session-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    interactionIndexRef.current = 0;
   }, []);
 
   const value: ChatContextValue = {

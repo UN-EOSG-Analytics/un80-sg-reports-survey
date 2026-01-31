@@ -136,3 +136,70 @@ CREATE INDEX IF NOT EXISTS idx_confirmations_proper_title ON sg_reports_survey.r
 CREATE INDEX IF NOT EXISTS idx_confirmations_entity ON sg_reports_survey.report_entity_confirmations (entity);
 CREATE INDEX IF NOT EXISTS idx_confirmations_user ON sg_reports_survey.report_entity_confirmations (confirmed_by_user_id);
 CREATE INDEX IF NOT EXISTS idx_confirmations_role ON sg_reports_survey.report_entity_confirmations (proper_title, role);
+
+--------------------------------------------------------------------------------
+-- AI CHAT INTERACTION LOGGING
+-- Stores all interactions for evaluation and analysis
+-- History can be reconstructed by querying all interactions for a session_id in order
+--------------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS sg_reports_survey.ai_chat_logs (
+  id BIGSERIAL PRIMARY KEY,
+  
+  -- Session tracking
+  session_id TEXT NOT NULL,  -- Client-generated session ID
+  user_id UUID REFERENCES sg_reports_survey.users(id),  -- NULL for anonymous
+  
+  -- Interaction data
+  interaction_index INTEGER NOT NULL,  -- Sequential within session (0, 1, 2...)
+  
+  -- User input
+  user_message TEXT NOT NULL,
+  user_message_timestamp TIMESTAMPTZ NOT NULL,
+  
+  -- AI response
+  ai_response TEXT,  -- Final text response
+  ai_response_timestamp TIMESTAMPTZ,
+  response_complete BOOLEAN DEFAULT false,
+  
+  -- Tool usage
+  tools_called JSONB,  -- Array of {name, args, timestamp}
+  tool_results JSONB,  -- Array of {name, result, success, timestamp}
+  
+  -- Performance metrics
+  total_duration_ms INTEGER,  -- Total time from user message to response complete
+  llm_calls INTEGER DEFAULT 0,  -- Number of LLM API calls (agentic loops)
+  
+  -- Error tracking
+  error_occurred BOOLEAN DEFAULT false,
+  error_message TEXT,
+  
+  -- Metadata
+  model_name TEXT,  -- e.g., "gpt-5"
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_chat_logs_session ON sg_reports_survey.ai_chat_logs (session_id);
+CREATE INDEX IF NOT EXISTS idx_ai_chat_logs_user ON sg_reports_survey.ai_chat_logs (user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_chat_logs_timestamp ON sg_reports_survey.ai_chat_logs (created_at);
+CREATE INDEX IF NOT EXISTS idx_ai_chat_logs_session_index ON sg_reports_survey.ai_chat_logs (session_id, interaction_index);
+
+COMMENT ON TABLE sg_reports_survey.ai_chat_logs IS 'Comprehensive logging of all AI chat interactions for evaluation and analysis';
+
+--------------------------------------------------------------------------------
+-- AI CHAT SESSIONS VIEW
+-- Helper view to reconstruct conversation history and aggregate session metrics
+--------------------------------------------------------------------------------
+
+CREATE OR REPLACE VIEW sg_reports_survey.ai_chat_sessions AS
+SELECT 
+  session_id,
+  user_id,
+  MIN(user_message_timestamp) as session_start,
+  MAX(ai_response_timestamp) as session_end,
+  COUNT(*) as interaction_count,
+  SUM(total_duration_ms) as total_duration_ms,
+  SUM(llm_calls) as total_llm_calls,
+  BOOL_OR(error_occurred) as had_errors
+FROM sg_reports_survey.ai_chat_logs
+GROUP BY session_id, user_id;

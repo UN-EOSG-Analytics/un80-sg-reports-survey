@@ -1,4 +1,5 @@
 import { tools, executeTool } from "@/lib/chat-tools";
+import { logChatInteraction } from "@/lib/chat-logger";
 
 // Azure AI Foundry configuration
 function getEndpoint() {
@@ -32,6 +33,16 @@ const SYSTEM_PROMPT = `You are a concise AI assistant for the UN Secretary-Gener
 - **survey_responses**: proper_title, user_entity, status, frequency, format, merge_targets[], comments
 - **report_frequencies**: proper_title, calculated_frequency ('annual'|'biennial'|'triennial'|'quadrennial'|'one-time'), gap_history[], year_count
 
+### Resolution Views & Tables
+- **resolutions**: Resolution documents in database (only those referenced by reports, not all UN resolutions)
+- **sg_report_mandates**: Links reports to mandating resolutions. Columns: report_symbol, report_title, resolution_symbol, resolution_title, resolution_year
+- **resolution_mandates**: AI-extracted mandate info. Columns: resolution_symbol, verbatim_paragraph, summary, explicit_frequency, implicit_frequency, frequency_reasoning
+
+### Vector Search
+- Documents have **embedding vector(1024)** column (text-embedding-3-large)
+- Use pgvector's **<=>** operator for cosine distance
+- Lower distance = more similar. Convert to similarity: \`1 - (embedding <=> source_embedding)\`
+
 ## Response Style
 - **Be brief**: 2-3 sentences max for simple questions. Bullet points for lists.
 - **Use markdown**: Headers (##), bullets, tables, \`code\` for symbols
@@ -62,13 +73,55 @@ WHERE rf.calculated_frequency = 'annual';
 
 -- Search by year using publication_date (TEXT)
 SELECT * FROM sg_reports WHERE SUBSTRING(publication_date, 1, 4) = '2024';
+
+-- Find semantically similar reports using vector search
+WITH source AS (
+  SELECT d.embedding
+  FROM documents d
+  WHERE d.symbol = 'A/78/123' AND d.embedding IS NOT NULL
+)
+SELECT 
+  lv.symbol,
+  lv.proper_title,
+  lv.effective_year,
+  1 - (lv.embedding <=> s.embedding) as similarity
+FROM latest_versions lv
+CROSS JOIN source s
+WHERE lv.embedding IS NOT NULL
+  AND lv.symbol != 'A/78/123'
+ORDER BY lv.embedding <=> s.embedding
+LIMIT 5;
+
+-- Find resolutions that mandate a specific report
+SELECT rm.resolution_symbol, rm.resolution_title, rm.resolution_year
+FROM sg_report_mandates rm
+WHERE rm.report_symbol = 'A/78/123';
+
+-- Or use the array directly
+SELECT symbol, proper_title, based_on_resolution_symbols
+FROM documents
+WHERE symbol = 'A/78/123' AND based_on_resolution_symbols IS NOT NULL;
+
+-- Find all reports mandated by a resolution
+SELECT rm.report_symbol, rm.report_title, rm.report_year
+FROM sg_report_mandates rm
+WHERE rm.resolution_symbol = 'A/RES/78/1';
+
+-- Get AI-extracted mandate details (supplementary - prefer read_document for accuracy)
+SELECT resolution_symbol, summary, explicit_frequency, verbatim_paragraph
+FROM resolution_mandates
+WHERE resolution_symbol = 'A/RES/78/1';
 \`\`\`
 
 ## Common Tasks
 - **Summarize a report**: Use read_document to get full text, then summarize key points
 - **Compare reports/versions**: ALWAYS use read_document on BOTH documents to compare actual content, not just SQL metadata. Present differences in a table.
-- **Find similar reports**: Query to find candidates, then read_document to compare content
-- **Find mandating resolutions**: Query based_on_resolution_symbols, then read_document on resolution
+- **Find similar reports**: Use vector search query with \`<=>\` operator to find semantically similar reports based on content embeddings (not just metadata)
+- **Find mandating resolutions**: 
+  1. Query sg_report_mandates view OR documents.based_on_resolution_symbols array
+  2. Optionally join with resolution_mandates for extracted mandate paragraphs and frequency analysis
+  3. Use read_document on resolution symbols to read the full resolution text (often more reliable than resolution_mandates table)
+  4. Note: Database only contains resolutions that are referenced by reports, not all UN resolutions
 - **Find reports by topic**: Query with subject_terms or title ILIKE
 
 ## Important: Content vs Metadata
@@ -99,6 +152,9 @@ interface ChatMessage {
 interface ChatRequest {
   messages: ChatMessage[];
   initialPrompt?: string;
+  sessionId?: string;
+  userId?: string;
+  interactionIndex?: number;
 }
 
 // SSE event types
@@ -179,16 +235,30 @@ export async function POST(request: Request) {
   try {
     const body: ChatRequest = await request.json();
     let { messages } = body;
-    const { initialPrompt } = body;
+    const { initialPrompt, sessionId, userId, interactionIndex } = body;
 
     // If there's an initial prompt (from URL params), add it as first user message
     if (initialPrompt && messages.length === 0) {
       messages = [{ role: "user", content: initialPrompt }];
     }
 
+    // Extract user message for logging
+    const userMessage = messages[messages.length - 1]?.content || initialPrompt || "";
+
     // Create the response stream
     const stream = new ReadableStream({
       async start(controller) {
+        // Logging state
+        const startTime = Date.now();
+        const userMessageTimestamp = new Date();
+        let fullAiResponse = "";
+        let aiResponseTimestamp: Date | undefined;
+        const toolsCalledLog: Array<{ name: string; args: any; timestamp: Date }> = [];
+        const toolResultsLog: Array<{ name: string; result: any; success: boolean; timestamp: Date }> = [];
+        let llmCallCount = 0;
+        let errorOccurred = false;
+        let errorMessage: string | undefined;
+
         try {
           // Prepare messages with system prompt
           const apiMessages: ChatMessage[] = [
@@ -202,6 +272,7 @@ export async function POST(request: Request) {
 
           while (iterations < maxIterations) {
             iterations++;
+            llmCallCount++;
 
             // Collect the streamed response
             let assistantContent = "";
@@ -220,6 +291,7 @@ export async function POST(request: Request) {
               // Handle text content
               if (delta?.content) {
                 assistantContent += delta.content;
+                fullAiResponse += delta.content;
                 sendEvent(controller, { type: "text_delta", content: delta.content });
               }
 
@@ -267,6 +339,7 @@ export async function POST(request: Request) {
 
             // If no tool calls, we're done
             if (toolCalls.length === 0) {
+              aiResponseTimestamp = new Date();
               sendEvent(controller, { type: "done" });
               break;
             }
@@ -301,11 +374,22 @@ export async function POST(request: Request) {
                 continue;
               }
 
+              // Log tool call
+              toolsCalledLog.push({ name, args, timestamp: new Date() });
+
               // Send tool start event
               sendEvent(controller, { type: "tool_start", name, args });
 
               // Execute the tool
               const result = await executeTool(name, args);
+
+              // Log tool result
+              toolResultsLog.push({
+                name,
+                result: result.data || result.error,
+                success: result.success,
+                timestamp: new Date(),
+              });
 
               // Send tool result event
               sendEvent(controller, {
@@ -325,16 +409,63 @@ export async function POST(request: Request) {
           }
 
           if (iterations >= maxIterations) {
+            errorOccurred = true;
+            errorMessage = "Maximum iterations reached";
             sendEvent(controller, {
               type: "error",
               message: "Maximum iterations reached",
             });
           }
+
+          // Log the interaction (success case)
+          if (sessionId !== undefined && interactionIndex !== undefined) {
+            await logChatInteraction({
+              sessionId,
+              userId,
+              interactionIndex,
+              userMessage,
+              userMessageTimestamp,
+              aiResponse: fullAiResponse,
+              aiResponseTimestamp,
+              responseComplete: !errorOccurred,
+              toolsCalled: toolsCalledLog.length > 0 ? toolsCalledLog : undefined,
+              toolResults: toolResultsLog.length > 0 ? toolResultsLog : undefined,
+              totalDurationMs: Date.now() - startTime,
+              llmCalls: llmCallCount,
+              errorOccurred,
+              errorMessage,
+              modelName: getModelName(),
+            });
+          }
         } catch (error) {
+          errorOccurred = true;
+          errorMessage = error instanceof Error ? error.message : "Unknown error";
+          
           sendEvent(controller, {
             type: "error",
-            message: error instanceof Error ? error.message : "Unknown error",
+            message: errorMessage,
           });
+
+          // Log the interaction (error case)
+          if (sessionId !== undefined && interactionIndex !== undefined) {
+            await logChatInteraction({
+              sessionId,
+              userId,
+              interactionIndex,
+              userMessage,
+              userMessageTimestamp,
+              aiResponse: fullAiResponse || undefined,
+              aiResponseTimestamp,
+              responseComplete: false,
+              toolsCalled: toolsCalledLog.length > 0 ? toolsCalledLog : undefined,
+              toolResults: toolResultsLog.length > 0 ? toolResultsLog : undefined,
+              totalDurationMs: Date.now() - startTime,
+              llmCalls: llmCallCount,
+              errorOccurred: true,
+              errorMessage,
+              modelName: getModelName(),
+            });
+          }
         } finally {
           controller.close();
         }

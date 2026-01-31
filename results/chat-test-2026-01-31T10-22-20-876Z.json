@@ -1,0 +1,553 @@
+{
+  "analysis": {
+    "timestamp": "2026-01-31T10:22:20.872Z",
+    "totalTests": 5,
+    "successfulTests": 5,
+    "failedTests": 0,
+    "totalSqlQueries": 8,
+    "sqlIssues": [],
+    "commonPatterns": [
+      "date_year usage (problematic): 0 queries",
+      "publication_date usage (good): 2 queries",
+      "effective_year usage (good): 2 queries",
+      "latest_versions view usage: 2 queries",
+      "report_frequencies table usage: 0 queries",
+      "Correct array handling (ANY/@>/unnest): 1 queries",
+      "Vector search usage (<=>): 2 queries",
+      "Vector search with CTE: 2 queries",
+      "Vector search calculates similarity: 2 queries",
+      "Resolution views usage: 5 queries"
+    ],
+    "recommendations": [
+      "Add report_frequencies table to system prompt - it contains calculated_frequency, gap_history",
+      "Emphasize latest_versions view which has effective_year and entity columns already computed"
+    ]
+  },
+  "results": [
+    {
+      "testCase": {
+        "id": 1,
+        "prompt": "Find the top 3 reports most similar to A/79/1",
+        "expectedBehavior": "Should use vector search with <=> operator, CTE with source embedding, ORDER BY distance, LIMIT 3"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "Find the top 3 reports most similar to A/79/1"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"WITH source AS (\\n  SELECT d.embedding\\n  FROM documents d\\n  WHERE d.symbol = 'A/79/1' AND d.embedding IS NOT NULL\\n)\\nSELECT \\n  lv.symbol,\\n  lv.proper_title,\\n  lv.title,\\n  lv.effective_year,\\n  ROUND((1 - (lv.embedding <=> s.embedding))::numeric, 2) AS similarity\\nFROM latest_versions lv\\nCROSS JOIN source s\\nWHERE lv.embedding IS NOT NULL\\n  AND lv.symbol != 'A/79/1'\\nORDER BY lv.embedding <=> s.embedding\\nLIMIT 3;\",\"explanation\":\"Find the top 3 most semantically similar latest-version reports to A/79/1 using content embeddings, returning symbols, titles, years, and similarity scores.\"}",
+                "name": "query_database"
+              },
+              "id": "call_ikTQQJEi0JxWLE1o4ZLiKUIB",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_ikTQQJEi0JxWLE1o4ZLiKUIB",
+          "content": "{\"explanation\":\"Find the top 3 most semantically similar latest-version reports to A/79/1 using content embeddings, returning symbols, titles, years, and similarity scores.\",\"rowCount\":3,\"rows\":[{\"symbol\":\"A/80/1\",\"proper_title\":\"Report of the Secretary-General on the work of the Organization\",\"title\":null,\"effective_year\":2025,\"similarity\":\"0.91\"},{\"symbol\":\"A/80/292\",\"proper_title\":\"Safety and security of humanitarian personnel and protection of United Nations personnel :\",\"title\":null,\"effective_year\":2025,\"similarity\":\"0.79\"},{\"symbol\":\"A/80/75\",\"proper_title\":\"Strengthening of the coordination of emergency humanitarian assistance of the United Nations :\",\"title\":null,\"effective_year\":2025,\"similarity\":\"0.77\"}]}"
+        },
+        {
+          "role": "assistant",
+          "content": "## Top 3 similar reports to `A/79/1`\n\n| Symbol | Proper Title | Year | Similarity |\n|---|---|---:|---:|\n| A/80/1 | Report of the Secretary-General on the work of the Organization | 2025 | 0.91 |\n| A/80/292 | Safety and security of humanitarian personnel and protection of United Nations personnel : | 2025 | 0.79 |\n| A/80/75 | Strengthening of the coordination of emergency humanitarian assistance of the United Nations : | 2025 | 0.77 |"
+        }
+      ],
+      "toolCalls": [
+        {
+          "name": "query_database",
+          "args": {
+            "query": "WITH source AS (\n  SELECT d.embedding\n  FROM documents d\n  WHERE d.symbol = 'A/79/1' AND d.embedding IS NOT NULL\n)\nSELECT \n  lv.symbol,\n  lv.proper_title,\n  lv.title,\n  lv.effective_year,\n  ROUND((1 - (lv.embedding <=> s.embedding))::numeric, 2) AS similarity\nFROM latest_versions lv\nCROSS JOIN source s\nWHERE lv.embedding IS NOT NULL\n  AND lv.symbol != 'A/79/1'\nORDER BY lv.embedding <=> s.embedding\nLIMIT 3;",
+            "explanation": "Find the top 3 most semantically similar latest-version reports to A/79/1 using content embeddings, returning symbols, titles, years, and similarity scores."
+          },
+          "result": {
+            "explanation": "Find the top 3 most semantically similar latest-version reports to A/79/1 using content embeddings, returning symbols, titles, years, and similarity scores.",
+            "rowCount": 3,
+            "rows": [
+              {
+                "symbol": "A/80/1",
+                "proper_title": "Report of the Secretary-General on the work of the Organization",
+                "title": null,
+                "effective_year": 2025,
+                "similarity": "0.91"
+              },
+              {
+                "symbol": "A/80/292",
+                "proper_title": "Safety and security of humanitarian personnel and protection of United Nations personnel :",
+                "title": null,
+                "effective_year": 2025,
+                "similarity": "0.79"
+              },
+              {
+                "symbol": "A/80/75",
+                "proper_title": "Strengthening of the coordination of emergency humanitarian assistance of the United Nations :",
+                "title": null,
+                "effective_year": 2025,
+                "similarity": "0.77"
+              }
+            ]
+          },
+          "success": true
+        }
+      ],
+      "finalResponse": "## Top 3 similar reports to `A/79/1`\n\n| Symbol | Proper Title | Year | Similarity |\n|---|---|---:|---:|\n| A/80/1 | Report of the Secretary-General on the work of the Organization | 2025 | 0.91 |\n| A/80/292 | Safety and security of humanitarian personnel and protection of United Nations personnel : | 2025 | 0.79 |\n| A/80/75 | Strengthening of the coordination of emergency humanitarian assistance of the United Nations : | 2025 | 0.77 |",
+      "sqlQueries": [
+        "WITH source AS (\n  SELECT d.embedding\n  FROM documents d\n  WHERE d.symbol = 'A/79/1' AND d.embedding IS NOT NULL\n)\nSELECT \n  lv.symbol,\n  lv.proper_title,\n  lv.title,\n  lv.effective_year,\n  ROUND((1 - (lv.embedding <=> s.embedding))::numeric, 2) AS similarity\nFROM latest_versions lv\nCROSS JOIN source s\nWHERE lv.embedding IS NOT NULL\n  AND lv.symbol != 'A/79/1'\nORDER BY lv.embedding <=> s.embedding\nLIMIT 3;"
+      ],
+      "errors": [],
+      "iterations": 2
+    },
+    {
+      "testCase": {
+        "id": 2,
+        "prompt": "What reports are semantically related to A/79/111?",
+        "expectedBehavior": "Should use vector similarity search, return reports with similarity scores"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "What reports are semantically related to A/79/111?"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"WITH source AS (\\n  SELECT d.embedding\\n  FROM documents d\\n  WHERE d.symbol = 'A/79/111' AND d.embedding IS NOT NULL\\n)\\nSELECT \\n  lv.symbol,\\n  lv.proper_title,\\n  lv.effective_year,\\n  ROUND((1 - (lv.embedding <=> s.embedding))::numeric, 2) AS similarity\\nFROM latest_versions lv\\nCROSS JOIN source s\\nWHERE lv.embedding IS NOT NULL\\n  AND lv.symbol != 'A/79/111'\\nORDER BY lv.embedding <=> s.embedding\\nLIMIT 10;\",\"explanation\":\"Find the 10 most semantically similar latest reports to A/79/111 using embeddings and return a rounded similarity score.\"}",
+                "name": "query_database"
+              },
+              "id": "call_GMnLbOAhYs8f2qu0Vir8tjhU",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_GMnLbOAhYs8f2qu0Vir8tjhU",
+          "content": "{\"explanation\":\"Find the 10 most semantically similar latest reports to A/79/111 using embeddings and return a rounded similarity score.\",\"rowCount\":10,\"rows\":[{\"symbol\":\"A/79/210\",\"proper_title\":\"Women in development :\",\"effective_year\":2024,\"similarity\":\"0.80\"},{\"symbol\":\"E/CN.6/2024/3\",\"proper_title\":\"Accelerating the achievement of gender equality and the empowerment of all women and girls by addressing poverty and strengthening institutions and financing with a gender perspective :\",\"effective_year\":2024,\"similarity\":\"0.75\"},{\"symbol\":\"A/80/262\",\"proper_title\":\"Improvement of the situation of women and girls in rural areas :\",\"effective_year\":2025,\"similarity\":\"0.74\"},{\"symbol\":\"E/CN.5/2024/3\",\"proper_title\":\"Fostering social development and social justice through social policies to accelerate progress on the implementation of the 2030 Agenda for Sustainable Development and to achieve the overarching goal of poverty eradication :\",\"effective_year\":2023,\"similarity\":\"0.71\"},{\"symbol\":\"A/80/260\",\"proper_title\":\"Improvement in the status of women in the United Nations System :\",\"effective_year\":2025,\"similarity\":\"0.71\"},{\"symbol\":\"E/CN.5/2025/3\",\"proper_title\":\"Strengthening social cohesion through social inclusion :\",\"effective_year\":2025,\"similarity\":\"0.70\"},{\"symbol\":\"A/80/147\",\"proper_title\":\"Follow-up to the International Year of Older Persons : 2nd World Assembly on Ageing :\",\"effective_year\":2025,\"similarity\":\"0.70\"},{\"symbol\":\"E/2025/58\",\"proper_title\":\"Mainstreaming a gender perspective into all policies and programmes in the United Nations System :\",\"effective_year\":2025,\"similarity\":\"0.70\"},{\"symbol\":\"A/78/211\",\"proper_title\":\"Implementation of the outcome of the World Summit for Social Development and of the 24th special session of the General Assembly :\",\"effective_year\":2023,\"similarity\":\"0.70\"},{\"symbol\":\"E/CN.6/2025/3\",\"proper_title\":\"Review and appraisal of the implementation of the Beijing Declaration and Platform for Action and the outcomes of the 23rd special session of the General Assembly :\",\"effective_year\":2024,\"similarity\":\"0.70\"}]}"
+        },
+        {
+          "role": "assistant",
+          "content": "## Semantically related to `A/79/111`\nClosest matches focus on gender equality, women’s empowerment, gender mainstreaming, and social development. Below are the top similar latest reports (higher similarity = more similar).\n\n| Symbol | Proper title | Year | Similarity |\n|---|---|---:|---:|\n| `A/79/210` | Women in development : | 2024 | 0.80 |\n| `E/CN.6/2024/3` | Accelerating the achievement of gender equality and the empowerment of all women and girls by addressing poverty and strengthening institutions and financing with a gender perspective : | 2024 | 0.75 |\n| `A/80/262` | Improvement of the situation of women and girls in rural areas : | 2025 | 0.74 |\n| `E/CN.5/2024/3` | Fostering social development and social justice through social policies to accelerate progress on the implementation of the 2030 Agenda for Sustainable Development and to achieve the overarching goal of poverty eradication : | 2023 | 0.71 |\n| `A/80/260` | Improvement in the status of women in the United Nations System : | 2025 | 0.71 |\n| `E/CN.5/2025/3` | Strengthening social cohesion through social inclusion : | 2025 | 0.70 |\n| `A/80/147` | Follow-up to the International Year of Older Persons : 2nd World Assembly on Ageing : | 2025 | 0.70 |\n| `E/2025/58` | Mainstreaming a gender perspective into all policies and programmes in the United Nations System : | 2025 | 0.70 |\n| `A/78/211` | Implementation of the outcome of the World Summit for Social Development and of the 24th special session of the General Assembly : | 2023 | 0.70 |\n| `E/CN.6/2025/3` | Review and appraisal of the implementation of the Beijing Declaration and Platform for Action and the outcomes of the 23rd special session of the General Assembly : | 2024 | 0.70 |"
+        }
+      ],
+      "toolCalls": [
+        {
+          "name": "query_database",
+          "args": {
+            "query": "WITH source AS (\n  SELECT d.embedding\n  FROM documents d\n  WHERE d.symbol = 'A/79/111' AND d.embedding IS NOT NULL\n)\nSELECT \n  lv.symbol,\n  lv.proper_title,\n  lv.effective_year,\n  ROUND((1 - (lv.embedding <=> s.embedding))::numeric, 2) AS similarity\nFROM latest_versions lv\nCROSS JOIN source s\nWHERE lv.embedding IS NOT NULL\n  AND lv.symbol != 'A/79/111'\nORDER BY lv.embedding <=> s.embedding\nLIMIT 10;",
+            "explanation": "Find the 10 most semantically similar latest reports to A/79/111 using embeddings and return a rounded similarity score."
+          },
+          "result": {
+            "explanation": "Find the 10 most semantically similar latest reports to A/79/111 using embeddings and return a rounded similarity score.",
+            "rowCount": 10,
+            "rows": [
+              {
+                "symbol": "A/79/210",
+                "proper_title": "Women in development :",
+                "effective_year": 2024,
+                "similarity": "0.80"
+              },
+              {
+                "symbol": "E/CN.6/2024/3",
+                "proper_title": "Accelerating the achievement of gender equality and the empowerment of all women and girls by addressing poverty and strengthening institutions and financing with a gender perspective :",
+                "effective_year": 2024,
+                "similarity": "0.75"
+              },
+              {
+                "symbol": "A/80/262",
+                "proper_title": "Improvement of the situation of women and girls in rural areas :",
+                "effective_year": 2025,
+                "similarity": "0.74"
+              },
+              {
+                "symbol": "E/CN.5/2024/3",
+                "proper_title": "Fostering social development and social justice through social policies to accelerate progress on the implementation of the 2030 Agenda for Sustainable Development and to achieve the overarching goal of poverty eradication :",
+                "effective_year": 2023,
+                "similarity": "0.71"
+              },
+              {
+                "symbol": "A/80/260",
+                "proper_title": "Improvement in the status of women in the United Nations System :",
+                "effective_year": 2025,
+                "similarity": "0.71"
+              },
+              {
+                "symbol": "E/CN.5/2025/3",
+                "proper_title": "Strengthening social cohesion through social inclusion :",
+                "effective_year": 2025,
+                "similarity": "0.70"
+              },
+              {
+                "symbol": "A/80/147",
+                "proper_title": "Follow-up to the International Year of Older Persons : 2nd World Assembly on Ageing :",
+                "effective_year": 2025,
+                "similarity": "0.70"
+              },
+              {
+                "symbol": "E/2025/58",
+                "proper_title": "Mainstreaming a gender perspective into all policies and programmes in the United Nations System :",
+                "effective_year": 2025,
+                "similarity": "0.70"
+              },
+              {
+                "symbol": "A/78/211",
+                "proper_title": "Implementation of the outcome of the World Summit for Social Development and of the 24th special session of the General Assembly :",
+                "effective_year": 2023,
+                "similarity": "0.70"
+              },
+              {
+                "symbol": "E/CN.6/2025/3",
+                "proper_title": "Review and appraisal of the implementation of the Beijing Declaration and Platform for Action and the outcomes of the 23rd special session of the General Assembly :",
+                "effective_year": 2024,
+                "similarity": "0.70"
+              }
+            ]
+          },
+          "success": true
+        }
+      ],
+      "finalResponse": "## Semantically related to `A/79/111`\nClosest matches focus on gender equality, women’s empowerment, gender mainstreaming, and social development. Below are the top similar latest reports (higher similarity = more similar).\n\n| Symbol | Proper title | Year | Similarity |\n|---|---|---:|---:|\n| `A/79/210` | Women in development : | 2024 | 0.80 |\n| `E/CN.6/2024/3` | Accelerating the achievement of gender equality and the empowerment of all women and girls by addressing poverty and strengthening institutions and financing with a gender perspective : | 2024 | 0.75 |\n| `A/80/262` | Improvement of the situation of women and girls in rural areas : | 2025 | 0.74 |\n| `E/CN.5/2024/3` | Fostering social development and social justice through social policies to accelerate progress on the implementation of the 2030 Agenda for Sustainable Development and to achieve the overarching goal of poverty eradication : | 2023 | 0.71 |\n| `A/80/260` | Improvement in the status of women in the United Nations System : | 2025 | 0.71 |\n| `E/CN.5/2025/3` | Strengthening social cohesion through social inclusion : | 2025 | 0.70 |\n| `A/80/147` | Follow-up to the International Year of Older Persons : 2nd World Assembly on Ageing : | 2025 | 0.70 |\n| `E/2025/58` | Mainstreaming a gender perspective into all policies and programmes in the United Nations System : | 2025 | 0.70 |\n| `A/78/211` | Implementation of the outcome of the World Summit for Social Development and of the 24th special session of the General Assembly : | 2023 | 0.70 |\n| `E/CN.6/2025/3` | Review and appraisal of the implementation of the Beijing Declaration and Platform for Action and the outcomes of the 23rd special session of the General Assembly : | 2024 | 0.70 |",
+      "sqlQueries": [
+        "WITH source AS (\n  SELECT d.embedding\n  FROM documents d\n  WHERE d.symbol = 'A/79/111' AND d.embedding IS NOT NULL\n)\nSELECT \n  lv.symbol,\n  lv.proper_title,\n  lv.effective_year,\n  ROUND((1 - (lv.embedding <=> s.embedding))::numeric, 2) AS similarity\nFROM latest_versions lv\nCROSS JOIN source s\nWHERE lv.embedding IS NOT NULL\n  AND lv.symbol != 'A/79/111'\nORDER BY lv.embedding <=> s.embedding\nLIMIT 10;"
+      ],
+      "errors": [],
+      "iterations": 2
+    },
+    {
+      "testCase": {
+        "id": 3,
+        "prompt": "What resolution mandates report A/79/1?",
+        "expectedBehavior": "Should query sg_report_mandates view or based_on_resolution_symbols array"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "What resolution mandates report A/79/1?"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT rm.resolution_symbol, rm.resolution_title, rm.resolution_year\\nFROM sg_report_mandates rm\\nWHERE rm.report_symbol = 'A/79/1';\",\"explanation\":\"Find the resolution(s) that mandate the SG report A/79/1.\"}",
+                "name": "query_database"
+              },
+              "id": "call_ZNQ8mgumXNLyY35ZgneMSBFp",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_ZNQ8mgumXNLyY35ZgneMSBFp",
+          "content": "{\"explanation\":\"Find the resolution(s) that mandate the SG report A/79/1.\",\"rowCount\":0,\"rows\":[]}"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT symbol, proper_title, title, based_on_resolution_symbols\\nFROM documents\\nWHERE symbol = 'A/79/1';\",\"explanation\":\"Get metadata for A/79/1 to see if it lists mandating resolutions.\"}",
+                "name": "query_database"
+              },
+              "id": "call_8UjA2gw3eG6t38FY560BsZG7",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_8UjA2gw3eG6t38FY560BsZG7",
+          "content": "{\"explanation\":\"Get metadata for A/79/1 to see if it lists mandating resolutions.\",\"rowCount\":1,\"rows\":[{\"symbol\":\"A/79/1\",\"proper_title\":\"Report of the Secretary-General on the work of the Organization\",\"title\":null,\"based_on_resolution_symbols\":null}]}"
+        },
+        {
+          "role": "assistant",
+          "content": "No resolution mandates `A/79/1`. The Secretary-General’s annual “Report on the work of the Organization” is mandated by Article 98 of the UN Charter, not by a General Assembly resolution."
+        }
+      ],
+      "toolCalls": [
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT rm.resolution_symbol, rm.resolution_title, rm.resolution_year\nFROM sg_report_mandates rm\nWHERE rm.report_symbol = 'A/79/1';",
+            "explanation": "Find the resolution(s) that mandate the SG report A/79/1."
+          },
+          "result": {
+            "explanation": "Find the resolution(s) that mandate the SG report A/79/1.",
+            "rowCount": 0,
+            "rows": []
+          },
+          "success": true
+        },
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT symbol, proper_title, title, based_on_resolution_symbols\nFROM documents\nWHERE symbol = 'A/79/1';",
+            "explanation": "Get metadata for A/79/1 to see if it lists mandating resolutions."
+          },
+          "result": {
+            "explanation": "Get metadata for A/79/1 to see if it lists mandating resolutions.",
+            "rowCount": 1,
+            "rows": [
+              {
+                "symbol": "A/79/1",
+                "proper_title": "Report of the Secretary-General on the work of the Organization",
+                "title": null,
+                "based_on_resolution_symbols": null
+              }
+            ]
+          },
+          "success": true
+        }
+      ],
+      "finalResponse": "No resolution mandates `A/79/1`. The Secretary-General’s annual “Report on the work of the Organization” is mandated by Article 98 of the UN Charter, not by a General Assembly resolution.",
+      "sqlQueries": [
+        "SELECT rm.resolution_symbol, rm.resolution_title, rm.resolution_year\nFROM sg_report_mandates rm\nWHERE rm.report_symbol = 'A/79/1';",
+        "SELECT symbol, proper_title, title, based_on_resolution_symbols\nFROM documents\nWHERE symbol = 'A/79/1';"
+      ],
+      "errors": [],
+      "iterations": 3
+    },
+    {
+      "testCase": {
+        "id": 4,
+        "prompt": "Show me all reports mandated by resolution A/RES/77/74",
+        "expectedBehavior": "Should query sg_report_mandates with resolution_symbol filter"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "Show me all reports mandated by resolution A/RES/77/74"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT rm.report_symbol, COALESCE(d.proper_title, rm.report_title) AS proper_title, d.un_body\\nFROM sg_report_mandates rm\\nLEFT JOIN documents d ON d.symbol = rm.report_symbol\\nWHERE rm.resolution_symbol = 'A/RES/77/74'\\nORDER BY rm.report_symbol;\",\"explanation\":\"List all reports linked to resolution A/RES/77/74, showing the report symbol, title (prefer proper_title), and UN body.\"}",
+                "name": "query_database"
+              },
+              "id": "call_rJZmnZyXS4OtStzxOeybcI8k",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_rJZmnZyXS4OtStzxOeybcI8k",
+          "content": "{\"explanation\":\"List all reports linked to resolution A/RES/77/74, showing the report symbol, title (prefer proper_title), and UN body.\",\"rowCount\":1,\"rows\":[{\"report_symbol\":\"A/78/118\",\"proper_title\":\"Nuclear disarmament; follow-up to the advisory opinion of the International Court of Justice on the legality of the threat or use of nuclear weapons; reducing nuclear danger :\",\"un_body\":\"{\\\"General Assembly\\\"}\"}]}"
+        },
+        {
+          "role": "assistant",
+          "content": "## Reports mandated by A/RES/77/74\n\n1 report found.\n\n| Symbol   | Proper Title                                                                                                                                              | UN Body          |\n|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|\n| A/78/118 | Nuclear disarmament; follow-up to the advisory opinion of the International Court of Justice on the legality of the threat or use of nuclear weapons; reducing nuclear danger : | General Assembly |"
+        }
+      ],
+      "toolCalls": [
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT rm.report_symbol, COALESCE(d.proper_title, rm.report_title) AS proper_title, d.un_body\nFROM sg_report_mandates rm\nLEFT JOIN documents d ON d.symbol = rm.report_symbol\nWHERE rm.resolution_symbol = 'A/RES/77/74'\nORDER BY rm.report_symbol;",
+            "explanation": "List all reports linked to resolution A/RES/77/74, showing the report symbol, title (prefer proper_title), and UN body."
+          },
+          "result": {
+            "explanation": "List all reports linked to resolution A/RES/77/74, showing the report symbol, title (prefer proper_title), and UN body.",
+            "rowCount": 1,
+            "rows": [
+              {
+                "report_symbol": "A/78/118",
+                "proper_title": "Nuclear disarmament; follow-up to the advisory opinion of the International Court of Justice on the legality of the threat or use of nuclear weapons; reducing nuclear danger :",
+                "un_body": "{\"General Assembly\"}"
+              }
+            ]
+          },
+          "success": true
+        }
+      ],
+      "finalResponse": "## Reports mandated by A/RES/77/74\n\n1 report found.\n\n| Symbol   | Proper Title                                                                                                                                              | UN Body          |\n|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|\n| A/78/118 | Nuclear disarmament; follow-up to the advisory opinion of the International Court of Justice on the legality of the threat or use of nuclear weapons; reducing nuclear danger : | General Assembly |",
+      "sqlQueries": [
+        "SELECT rm.report_symbol, COALESCE(d.proper_title, rm.report_title) AS proper_title, d.un_body\nFROM sg_report_mandates rm\nLEFT JOIN documents d ON d.symbol = rm.report_symbol\nWHERE rm.resolution_symbol = 'A/RES/77/74'\nORDER BY rm.report_symbol;"
+      ],
+      "errors": [],
+      "iterations": 2
+    },
+    {
+      "testCase": {
+        "id": 5,
+        "prompt": "Find reports on women's development and tell me which resolutions mandate them",
+        "expectedBehavior": "Should query for reports by topic, then lookup mandating resolutions from sg_report_mandates or based_on_resolution_symbols"
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "Find reports on women's development and tell me which resolutions mandate them"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT sr.symbol, sr.proper_title, SUBSTRING(sr.publication_date,1,4) AS year, rm.resolution_symbol, rm.resolution_title, rm.resolution_year\\nFROM sg_reports sr\\nLEFT JOIN sg_report_mandates rm ON rm.report_symbol = sr.symbol\\nWHERE sr.title ILIKE '%women in development%' \\n   OR (sr.title ILIKE '%women%' AND sr.title ILIKE '%develop%')\\nORDER BY year DESC, sr.symbol;\",\"explanation\":\"Find SG reports (2023+) about women’s development (exact phrase or both words in title) and list their mandating resolutions.\"}",
+                "name": "query_database"
+              },
+              "id": "call_bQ6nI3SGUqwXGx4rWnMiVmJt",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_bQ6nI3SGUqwXGx4rWnMiVmJt",
+          "content": "{\"explanation\":\"Find SG reports (2023+) about women’s development (exact phrase or both words in title) and list their mandating resolutions.\",\"rowCount\":0,\"rows\":[]}"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT symbol, proper_title, title, SUBSTRING(publication_date,1,4) AS year, subject_terms\\nFROM sg_reports\\nWHERE proper_title ILIKE '%women in development%'\\n   OR title ILIKE '%women in development%'\\n   OR subject_terms @> ARRAY['WOMEN IN DEVELOPMENT']\\n   OR ( 'WOMEN' = ANY(subject_terms) AND ('DEVELOPMENT' = ANY(subject_terms) OR 'SUSTAINABLE DEVELOPMENT' = ANY(subject_terms)))\\nORDER BY year DESC;\",\"explanation\":\"Broaden search for SG reports (2023+) related to Women in development using titles and subject_terms.\"}",
+                "name": "query_database"
+              },
+              "id": "call_x3nXkOZQJBu8MF6l0tC76K74",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_x3nXkOZQJBu8MF6l0tC76K74",
+          "content": "{\"explanation\":\"Broaden search for SG reports (2023+) related to Women in development using titles and subject_terms.\",\"rowCount\":2,\"rows\":[{\"symbol\":\"A/79/210\",\"proper_title\":\"Women in development :\",\"title\":null,\"year\":\"2024\",\"subject_terms\":[\"WOMEN IN DEVELOPMENT\",\"WOMEN WORKERS\",\"WOMEN'S EMPLOYMENT\",\"GENDER DISCRIMINATION\",\"GENDER EQUALITY\"]},{\"symbol\":\"A/79/111\",\"proper_title\":\"World survey on the role of women in development : harnessing social protection for gender equality, resilience and transformation :\",\"title\":null,\"year\":\"2024\",\"subject_terms\":[\"WOMEN IN DEVELOPMENT\",\"POVERTY MITIGATION\",\"SUSTAINABLE DEVELOPMENT\",\"SOCIAL SECURITY\",\"SOCIAL SERVICES\",\"RESILIENCE\",\"WOMEN\",\"GENDER EQUALITY\"]}]}"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "tool_calls": [
+            {
+              "function": {
+                "arguments": "{\"query\":\"SELECT rm.report_symbol, rm.report_title, rm.resolution_symbol, rm.resolution_title, rm.resolution_year\\nFROM sg_report_mandates rm\\nWHERE rm.report_symbol IN ('A/79/210','A/79/111')\\nORDER BY rm.report_symbol, rm.resolution_year DESC;\",\"explanation\":\"Get the mandating resolutions for the two women-in-development SG reports found (A/79/210 and A/79/111).\"}",
+                "name": "query_database"
+              },
+              "id": "call_l6zv2rq66TcaEj3G2zZ55n03",
+              "type": "function"
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "tool_call_id": "call_l6zv2rq66TcaEj3G2zZ55n03",
+          "content": "{\"explanation\":\"Get the mandating resolutions for the two women-in-development SG reports found (A/79/210 and A/79/111).\",\"rowCount\":2,\"rows\":[{\"report_symbol\":\"A/79/111\",\"report_title\":\"World survey on the role of women in development : harnessing social protection for gender equality, resilience and transformation :\",\"resolution_symbol\":\"A/RES/74/235\",\"resolution_title\":\"Women in development :\",\"resolution_year\":2019},{\"report_symbol\":\"A/79/210\",\"report_title\":\"Women in development :\",\"resolution_symbol\":\"A/RES/77/181\",\"resolution_title\":\"Women in development :\",\"resolution_year\":2022}]}"
+        },
+        {
+          "role": "assistant",
+          "content": "## Key findings\n- Two 2024 SG reports on women’s development are in scope; they are mandated by GA resolutions A/RES/77/181 (2022) and A/RES/74/235 (2019). If you need earlier years, I can expand beyond 2023+.\n\n### Reports and mandating resolutions\n| Report symbol | Proper title | Year | Mandating resolution | Resolution title | Resolution year |\n|---|---|---|---|---|---|\n| A/79/210 | Women in development : | 2024 | A/RES/77/181 | Women in development : | 2022 |\n| A/79/111 | World survey on the role of women in development : harnessing social protection for gender equality, resilience and transformation : | 2024 | A/RES/74/235 | Women in development : | 2019 |"
+        }
+      ],
+      "toolCalls": [
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT sr.symbol, sr.proper_title, SUBSTRING(sr.publication_date,1,4) AS year, rm.resolution_symbol, rm.resolution_title, rm.resolution_year\nFROM sg_reports sr\nLEFT JOIN sg_report_mandates rm ON rm.report_symbol = sr.symbol\nWHERE sr.title ILIKE '%women in development%' \n   OR (sr.title ILIKE '%women%' AND sr.title ILIKE '%develop%')\nORDER BY year DESC, sr.symbol;",
+            "explanation": "Find SG reports (2023+) about women’s development (exact phrase or both words in title) and list their mandating resolutions."
+          },
+          "result": {
+            "explanation": "Find SG reports (2023+) about women’s development (exact phrase or both words in title) and list their mandating resolutions.",
+            "rowCount": 0,
+            "rows": []
+          },
+          "success": true
+        },
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT symbol, proper_title, title, SUBSTRING(publication_date,1,4) AS year, subject_terms\nFROM sg_reports\nWHERE proper_title ILIKE '%women in development%'\n   OR title ILIKE '%women in development%'\n   OR subject_terms @> ARRAY['WOMEN IN DEVELOPMENT']\n   OR ( 'WOMEN' = ANY(subject_terms) AND ('DEVELOPMENT' = ANY(subject_terms) OR 'SUSTAINABLE DEVELOPMENT' = ANY(subject_terms)))\nORDER BY year DESC;",
+            "explanation": "Broaden search for SG reports (2023+) related to Women in development using titles and subject_terms."
+          },
+          "result": {
+            "explanation": "Broaden search for SG reports (2023+) related to Women in development using titles and subject_terms.",
+            "rowCount": 2,
+            "rows": [
+              {
+                "symbol": "A/79/210",
+                "proper_title": "Women in development :",
+                "title": null,
+                "year": "2024",
+                "subject_terms": [
+                  "WOMEN IN DEVELOPMENT",
+                  "WOMEN WORKERS",
+                  "WOMEN'S EMPLOYMENT",
+                  "GENDER DISCRIMINATION",
+                  "GENDER EQUALITY"
+                ]
+              },
+              {
+                "symbol": "A/79/111",
+                "proper_title": "World survey on the role of women in development : harnessing social protection for gender equality, resilience and transformation :",
+                "title": null,
+                "year": "2024",
+                "subject_terms": [
+                  "WOMEN IN DEVELOPMENT",
+                  "POVERTY MITIGATION",
+                  "SUSTAINABLE DEVELOPMENT",
+                  "SOCIAL SECURITY",
+                  "SOCIAL SERVICES",
+                  "RESILIENCE",
+                  "WOMEN",
+                  "GENDER EQUALITY"
+                ]
+              }
+            ]
+          },
+          "success": true
+        },
+        {
+          "name": "query_database",
+          "args": {
+            "query": "SELECT rm.report_symbol, rm.report_title, rm.resolution_symbol, rm.resolution_title, rm.resolution_year\nFROM sg_report_mandates rm\nWHERE rm.report_symbol IN ('A/79/210','A/79/111')\nORDER BY rm.report_symbol, rm.resolution_year DESC;",
+            "explanation": "Get the mandating resolutions for the two women-in-development SG reports found (A/79/210 and A/79/111)."
+          },
+          "result": {
+            "explanation": "Get the mandating resolutions for the two women-in-development SG reports found (A/79/210 and A/79/111).",
+            "rowCount": 2,
+            "rows": [
+              {
+                "report_symbol": "A/79/111",
+                "report_title": "World survey on the role of women in development : harnessing social protection for gender equality, resilience and transformation :",
+                "resolution_symbol": "A/RES/74/235",
+                "resolution_title": "Women in development :",
+                "resolution_year": 2019
+              },
+              {
+                "report_symbol": "A/79/210",
+                "report_title": "Women in development :",
+                "resolution_symbol": "A/RES/77/181",
+                "resolution_title": "Women in development :",
+                "resolution_year": 2022
+              }
+            ]
+          },
+          "success": true
+        }
+      ],
+      "finalResponse": "## Key findings\n- Two 2024 SG reports on women’s development are in scope; they are mandated by GA resolutions A/RES/77/181 (2022) and A/RES/74/235 (2019). If you need earlier years, I can expand beyond 2023+.\n\n### Reports and mandating resolutions\n| Report symbol | Proper title | Year | Mandating resolution | Resolution title | Resolution year |\n|---|---|---|---|---|---|\n| A/79/210 | Women in development : | 2024 | A/RES/77/181 | Women in development : | 2022 |\n| A/79/111 | World survey on the role of women in development : harnessing social protection for gender equality, resilience and transformation : | 2024 | A/RES/74/235 | Women in development : | 2019 |",
+      "sqlQueries": [
+        "SELECT sr.symbol, sr.proper_title, SUBSTRING(sr.publication_date,1,4) AS year, rm.resolution_symbol, rm.resolution_title, rm.resolution_year\nFROM sg_reports sr\nLEFT JOIN sg_report_mandates rm ON rm.report_symbol = sr.symbol\nWHERE sr.title ILIKE '%women in development%' \n   OR (sr.title ILIKE '%women%' AND sr.title ILIKE '%develop%')\nORDER BY year DESC, sr.symbol;",
+        "SELECT symbol, proper_title, title, SUBSTRING(publication_date,1,4) AS year, subject_terms\nFROM sg_reports\nWHERE proper_title ILIKE '%women in development%'\n   OR title ILIKE '%women in development%'\n   OR subject_terms @> ARRAY['WOMEN IN DEVELOPMENT']\n   OR ( 'WOMEN' = ANY(subject_terms) AND ('DEVELOPMENT' = ANY(subject_terms) OR 'SUSTAINABLE DEVELOPMENT' = ANY(subject_terms)))\nORDER BY year DESC;",
+        "SELECT rm.report_symbol, rm.report_title, rm.resolution_symbol, rm.resolution_title, rm.resolution_year\nFROM sg_report_mandates rm\nWHERE rm.report_symbol IN ('A/79/210','A/79/111')\nORDER BY rm.report_symbol, rm.resolution_year DESC;"
+      ],
+      "errors": [],
+      "iterations": 4
+    }
+  ]
+}

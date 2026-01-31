@@ -8,10 +8,15 @@
 -- to restore permissions.
 
 -- Create the user (run as superuser/admin)
--- Password should be set via environment variable in production
+-- IMPORTANT: Replace 'CHANGE_THIS_PASSWORD' with actual password before running!
+-- Use the password from DATABASE_URL_CHAT in .env
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'chat_readonly') THEN
+    -- Security check: prevent running with default password
+    IF 'CHANGE_THIS_PASSWORD' = 'CHANGE_THIS_PASSWORD' THEN
+      RAISE EXCEPTION 'SECURITY ERROR: You must change the password in this script before running. Use password from DATABASE_URL_CHAT in .env';
+    END IF;
     CREATE USER chat_readonly WITH PASSWORD 'CHANGE_THIS_PASSWORD';
   END IF;
 END
@@ -31,7 +36,9 @@ GRANT USAGE ON SCHEMA sg_reports_survey TO chat_readonly;
 
 --------------------------------------------------------------------------------
 -- ALLOWED TABLES AND VIEWS
--- These are the objects the AI chat can query (must match ALLOWED_TABLES in chat-tools.ts)
+-- These are the objects the AI chat can query
+-- The TypeScript safety checker only blocks dangerous keywords and sensitive tables
+-- Real access control is enforced by these database grants
 --------------------------------------------------------------------------------
 
 -- Main documents table
@@ -40,6 +47,10 @@ GRANT SELECT ON sg_reports_survey.documents TO chat_readonly;
 -- Views (grant unconditionally - will fail if view doesn't exist yet)
 GRANT SELECT ON sg_reports_survey.sg_reports TO chat_readonly;
 GRANT SELECT ON sg_reports_survey.latest_versions TO chat_readonly;
+
+-- Resolution views (for AI agent capabilities)
+GRANT SELECT ON sg_reports_survey.resolutions TO chat_readonly;
+GRANT SELECT ON sg_reports_survey.sg_report_mandates TO chat_readonly;
 
 -- Survey and frequency tables
 GRANT SELECT ON sg_reports_survey.survey_responses TO chat_readonly;
@@ -50,14 +61,25 @@ GRANT SELECT ON sg_reports_survey.report_frequency_confirmations TO chat_readonl
 GRANT SELECT ON sg_reports_survey.report_entity_suggestions TO chat_readonly;
 GRANT SELECT ON sg_reports_survey.report_entity_confirmations TO chat_readonly;
 
+-- Resolution mandates table
+GRANT SELECT ON sg_reports_survey.resolution_mandates TO chat_readonly;
+
+-- NOTE: ai_chat_sessions and ai_chat_logs are NOT granted to chat_readonly
+-- These contain sensitive user conversation data and are admin-only
+
 --------------------------------------------------------------------------------
 -- FORBIDDEN TABLES (explicitly revoke just in case)
+-- Sensitive data that must never be accessible to the AI agent
 --------------------------------------------------------------------------------
 REVOKE ALL ON sg_reports_survey.users FROM chat_readonly;
 REVOKE ALL ON sg_reports_survey.magic_tokens FROM chat_readonly;
+REVOKE ALL ON sg_reports_survey.ai_chat_logs FROM chat_readonly;
+REVOKE ALL ON sg_reports_survey.ai_chat_sessions FROM chat_readonly;
 
 -- Set default search_path for the user
-ALTER USER chat_readonly SET search_path TO sg_reports_survey;
+-- Includes 'public' schema to access pgvector operators (<=>)
+-- REVOKE ALL on public tables above ensures no access to other project's data
+ALTER USER chat_readonly SET search_path TO sg_reports_survey, public;
 
 --------------------------------------------------------------------------------
 -- VERIFY PERMISSIONS

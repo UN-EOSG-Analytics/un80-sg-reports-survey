@@ -38,8 +38,8 @@ export async function chatQuery<T = unknown>(
 ): Promise<T[]> {
   const client = await chatPool.connect();
   try {
-    // Ensure we're using the correct schema
-    await client.query(`SET search_path TO ${dbSchema}`);
+    // Set search_path to include app schema and public (for pgvector operators)
+    await client.query(`SET search_path TO ${dbSchema}, public`);
     const result = await client.query(text, params);
     return result.rows;
   } finally {

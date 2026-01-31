@@ -46,6 +46,17 @@ const SYSTEM_PROMPT = `You are a concise AI assistant for the UN Secretary-Gener
 - **survey_responses**: proper_title, user_entity, status, frequency, format, merge_targets[], comments
 - **report_frequencies**: proper_title, calculated_frequency ('annual'|'biennial'|'triennial'|'quadrennial'|'one-time'), gap_history[], year_count
 
+### Resolution Views & Tables
+- **resolutions**: Resolution documents in database (only those referenced by reports, not all UN resolutions)
+- **sg_report_mandates**: Links reports to mandating resolutions. Columns: report_symbol, report_title, resolution_symbol, resolution_title, resolution_year
+- **resolution_mandates**: AI-extracted mandate info. Columns: resolution_symbol, verbatim_paragraph, summary, explicit_frequency, implicit_frequency, frequency_reasoning
+
+### Vector Search
+- Documents have **embedding vector(1024)** column (text-embedding-3-large)
+- Use pgvector's **<=>** operator for cosine distance
+- Lower distance = more similar. Convert to similarity: \`1 - (embedding <=> source_embedding)\`
+- To round similarity scores, cast to numeric first: \`ROUND((1 - distance)::numeric, 2)\`
+
 ## Response Style
 - **Be brief**: 2-3 sentences max for simple questions. Bullet points for lists.
 - **Use markdown**: Headers (##), bullets, tables, \`code\` for symbols
@@ -76,13 +87,55 @@ WHERE rf.calculated_frequency = 'annual';
 
 -- Search by year using publication_date (TEXT)
 SELECT * FROM sg_reports WHERE SUBSTRING(publication_date, 1, 4) = '2024';
+
+-- Find semantically similar reports using vector search
+WITH source AS (
+  SELECT d.embedding
+  FROM documents d
+  WHERE d.symbol = 'A/78/123' AND d.embedding IS NOT NULL
+)
+SELECT 
+  lv.symbol,
+  lv.proper_title,
+  lv.effective_year,
+  1 - (lv.embedding <=> s.embedding) as similarity
+FROM latest_versions lv
+CROSS JOIN source s
+WHERE lv.embedding IS NOT NULL
+  AND lv.symbol != 'A/78/123'
+ORDER BY lv.embedding <=> s.embedding
+LIMIT 5;
+
+-- Find resolutions that mandate a specific report
+SELECT rm.resolution_symbol, rm.resolution_title, rm.resolution_year
+FROM sg_report_mandates rm
+WHERE rm.report_symbol = 'A/78/123';
+
+-- Or use the array directly
+SELECT symbol, proper_title, based_on_resolution_symbols
+FROM documents
+WHERE symbol = 'A/78/123' AND based_on_resolution_symbols IS NOT NULL;
+
+-- Find all reports mandated by a resolution
+SELECT rm.report_symbol, rm.report_title, rm.report_year
+FROM sg_report_mandates rm
+WHERE rm.resolution_symbol = 'A/RES/78/1';
+
+-- Get AI-extracted mandate details (supplementary - prefer read_document for accuracy)
+SELECT resolution_symbol, summary, explicit_frequency, verbatim_paragraph
+FROM resolution_mandates
+WHERE resolution_symbol = 'A/RES/78/1';
 \`\`\`
 
 ## Common Tasks
 - **Summarize a report**: Use read_document to get full text, then summarize key points
 - **Compare reports/versions**: ALWAYS use read_document on BOTH documents to compare actual content, not just SQL metadata. Present differences in a table.
-- **Find similar reports**: Query to find candidates, then read_document to compare content
-- **Find mandating resolutions**: Query based_on_resolution_symbols, then read_document on resolution
+- **Find similar reports**: Use vector search query with \`<=>\` operator to find semantically similar reports based on content embeddings (not just metadata)
+- **Find mandating resolutions**: 
+  1. Query sg_report_mandates view OR documents.based_on_resolution_symbols array
+  2. Optionally join with resolution_mandates for extracted mandate paragraphs and frequency analysis
+  3. Use read_document on resolution symbols to read the full resolution text (often more reliable than resolution_mandates table)
+  4. Note: Database only contains resolutions that are referenced by reports, not all UN resolutions
 - **Find reports by topic**: Query with subject_terms or title ILIKE
 
 ## Important: Content vs Metadata
@@ -209,9 +262,48 @@ const UI_SUGGESTION_CASES: TestCase[] = [
   },
 ];
 
+// New capabilities test cases - vector search and resolution lookups
+// Using real documents that exist in the database
+const NEW_CAPABILITIES_CASES: TestCase[] = [
+  {
+    id: 1,
+    prompt: "Find the top 3 reports most similar to A/79/1",
+    expectedBehavior:
+      "Should use vector search with <=> operator, CTE with source embedding, ORDER BY distance, LIMIT 3",
+  },
+  {
+    id: 2,
+    prompt: "What reports are semantically related to A/79/111?",
+    expectedBehavior:
+      "Should use vector similarity search, return reports with similarity scores",
+  },
+  {
+    id: 3,
+    prompt: "What resolution mandates report A/79/1?",
+    expectedBehavior:
+      "Should query sg_report_mandates view or based_on_resolution_symbols array",
+  },
+  {
+    id: 4,
+    prompt: "Show me all reports mandated by resolution A/RES/77/74",
+    expectedBehavior:
+      "Should query sg_report_mandates with resolution_symbol filter",
+  },
+  {
+    id: 5,
+    prompt: "Find reports on women's development and tell me which resolutions mandate them",
+    expectedBehavior:
+      "Should query for reports by topic, then lookup mandating resolutions from sg_report_mandates or based_on_resolution_symbols",
+  },
+];
+
 // Select test cases based on command line args
 const args = process.argv.slice(2);
-const TEST_CASES = args.includes("--ui-suggestions") ? UI_SUGGESTION_CASES : DEFAULT_TEST_CASES;
+const TEST_CASES = args.includes("--ui-suggestions") 
+  ? UI_SUGGESTION_CASES 
+  : args.includes("--new-capabilities")
+  ? NEW_CAPABILITIES_CASES
+  : DEFAULT_TEST_CASES;
 
 // Call Azure OpenAI API (non-streaming for simplicity)
 async function callChatCompletion(
@@ -412,6 +504,10 @@ function analyzeResults(results: TestResult[]): AnalysisReport {
     usesLatestVersions: 0,
     usesReportFrequencies: 0,
     usesSubjectTermsCorrectly: 0,
+    usesVectorSearch: 0,
+    usesResolutionViews: 0,
+    vectorSearchHasCTE: 0,
+    vectorSearchCalculatesSimilarity: 0,
   };
 
   for (const result of results) {
@@ -465,6 +561,31 @@ function analyzeResults(results: TestResult[]): AnalysisReport {
       ) {
         sqlPatterns.usesSubjectTermsCorrectly++;
       }
+
+      // Check for vector search usage
+      if (lowerQuery.includes("<=>") || lowerQuery.includes("embedding")) {
+        sqlPatterns.usesVectorSearch++;
+        
+        // Check for proper CTE pattern
+        if (lowerQuery.includes("with") && lowerQuery.includes("source")) {
+          sqlPatterns.vectorSearchHasCTE++;
+        }
+        
+        // Check if it calculates similarity (1 - distance)
+        if (lowerQuery.includes("1 -")) {
+          sqlPatterns.vectorSearchCalculatesSimilarity++;
+        }
+      }
+
+      // Check for resolution view usage
+      if (
+        lowerQuery.includes("sg_report_mandates") ||
+        lowerQuery.includes("resolution_mandates") ||
+        lowerQuery.includes("resolutions") ||
+        lowerQuery.includes("based_on_resolution_symbols")
+      ) {
+        sqlPatterns.usesResolutionViews++;
+      }
     }
   }
 
@@ -476,6 +597,10 @@ function analyzeResults(results: TestResult[]): AnalysisReport {
     `latest_versions view usage: ${sqlPatterns.usesLatestVersions} queries`,
     `report_frequencies table usage: ${sqlPatterns.usesReportFrequencies} queries`,
     `Correct array handling (ANY/@>/unnest): ${sqlPatterns.usesSubjectTermsCorrectly} queries`,
+    `Vector search usage (<=>): ${sqlPatterns.usesVectorSearch} queries`,
+    `Vector search with CTE: ${sqlPatterns.vectorSearchHasCTE} queries`,
+    `Vector search calculates similarity: ${sqlPatterns.vectorSearchCalculatesSimilarity} queries`,
+    `Resolution views usage: ${sqlPatterns.usesResolutionViews} queries`,
   ];
 
   // Generate recommendations
@@ -495,6 +620,20 @@ function analyzeResults(results: TestResult[]): AnalysisReport {
     report.recommendations.push(
       "Emphasize latest_versions view which has effective_year and entity columns already computed"
     );
+  }
+
+  // Check vector search quality
+  if (sqlPatterns.usesVectorSearch > 0) {
+    if (sqlPatterns.vectorSearchHasCTE < sqlPatterns.usesVectorSearch) {
+      report.recommendations.push(
+        "Vector searches should use a CTE (WITH source AS...) to get the source embedding"
+      );
+    }
+    if (sqlPatterns.vectorSearchCalculatesSimilarity < sqlPatterns.usesVectorSearch) {
+      report.recommendations.push(
+        "Vector searches should calculate similarity as '1 - (embedding <=> source)' for user-friendly scores"
+      );
+    }
   }
 
   return report;

@@ -107,26 +107,18 @@ export async function readDocument(symbol: string): Promise<ToolResult> {
   }
 }
 
-// Allowed tables for SQL queries (reports-related only)
-const ALLOWED_TABLES = [
-  "documents",
-  "sg_reports",
-  "latest_versions",
-  "report_entity_suggestions",
-  "report_entity_confirmations",
-  "report_frequency_confirmations",
-  "report_frequencies",
-  "survey_responses",
-];
-
-// Forbidden tables (auth/sensitive)
+// Forbidden tables (auth/sensitive/private)
 const FORBIDDEN_TABLES = [
   "users",
   "magic_tokens",
   "sessions",
+  "ai_chat_logs",        // Contains all users' chat history
+  "ai_chat_sessions",    // Aggregated chat data from all users
 ];
 
 // SQL query safety check
+// Simplified approach: block dangerous operations, check for forbidden tables,
+// and let the database handle all table-level access control
 function isQuerySafe(sql: string): { safe: boolean; error?: string } {
   const normalized = sql.trim().toLowerCase();
 
@@ -161,84 +153,19 @@ function isQuerySafe(sql: string): { safe: boolean; error?: string } {
     }
   }
 
-  // Check for forbidden tables
+  // Check for explicitly forbidden tables (sensitive data)
+  // The database will enforce allowed tables via grants, but we block
+  // sensitive tables here for an extra safety layer
   for (const table of FORBIDDEN_TABLES) {
     const regex = new RegExp(`\\b${table}\\b`, "i");
     if (regex.test(sql)) {
-      return { safe: false, error: `Access to table '${table}' is not allowed` };
+      return { safe: false, error: `Access to table '${table}' is not allowed - this contains sensitive data` };
     }
   }
 
-  // Check that query only references allowed tables
-  // Extract potential table names from FROM and JOIN clauses
-  // This regex is more careful to avoid matching:
-  // - EXTRACT(... FROM column) - the FROM inside EXTRACT
-  // - Function calls like FROM unnest(...) 
-  // - SQL keywords like LATERAL
-  // - Table aliases
-
-  // Common SQL keywords and functions that aren't table names
-  const sqlKeywords = new Set([
-    "select", "where", "and", "or", "not", "in", "between", "like", "ilike",
-    "is", "null", "true", "false", "as", "on", "using", "order", "by", "group",
-    "having", "limit", "offset", "union", "intersect", "except", "all", "distinct",
-    "case", "when", "then", "else", "end", "cast", "coalesce", "nullif",
-    "lateral", "cross", "inner", "outer", "left", "right", "full", "natural",
-    "unnest", "array", "any", "some", "exists", "with", "recursive"
-  ]);
-
-  // Match FROM/JOIN followed by table name, handling subqueries and functions
-  const tablePattern = /\b(?:from|join)\s+(?:lateral\s+)?([a-z_][a-z0-9_]*)/gi;
-  let match;
-  while ((match = tablePattern.exec(sql)) !== null) {
-    const tableName = match[1].toLowerCase();
-    
-    // Skip if it's a SQL keyword/function
-    if (sqlKeywords.has(tableName)) {
-      continue;
-    }
-    
-    // Skip if followed by an open parenthesis (it's a function call like unnest())
-    const afterMatch = sql.slice(match.index + match[0].length).trimStart();
-    if (afterMatch.startsWith("(")) {
-      continue;
-    }
-    
-    if (!ALLOWED_TABLES.includes(tableName)) {
-      return { 
-        safe: false, 
-        error: `Table '${tableName}' is not allowed. Allowed tables: ${ALLOWED_TABLES.join(", ")}` 
-      };
-    }
-  }
-
-  // Also check for schema-prefixed tables like public.tablename or schema.tablename
-  // Skip short aliases (1-3 chars) as they're typically table aliases, not schemas
-  const schemaTablePattern = /\b([a-z_][a-z0-9_]*)\.([a-z_][a-z0-9_]*)\b/gi;
-  while ((match = schemaTablePattern.exec(sql)) !== null) {
-    const schema = match[1].toLowerCase();
-    const table = match[2].toLowerCase();
-    
-    // Skip column references like table.column within allowed tables
-    if (ALLOWED_TABLES.includes(schema)) {
-      continue; // It's table.column, not schema.table
-    }
-    
-    // Skip short aliases (1-3 chars) - these are table aliases like rf, sr, lv, d, s
-    if (schema.length <= 3) {
-      continue;
-    }
-    
-    // If it looks like schema.table format and schema isn't an allowed table,
-    // check if the table part is allowed
-    if (!ALLOWED_TABLES.includes(table) && !sqlKeywords.has(schema)) {
-      return { 
-        safe: false, 
-        error: `Schema-prefixed table '${schema}.${table}' is not allowed. Use table names directly: ${ALLOWED_TABLES.join(", ")}` 
-      };
-    }
-  }
-
+  // That's it! The database's grant system will handle everything else.
+  // No need to parse table aliases, CTEs, or check allowed tables -
+  // the chat_readonly user simply won't have access to unauthorized tables.
   return { safe: true };
 }
 

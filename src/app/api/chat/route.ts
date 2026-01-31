@@ -1,5 +1,6 @@
 import { tools, executeTool } from "@/lib/chat-tools";
 import { logChatInteraction } from "@/lib/chat-logger";
+import { getSession } from "@/lib/auth";
 
 // Azure AI Foundry configuration
 function getEndpoint() {
@@ -42,6 +43,7 @@ const SYSTEM_PROMPT = `You are a concise AI assistant for the UN Secretary-Gener
 - Documents have **embedding vector(1024)** column (text-embedding-3-large)
 - Use pgvector's **<=>** operator for cosine distance
 - Lower distance = more similar. Convert to similarity: \`1 - (embedding <=> source_embedding)\`
+- To round similarity scores, cast to numeric first: \`ROUND((1 - distance)::numeric, 2)\`
 
 ## Response Style
 - **Be brief**: 2-3 sentences max for simple questions. Bullet points for lists.
@@ -153,8 +155,8 @@ interface ChatRequest {
   messages: ChatMessage[];
   initialPrompt?: string;
   sessionId?: string;
-  userId?: string;
   interactionIndex?: number;
+  // Note: userId is extracted server-side from session cookie, not from request body
 }
 
 // SSE event types
@@ -235,7 +237,11 @@ export async function POST(request: Request) {
   try {
     const body: ChatRequest = await request.json();
     let { messages } = body;
-    const { initialPrompt, sessionId, userId, interactionIndex } = body;
+    const { initialPrompt, sessionId, interactionIndex } = body;
+
+    // Get userId from session cookie (server-side auth)
+    const session = await getSession();
+    const userId = session?.userId || undefined;
 
     // If there's an initial prompt (from URL params), add it as first user message
     if (initialPrompt && messages.length === 0) {

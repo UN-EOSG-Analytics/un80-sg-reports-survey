@@ -57,6 +57,13 @@ export interface ReportGroup {
   calculatedFrequency?: string | null; // From Python weighted-mode
   confirmedFrequency?: string | null; // User confirmed
   gapHistory?: number[] | null; // Year gaps for transparency
+  responseCount?: number;
+  responseStats?: {
+    continue: number;
+    continueWithChanges: number;
+    merge: number;
+    discontinue: number;
+  };
   subjectTerms: string[];
 }
 
@@ -99,6 +106,65 @@ export interface SimilarReport {
   year: number | null;
   similarity: number;
   entity: string | null;
+}
+
+interface VisibleSurveyResponse {
+  id: number;
+  properTitle: string;
+  normalizedBody: string;
+  latestSymbol: string;
+  status: string;
+  frequency: string | null;
+  format: string | null;
+  formatOther: string | null;
+  mergeTargets: string[];
+  discontinueReason: string | null;
+  comments: string | null;
+  createdAt: string;
+  updatedAt: string;
+  userEntity: string;
+  responderEmail: string | null;
+}
+
+interface EntityResponseCount {
+  entity: string;
+  count: number;
+}
+
+function getActionMetaFromResponse(resp: VisibleSurveyResponse): {
+  label: string;
+  shortLabel: string;
+  className: string;
+} {
+  const isContinueWithChanges =
+    resp.status === "continue" && (resp.frequency !== null || resp.format !== null);
+
+  if (isContinueWithChanges) {
+    return {
+      label: "Continue with changes",
+      shortLabel: "Cont w ch",
+      className: "bg-blue-50 border-blue-200 text-blue-700",
+    };
+  }
+  if (resp.status === "continue") {
+    return {
+      label: "Continue",
+      shortLabel: "Cont",
+      className: "bg-green-50 border-green-200 text-green-700",
+    };
+  }
+  if (resp.status === "merge") {
+    return {
+      label: "Merge with another report",
+      shortLabel: "Merge",
+      className: "bg-amber-50 border-amber-200 text-amber-700",
+    };
+  }
+  return {
+    label: "Discontinue",
+    shortLabel: "Disc",
+    className: "bg-red-50 border-red-200 text-red-700",
+  };
 }
 
 // Feedback types (for survey responses)
@@ -1275,6 +1341,9 @@ export function ReportSidebar({
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [loadingExisting, setLoadingExisting] = useState(true);
+  const [responseCount, setResponseCount] = useState(0);
+  const [entityResponseCounts, setEntityResponseCounts] = useState<EntityResponseCount[]>([]);
+  const [allResponses, setAllResponses] = useState<VisibleSurveyResponse[]>([]);
   
   // Entity confirmation state (optimistic updates)
   const [confirming, setConfirming] = useState(false);
@@ -1331,6 +1400,9 @@ export function ReportSidebar({
     setLocalFrequencyConfirmed(null);
     setLocalFrequencyRemoved(false);
     setMandatingParagraphsExpanded(false);
+    setResponseCount(0);
+    setEntityResponseCounts([]);
+    setAllResponses([]);
   }, [report?.title]);
 
   // Handle confirming entity ownership with role
@@ -1481,9 +1553,14 @@ export function ReportSidebar({
     if (!report) return;
     setLoadingExisting(true);
     setSaveSuccess(false);
-    fetch(`/api/survey-responses?properTitle=${encodeURIComponent(report.title)}`)
+    fetch(
+      `/api/survey-responses?properTitle=${encodeURIComponent(report.title)}&normalizedBody=${encodeURIComponent(report.body || "")}`
+    )
       .then((r) => r.json())
       .then((data) => {
+        setResponseCount(typeof data.responseCount === "number" ? data.responseCount : 0);
+        setEntityResponseCounts(Array.isArray(data.entityResponseCounts) ? data.entityResponseCounts : []);
+        setAllResponses(Array.isArray(data.allResponses) ? data.allResponses : []);
         if (data.response) {
           // Map old "continue" with frequency/format to "continue_with_changes"
           let status = data.response.status as FeedbackStatus;
@@ -1514,7 +1591,7 @@ export function ReportSidebar({
       })
       .catch(() => {})
       .finally(() => setLoadingExisting(false));
-  }, [report?.title, sidebarOpenCount]);
+  }, [report?.title, report?.body, sidebarOpenCount]);
 
   const updateFeedback = useCallback(<K extends keyof Omit<Feedback, 'mergeTargets'>>(
     key: K,
@@ -1553,6 +1630,7 @@ export function ReportSidebar({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           properTitle: report.title,
+          normalizedBody: report.body || "",
           latestSymbol: report.symbol,
           status: apiStatus,
           frequency: feedback.status === "continue_with_changes" || feedback.status === "merge" ? feedback.frequency : null,
@@ -1566,6 +1644,16 @@ export function ReportSidebar({
       
       if (response.ok) {
         setSaveSuccess(true);
+        fetch(
+          `/api/survey-responses?properTitle=${encodeURIComponent(report.title)}&normalizedBody=${encodeURIComponent(report.body || "")}`
+        )
+          .then((r) => r.json())
+          .then((data) => {
+            setResponseCount(typeof data.responseCount === "number" ? data.responseCount : 0);
+            setEntityResponseCounts(Array.isArray(data.entityResponseCounts) ? data.entityResponseCounts : []);
+            setAllResponses(Array.isArray(data.allResponses) ? data.allResponses : []);
+          })
+          .catch(() => {});
         onSave?.();
       }
     } catch (error) {
@@ -1758,6 +1846,99 @@ export function ReportSidebar({
                 />
                 <h3 className="text-sm font-medium text-gray-700">Provide Feedback</h3>
               </div>
+              <div className="flex flex-wrap items-center gap-1 text-xs text-gray-500">
+                <span>Responses submitted:</span>
+                {entityResponseCounts.length > 0 ? (
+                  entityResponseCounts.map((item) => (
+                    <span
+                      key={item.entity}
+                      className="inline-flex items-center gap-1 rounded-full border border-gray-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-gray-700"
+                    >
+                      <span>{item.entity}</span>
+                      <span>{item.count}</span>
+                    </span>
+                  ))
+                ) : (
+                  <span>{responseCount}</span>
+                )}
+              </div>
+
+              {allResponses.length > 0 && (
+                <div className="rounded-md border border-gray-200 bg-white p-2 space-y-2 max-h-56 overflow-y-auto">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Admin view: all submitted responses
+                  </p>
+                  {allResponses.map((resp) => (
+                    <div key={resp.id} className="rounded border border-gray-100 bg-gray-50 p-2 text-xs text-gray-600 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium text-gray-700">
+                          {resp.userEntity || "Unknown entity"}{resp.responderEmail ? ` - ${resp.responderEmail}` : ""}
+                        </span>
+                      </div>
+
+                      <div>
+                        <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-0.5">
+                          What action do you recommend?
+                        </p>
+                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${getActionMetaFromResponse(resp).className}`}>
+                          {getActionMetaFromResponse(resp).label}
+                        </span>
+                      </div>
+
+                      {(resp.frequency || resp.format) && (
+                        <div className="space-y-1">
+                          {resp.frequency && (
+                            <div>
+                              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-0.5">
+                                What frequency do you recommend?
+                              </p>
+                              <p>{resp.frequency}</p>
+                            </div>
+                          )}
+                          {resp.format && (
+                            <div>
+                              <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-0.5">
+                                What format do you recommend?
+                              </p>
+                              <p>
+                                {resp.format}
+                                {resp.format === "other" && resp.formatOther ? ` (${resp.formatOther})` : ""}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {resp.mergeTargets?.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-0.5">
+                            Which report(s) to merge with?
+                          </p>
+                          <p>{resp.mergeTargets.join(", ")}</p>
+                        </div>
+                      )}
+
+                      {resp.discontinueReason && (
+                        <div>
+                          <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-0.5">
+                            Why discontinue this report?
+                          </p>
+                          <p>{resp.discontinueReason}</p>
+                        </div>
+                      )}
+
+                      {resp.comments && (
+                        <div>
+                          <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-0.5">
+                            Any additional comments?
+                          </p>
+                          <p>{resp.comments}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Not ready - Step 1 incomplete */}
               {!isFrequencyConfirmed && (

@@ -31,7 +31,7 @@ export default async function ReportsPage() {
                 (2023 to present)
               </p>
             </div>
-            <ReportsTable mode="all" userEntity={user?.entity} userEmail={user?.email} />
+            <ReportsTable mode="all" userEntity={user?.entity} userEmail={user?.email} userRole={user?.role} />
           </section>
         </div>
       </main>

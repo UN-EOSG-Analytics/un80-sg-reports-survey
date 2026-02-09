@@ -41,6 +41,11 @@ interface ReportRow {
   calculated_frequency: string | null;
   confirmed_frequency: string | null;
   gap_history: number[] | null;
+  response_count: number;
+  response_continue_count: number;
+  response_continue_changes_count: number;
+  response_merge_count: number;
+  response_discontinue_count: number;
 }
 
 interface SingleReportRow {
@@ -104,6 +109,17 @@ export async function GET(req: NextRequest) {
   const filterSubjects = req.nextUrl.searchParams.getAll("filterSubject");
   const filterEntities = req.nextUrl.searchParams.getAll("filterEntity"); // Filter by reporting entities
   const filterReportTypes = req.nextUrl.searchParams.getAll("filterReportType"); // Filter by report type (Report/Note/Other)
+  const filterResponses = req.nextUrl.searchParams
+    .getAll("filterResponse")
+    .filter((value) =>
+      value === "continue" ||
+      value === "continue_changes" ||
+      value === "merge" ||
+      value === "discontinue"
+    );
+  const sortColumn = req.nextUrl.searchParams.get("sortColumn");
+  const sortDirectionParam = req.nextUrl.searchParams.get("sortDirection");
+  const sortDirection = sortDirectionParam === "desc" ? "DESC" : "ASC";
   
   // Survey focus years (2023 to present) - base filter applied to all queries
   const currentYear = new Date().getFullYear();
@@ -277,8 +293,39 @@ export async function GET(req: NextRequest) {
     havingParamIndex++;
   }
 
+  const responsePredicates: string[] = [];
+  if (filterResponses.includes("continue")) {
+    responsePredicates.push("response_continue_count > 0");
+  }
+  if (filterResponses.includes("continue_changes")) {
+    responsePredicates.push("response_continue_changes_count > 0");
+  }
+  if (filterResponses.includes("merge")) {
+    responsePredicates.push("response_merge_count > 0");
+  }
+  if (filterResponses.includes("discontinue")) {
+    responsePredicates.push("response_discontinue_count > 0");
+  }
+  const responseFilterSQL = responsePredicates.length > 0
+    ? `AND (${responsePredicates.join(" OR ")})`
+    : "";
+
   const whereClause = whereClauses.length > 0 ? whereClauses.join(" AND ") : "TRUE";
   const havingClause = havingClauses.length > 0 ? `HAVING ${havingClauses.join(" AND ")}` : "";
+
+  const sortColumnSQLMap: Record<string, string> = {
+    symbol: "symbols[1]",
+    title: "proper_title",
+    entity: "primary_entity",
+    body: "normalized_body",
+    year: "latest_year",
+    frequency: "COALESCE(confirmed_frequency, calculated_frequency)",
+    responseCount: "response_count",
+  };
+  const sortExpression = sortColumn ? sortColumnSQLMap[sortColumn] : null;
+  const orderByClause = sortExpression
+    ? `${sortExpression} ${sortDirection} NULLS LAST, proper_title ASC, normalized_body ASC`
+    : "latest_year DESC NULLS LAST, proper_title, normalized_body";
 
   // Build the main query with CTE to calculate frequency
   const allParams = [...params, ...havingParams];
@@ -322,6 +369,28 @@ export async function GET(req: NextRequest) {
           (SELECT rfc.frequency FROM ${DB_SCHEMA}.report_frequency_confirmations rfc 
            WHERE rfc.proper_title = sub.proper_title
            AND rfc.normalized_body = COALESCE(sub.normalized_body, '')) as confirmed_frequency,
+          (SELECT COUNT(*)::int FROM ${DB_SCHEMA}.survey_responses sr
+           WHERE sr.proper_title = sub.proper_title
+           AND sr.normalized_body = COALESCE(sub.normalized_body, '')) as response_count,
+          (SELECT COUNT(*)::int FROM ${DB_SCHEMA}.survey_responses sr
+           WHERE sr.proper_title = sub.proper_title
+           AND sr.normalized_body = COALESCE(sub.normalized_body, '')
+           AND sr.status = 'continue'
+           AND sr.frequency IS NULL
+           AND sr.format IS NULL) as response_continue_count,
+          (SELECT COUNT(*)::int FROM ${DB_SCHEMA}.survey_responses sr
+           WHERE sr.proper_title = sub.proper_title
+           AND sr.normalized_body = COALESCE(sub.normalized_body, '')
+           AND sr.status = 'continue'
+           AND (sr.frequency IS NOT NULL OR sr.format IS NOT NULL)) as response_continue_changes_count,
+          (SELECT COUNT(*)::int FROM ${DB_SCHEMA}.survey_responses sr
+           WHERE sr.proper_title = sub.proper_title
+           AND sr.normalized_body = COALESCE(sub.normalized_body, '')
+           AND sr.status = 'merge') as response_merge_count,
+          (SELECT COUNT(*)::int FROM ${DB_SCHEMA}.survey_responses sr
+           WHERE sr.proper_title = sub.proper_title
+           AND sr.normalized_body = COALESCE(sub.normalized_body, '')
+           AND sr.status = 'discontinue') as response_discontinue_count,
           COUNT(*)::int as count,
           MAX(effective_year) as latest_year
         FROM (
@@ -362,8 +431,8 @@ export async function GET(req: NextRequest) {
         ${havingClause}
       )
       SELECT * FROM grouped
-      WHERE 1=1 ${frequencyFilterSQL}
-      ORDER BY latest_year DESC NULLS LAST, proper_title, normalized_body
+      WHERE 1=1 ${frequencyFilterSQL} ${responseFilterSQL}
+      ORDER BY ${orderByClause}
       LIMIT $${limitParamIndex} OFFSET $${limitParamIndex + 1}`,
       [...allParams, limit, offset]
     ),
@@ -381,6 +450,28 @@ export async function GET(req: NextRequest) {
           (SELECT rfc.frequency FROM ${DB_SCHEMA}.report_frequency_confirmations rfc 
            WHERE rfc.proper_title = sub.proper_title
            AND rfc.normalized_body = COALESCE(sub.normalized_body, '')) as confirmed_frequency,
+          (SELECT COUNT(*)::int FROM ${DB_SCHEMA}.survey_responses sr
+           WHERE sr.proper_title = sub.proper_title
+           AND sr.normalized_body = COALESCE(sub.normalized_body, '')) as response_count,
+          (SELECT COUNT(*)::int FROM ${DB_SCHEMA}.survey_responses sr
+           WHERE sr.proper_title = sub.proper_title
+           AND sr.normalized_body = COALESCE(sub.normalized_body, '')
+           AND sr.status = 'continue'
+           AND sr.frequency IS NULL
+           AND sr.format IS NULL) as response_continue_count,
+          (SELECT COUNT(*)::int FROM ${DB_SCHEMA}.survey_responses sr
+           WHERE sr.proper_title = sub.proper_title
+           AND sr.normalized_body = COALESCE(sub.normalized_body, '')
+           AND sr.status = 'continue'
+           AND (sr.frequency IS NOT NULL OR sr.format IS NOT NULL)) as response_continue_changes_count,
+          (SELECT COUNT(*)::int FROM ${DB_SCHEMA}.survey_responses sr
+           WHERE sr.proper_title = sub.proper_title
+           AND sr.normalized_body = COALESCE(sub.normalized_body, '')
+           AND sr.status = 'merge') as response_merge_count,
+          (SELECT COUNT(*)::int FROM ${DB_SCHEMA}.survey_responses sr
+           WHERE sr.proper_title = sub.proper_title
+           AND sr.normalized_body = COALESCE(sub.normalized_body, '')
+           AND sr.status = 'discontinue') as response_discontinue_count,
           COUNT(*)::int as count,
           MAX(effective_year) as latest_year
         FROM (
@@ -415,7 +506,7 @@ export async function GET(req: NextRequest) {
         ${havingClause}
       )
       SELECT COUNT(*)::int as total FROM grouped
-      WHERE 1=1 ${frequencyFilterSQL}`,
+      WHERE 1=1 ${frequencyFilterSQL} ${responseFilterSQL}`,
       allParams
     ),
     // Body counts (from latest_versions view - one per series)
@@ -531,6 +622,13 @@ export async function GET(req: NextRequest) {
       calculatedFrequency: formatFrequency(r.calculated_frequency),
       confirmedFrequency: formatFrequency(r.confirmed_frequency),
       gapHistory: r.gap_history || null,
+      responseCount: r.response_count || 0,
+      responseStats: {
+        continue: r.response_continue_count || 0,
+        continueWithChanges: r.response_continue_changes_count || 0,
+        merge: r.response_merge_count || 0,
+        discontinue: r.response_discontinue_count || 0,
+      },
       subjectTerms: Array.from(allSubjects),
     };
   });

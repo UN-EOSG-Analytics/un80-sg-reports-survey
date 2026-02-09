@@ -6,32 +6,31 @@ const DB_SCHEMA = process.env.DB_SCHEMA || "sg_reports_survey";
 
 interface SurveyResponseRow {
   proper_title: string;
+  normalized_body: string;
   status: string;
   frequency: string | null;
   format: string | null;
 }
 
-// GET - Fetch all responses for the current user's entity (for display in table)
+// GET - Fetch all responses created by the current user (for display in tables)
 export async function GET() {
   const user = await getCurrentUser();
-  if (!user || !user.entity) {
-    // No user or no entity - return empty responses
+  if (!user) {
     return NextResponse.json({ responses: {} });
   }
 
   try {
-    // Query by entity, not by email (one response per entity per report)
     const rows = await query<SurveyResponseRow>(
-      `SELECT proper_title, status, frequency, format
-       FROM ${DB_SCHEMA}.survey_responses 
-       WHERE user_entity = $1`,
-      [user.entity]
+      `SELECT proper_title, normalized_body, status, frequency, format
+       FROM ${DB_SCHEMA}.survey_responses
+       WHERE responded_by_user_id = $1`,
+      [user.id]
     );
 
-    // Convert to a map keyed by proper_title for easy lookup
     const responses: Record<string, { status: string; frequency: string | null; format: string | null }> = {};
     for (const row of rows) {
-      responses[row.proper_title] = {
+      const key = `${row.proper_title}|||${row.normalized_body || ""}`;
+      responses[key] = {
         status: row.status,
         frequency: row.frequency,
         format: row.format,
@@ -40,7 +39,7 @@ export async function GET() {
 
     return NextResponse.json({ responses });
   } catch (error) {
-    console.error("Error fetching entity responses:", error);
+    console.error("Error fetching user responses:", error);
     return NextResponse.json({ responses: {} });
   }
 }

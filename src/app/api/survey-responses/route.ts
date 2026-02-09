@@ -6,6 +6,7 @@ const DB_SCHEMA = process.env.DB_SCHEMA || "sg_reports_survey";
 
 interface SurveyResponseInput {
   properTitle: string;
+  normalizedBody?: string | null;
   latestSymbol: string;
   status: "continue" | "merge" | "discontinue";
   frequency?: string | null;
@@ -19,7 +20,9 @@ interface SurveyResponseInput {
 interface SurveyResponseRow {
   id: number;
   proper_title: string;
+  normalized_body: string;
   latest_symbol: string;
+  responded_by_user_id: string;
   user_entity: string;
   status: string;
   frequency: string | null;
@@ -32,19 +35,43 @@ interface SurveyResponseRow {
   updated_at: string;
 }
 
-// GET - Fetch entity's response for a specific report
+interface AdminResponseRow extends SurveyResponseRow {
+  responder_email: string | null;
+}
+
+interface EntityResponseCountRow {
+  entity: string;
+  count: string;
+}
+
+function normalizeBodyKey(value: string | null | undefined): string {
+  return value?.trim() || "";
+}
+
+function toPublicResponse(row: SurveyResponseRow) {
+  return {
+    id: row.id,
+    properTitle: row.proper_title,
+    normalizedBody: row.normalized_body,
+    latestSymbol: row.latest_symbol,
+    status: row.status,
+    frequency: row.frequency,
+    format: row.format,
+    formatOther: row.format_other,
+    mergeTargets: row.merge_targets || [],
+    discontinueReason: row.discontinue_reason,
+    comments: row.comments,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+// GET - Fetch current user's response + aggregate response count for a specific report/body
+// Admins additionally receive all response contents across entities (read-only superpower).
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  // Entity is required for survey operations
-  if (!user.entity) {
-    return NextResponse.json(
-      { error: "Entity required to view survey responses" },
-      { status: 400 }
-    );
   }
 
   const properTitle = req.nextUrl.searchParams.get("properTitle");
@@ -55,35 +82,60 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  const normalizedBody = normalizeBodyKey(req.nextUrl.searchParams.get("normalizedBody"));
+  const isAdmin = user.role === "admin";
+
   try {
-    // Fetch response for the user's entity (not by email)
-    const rows = await query<SurveyResponseRow>(
-      `SELECT * FROM ${DB_SCHEMA}.survey_responses 
-       WHERE proper_title = $1 AND user_entity = $2`,
-      [properTitle, user.entity]
-    );
+    const [ownRows, countRows, entityCountRows, adminRows] = await Promise.all([
+      query<SurveyResponseRow>(
+        `SELECT * FROM ${DB_SCHEMA}.survey_responses
+         WHERE proper_title = $1 AND normalized_body = $2 AND responded_by_user_id = $3`,
+        [properTitle, normalizedBody, user.id]
+      ),
+      query<{ count: string }>(
+        `SELECT COUNT(*)::text as count
+         FROM ${DB_SCHEMA}.survey_responses
+         WHERE proper_title = $1 AND normalized_body = $2`,
+        [properTitle, normalizedBody]
+      ),
+      query<EntityResponseCountRow>(
+        `SELECT user_entity as entity, COUNT(*)::text as count
+         FROM ${DB_SCHEMA}.survey_responses
+         WHERE proper_title = $1 AND normalized_body = $2
+         GROUP BY user_entity
+         ORDER BY user_entity ASC`,
+        [properTitle, normalizedBody]
+      ),
+      isAdmin
+        ? query<AdminResponseRow>(
+            `SELECT sr.*, u.email as responder_email
+             FROM ${DB_SCHEMA}.survey_responses sr
+             LEFT JOIN ${DB_SCHEMA}.users u ON u.id = sr.responded_by_user_id
+             WHERE sr.proper_title = $1 AND sr.normalized_body = $2
+             ORDER BY sr.updated_at DESC`,
+            [properTitle, normalizedBody]
+          )
+        : Promise.resolve([] as AdminResponseRow[]),
+    ]);
 
-    if (rows.length === 0) {
-      return NextResponse.json({ response: null });
-    }
+    const ownResponse = ownRows[0] ? toPublicResponse(ownRows[0]) : null;
+    const responseCount = parseInt(countRows[0]?.count || "0", 10);
 
-    const row = rows[0];
-    // Return response without user attribution (confidential)
     return NextResponse.json({
-      response: {
-        id: row.id,
-        properTitle: row.proper_title,
-        latestSymbol: row.latest_symbol,
-        status: row.status,
-        frequency: row.frequency,
-        format: row.format,
-        formatOther: row.format_other,
-        mergeTargets: row.merge_targets || [],
-        discontinueReason: row.discontinue_reason,
-        comments: row.comments,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-      },
+      response: ownResponse,
+      responseCount,
+      entityResponseCounts: entityCountRows.map((row) => ({
+        entity: row.entity,
+        count: parseInt(row.count, 10),
+      })),
+      allResponses: isAdmin
+        ? adminRows.map((row) => ({
+            ...toPublicResponse(row),
+            userEntity: row.user_entity,
+            responderEmail: row.responder_email,
+            respondedByUserId: row.responded_by_user_id,
+          }))
+        : undefined,
     });
   } catch (error) {
     console.error("Error fetching survey response:", error);
@@ -94,14 +146,13 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST - Create or update a survey response (one per entity per report)
+// POST - Create or update the current user's survey response (one per user per report/body)
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Entity is required for survey operations
   if (!user.entity) {
     return NextResponse.json(
       { error: "Entity required to submit survey responses" },
@@ -112,7 +163,6 @@ export async function POST(req: NextRequest) {
   try {
     const body: SurveyResponseInput = await req.json();
 
-    // Validate required fields
     if (!body.properTitle || !body.latestSymbol || !body.status) {
       return NextResponse.json(
         { error: "Missing required fields: properTitle, latestSymbol, status" },
@@ -120,7 +170,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate status
     if (!["continue", "merge", "discontinue"].includes(body.status)) {
       return NextResponse.json(
         { error: "Invalid status value" },
@@ -128,14 +177,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Upsert the response by entity (any user from the entity can edit)
+    const normalizedBody = normalizeBodyKey(body.normalizedBody);
+
     const result = await query<SurveyResponseRow>(
       `INSERT INTO ${DB_SCHEMA}.survey_responses (
         proper_title,
+        normalized_body,
         latest_symbol,
+        responded_by_user_id,
         user_entity,
-        created_by_email,
-        updated_by_email,
         status,
         frequency,
         format,
@@ -143,11 +193,11 @@ export async function POST(req: NextRequest) {
         merge_targets,
         discontinue_reason,
         comments
-      ) VALUES ($1, $2, $3, $4, $4, $5, $6, $7, $8, $9, $10, $11)
-      ON CONFLICT (proper_title, user_entity) 
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      ON CONFLICT (proper_title, normalized_body, responded_by_user_id)
       DO UPDATE SET
         latest_symbol = EXCLUDED.latest_symbol,
-        updated_by_email = EXCLUDED.updated_by_email,
+        user_entity = EXCLUDED.user_entity,
         status = EXCLUDED.status,
         frequency = EXCLUDED.frequency,
         format = EXCLUDED.format,
@@ -159,9 +209,10 @@ export async function POST(req: NextRequest) {
       RETURNING *`,
       [
         body.properTitle,
+        normalizedBody,
         body.latestSymbol,
+        user.id,
         user.entity,
-        user.email, // For audit: created_by_email on insert, updated_by_email on update
         body.status,
         body.status !== "discontinue" ? body.frequency : null,
         body.status !== "discontinue" ? body.format : null,
@@ -172,24 +223,9 @@ export async function POST(req: NextRequest) {
       ]
     );
 
-    const row = result[0];
-    // Return response without user attribution (confidential)
     return NextResponse.json({
       success: true,
-      response: {
-        id: row.id,
-        properTitle: row.proper_title,
-        latestSymbol: row.latest_symbol,
-        status: row.status,
-        frequency: row.frequency,
-        format: row.format,
-        formatOther: row.format_other,
-        mergeTargets: row.merge_targets || [],
-        discontinueReason: row.discontinue_reason,
-        comments: row.comments,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-      },
+      response: toPublicResponse(result[0]),
     });
   } catch (error) {
     console.error("Error saving survey response:", error);
@@ -200,19 +236,11 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// DELETE - Remove an entity's survey response
+// DELETE - Remove current user's survey response for a specific report/body
 export async function DELETE(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  // Entity is required for survey operations
-  if (!user.entity) {
-    return NextResponse.json(
-      { error: "Entity required to delete survey responses" },
-      { status: 400 }
-    );
   }
 
   const properTitle = req.nextUrl.searchParams.get("properTitle");
@@ -223,12 +251,13 @@ export async function DELETE(req: NextRequest) {
     );
   }
 
+  const normalizedBody = normalizeBodyKey(req.nextUrl.searchParams.get("normalizedBody"));
+
   try {
-    // Delete by entity (any user from the entity can delete)
     await query(
-      `DELETE FROM ${DB_SCHEMA}.survey_responses 
-       WHERE proper_title = $1 AND user_entity = $2`,
-      [properTitle, user.entity]
+      `DELETE FROM ${DB_SCHEMA}.survey_responses
+       WHERE proper_title = $1 AND normalized_body = $2 AND responded_by_user_id = $3`,
+      [properTitle, normalizedBody, user.id]
     );
 
     return NextResponse.json({ success: true });

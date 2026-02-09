@@ -110,13 +110,25 @@ export async function clearSession() {
   cookieStore.delete(COOKIE_NAME);
 }
 
-export async function getCurrentUser() {
+export interface CurrentUser {
+  id: string;
+  email: string;
+  entity: string | null;
+  role: "user" | "admin";
+}
+
+export async function getCurrentUser(): Promise<CurrentUser | null> {
   const session = await getSession();
   if (!session) return null;
-  const rows = await query<{ id: string; email: string; entity: string | null }>(
-    `SELECT id, email, entity FROM ${tables.users} WHERE id = $1`,
+  const rows = await query<{ id: string; email: string; entity: string | null; role: string }>(
+    `SELECT id, email, entity, role FROM ${tables.users} WHERE id = $1`,
     [session.userId]
   );
   if (!rows[0]) return null;
-  return { id: rows[0].id, email: rows[0].email, entity: rows[0].entity };
+  return {
+    id: rows[0].id,
+    email: rows[0].email,
+    entity: rows[0].entity,
+    role: rows[0].role === "admin" ? "admin" : "user",
+  };
 }

@@ -73,6 +73,7 @@ interface Filters {
   bodies: string[];
   years: number[]; // Selected years (2023 to present)
   frequencies: string[];
+  responses: string[]; // Admin filter: with/without responses
   subjects: string[];
   entities: string[]; // Filter by reporting entities
   reportTypes: string[]; // Filter by report type (Report/Note/Other)
@@ -103,7 +104,7 @@ function abbreviateBody(body: string | null): string | null {
     .join("");
 }
 
-type SortColumn = "symbol" | "title" | "subjects" | "entity" | "body" | "year" | "frequency";
+type SortColumn = "symbol" | "title" | "subjects" | "entity" | "body" | "year" | "frequency" | "responseCount";
 type SortDirection = "asc" | "desc";
 
 // Grid columns vary by mode:
@@ -111,8 +112,13 @@ type SortDirection = "asc" | "desc";
 // My: Actions(36px), Symbol, Title, Body, Year, Subjects, Frequency, Survey (no entity - it's the user's)
 // Suggested: Actions(36px), Symbol, Title, Entity, Body, Year, Subjects, Frequency (no survey)
 const GRID_COLS_ALL = "grid-cols-[120px_1fr_100px_75px_65px_120px_90px_150px]";
+const GRID_COLS_ALL_ADMIN = "grid-cols-[120px_1fr_100px_75px_65px_120px_90px_220px_150px]";
 const GRID_COLS_MY = "grid-cols-[36px_120px_1fr_75px_65px_100px_80px_150px]";
 const GRID_COLS_SUGGESTED = "grid-cols-[36px_120px_1fr_100px_75px_65px_120px_100px]";
+
+function getResponseMapKey(title: string, normalizedBody: string | null) {
+  return `${title}|||${normalizedBody || ""}`;
+}
 
 // Convert string to Title Case
 function toTitleCase(str: string): string {
@@ -290,6 +296,83 @@ function FrequencyFilterPopover({
         </div>
       </PopoverContent>
     </Popover>
+  );
+}
+
+function ResponseFilterPopover({
+  selected,
+  onChange,
+}: {
+  selected: string[];
+  onChange: (values: string[]) => void;
+}) {
+  const OPTIONS = [
+    { value: "continue", label: "Continue" },
+    { value: "continue_changes", label: "Continue with changes" },
+    { value: "merge", label: "Merge" },
+    { value: "discontinue", label: "Discontinue" },
+  ];
+
+  const toggleOption = (value: string) => {
+    onChange(selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value]);
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          className={`inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
+            selected.length > 0
+              ? "bg-un-blue text-white"
+              : "text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+          }`}
+        >
+          <Filter className="h-3 w-3" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-2" align="start">
+        <div className="space-y-1">
+          {selected.length > 0 && (
+            <button
+              onClick={() => onChange([])}
+              className="mb-2 flex w-full items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+            >
+              <X className="h-3 w-3" /> Clear filter
+            </button>
+          )}
+          {OPTIONS.map((opt) => (
+            <label
+              key={opt.value}
+              className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 rounded cursor-pointer text-sm"
+            >
+              <Checkbox
+                checked={selected.includes(opt.value)}
+                onCheckedChange={() => toggleOption(opt.value)}
+              />
+              <span>{opt.label}</span>
+            </label>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function ResponseCountBadge({
+  label,
+  count,
+  className,
+}: {
+  label: string;
+  count: number;
+  className: string;
+}) {
+  if (!count) return null;
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${className}`}>
+      <span>{label}</span>
+      <span>{count}</span>
+    </span>
   );
 }
 
@@ -574,6 +657,7 @@ function ColumnHeaders({
   onFilterChange,
   subjectCounts,
   mode = "all",
+  isAdmin = false,
 }: {
   sortColumn: SortColumn | null;
   sortDirection: SortDirection;
@@ -583,12 +667,21 @@ function ColumnHeaders({
   onFilterChange: (filters: Filters) => void;
   subjectCounts: SubjectCount[];
   mode?: ReportsTableMode;
+  isAdmin?: boolean;
 }) {
   const showFeedbackColumn = mode === "all" || mode === "my";
+  const showAdminResponseCount = mode === "all" && isAdmin;
   const showActions = mode === "my" || mode === "suggested";
   const showEntityColumn = mode !== "my";  // Hide entity column in "my" mode
   const showFilters = mode !== "suggested";  // Hide filter icons in suggested mode
-  const gridCols = mode === "all" ? GRID_COLS_ALL : mode === "my" ? GRID_COLS_MY : GRID_COLS_SUGGESTED;
+  const gridCols =
+    mode === "all"
+      ? showAdminResponseCount
+        ? GRID_COLS_ALL_ADMIN
+        : GRID_COLS_ALL
+      : mode === "my"
+      ? GRID_COLS_MY
+      : GRID_COLS_SUGGESTED;
   
   return (
     <div
@@ -667,6 +760,18 @@ function ColumnHeaders({
         )}
         <SortArrow column="frequency" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
       </div>
+      {showAdminResponseCount && (
+        <div className="flex items-center gap-1 justify-start">
+          <span>Responses</span>
+          {showFilters && (
+            <ResponseFilterPopover
+              selected={filters.responses}
+              onChange={(v) => onFilterChange({ ...filters, responses: v })}
+            />
+          )}
+          <SortArrow column="responseCount" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
+        </div>
+      )}
       {showFeedbackColumn && (
         <div className="flex items-center gap-1 justify-end">
           <span>Survey</span>
@@ -693,6 +798,7 @@ function ReportRow({
   onAdd,
   onRemove,
   isConfirmedByEntity,
+  isAdmin = false,
 }: {
   report: ReportGroup;
   isSelected: boolean;
@@ -704,10 +810,19 @@ function ReportRow({
   onAdd?: (report: ReportGroup) => void;
   onRemove?: (report: ReportGroup) => void;
   isConfirmedByEntity?: boolean;
+  isAdmin?: boolean;
 }) {
   const showActions = mode === "my" || mode === "suggested";
   const showEntityColumn = mode !== "my";  // Hide entity column in "my" mode
-  const gridCols = mode === "all" ? GRID_COLS_ALL : mode === "my" ? GRID_COLS_MY : GRID_COLS_SUGGESTED;
+  const showAdminResponseCount = mode === "all" && isAdmin;
+  const gridCols =
+    mode === "all"
+      ? showAdminResponseCount
+        ? GRID_COLS_ALL_ADMIN
+        : GRID_COLS_ALL
+      : mode === "my"
+      ? GRID_COLS_MY
+      : GRID_COLS_SUGGESTED;
   
   // Gray out confirmed reports in suggested mode
   const isGrayedOut = mode === "suggested" && isConfirmedByEntity;
@@ -839,6 +954,41 @@ function ReportRow({
           size="xs"
         />
       </div>
+
+      {showAdminResponseCount && (
+        <div className="flex items-center justify-start">
+          {report.responseStats ? (
+            <div className="flex flex-wrap items-center justify-start gap-1">
+              <ResponseCountBadge
+                label="Continue"
+                count={report.responseStats.continue || 0}
+                className="bg-green-50 border-green-200 text-green-700"
+              />
+              <ResponseCountBadge
+                label="Continue with changes"
+                count={report.responseStats.continueWithChanges || 0}
+                className="bg-blue-50 border-blue-200 text-blue-700"
+              />
+              <ResponseCountBadge
+                label="Merge"
+                count={report.responseStats.merge || 0}
+                className="bg-amber-50 border-amber-200 text-amber-700"
+              />
+              <ResponseCountBadge
+                label="Discontinue"
+                count={report.responseStats.discontinue || 0}
+                className="bg-red-50 border-red-200 text-red-700"
+              />
+            </div>
+          ) : report.responseCount && report.responseCount > 0 ? (
+            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-un-blue/10 px-2 text-xs font-semibold text-un-blue">
+              {report.responseCount}
+            </span>
+          ) : (
+            <span className="text-xs text-gray-300">-</span>
+          )}
+        </div>
+      )}
 
       {/* Survey column - for mode="my" and mode="all" */}
       {(mode === "my" || mode === "all") && (
@@ -1343,6 +1493,7 @@ interface ReportsTableProps {
   entity?: string;  // Required for mode=my and mode=suggested
   userEntity?: string | null;  // The logged-in user's entity (for permissions)
   userEmail?: string | null;  // The logged-in user's email (for feedback display)
+  userRole?: "user" | "admin";
   showAddSearch?: boolean;  // Show inline search row at bottom (for mode=my)
   onDataChanged?: () => void;  // Callback when data changes (report added/removed)
   refetchTrigger?: number;  // Increment to trigger a refetch without remounting
@@ -1350,13 +1501,14 @@ interface ReportsTableProps {
 }
 
 // Backward compatibility alias
-export interface SGReportsListProps extends Omit<ReportsTableProps, 'mode'> {}
+export type SGReportsListProps = Omit<ReportsTableProps, "mode">;
 
 export function ReportsTable({ 
   mode = "all", 
   entity, 
   userEntity, 
   userEmail,
+  userRole = "user",
   showAddSearch,
   onDataChanged,
   refetchTrigger,
@@ -1373,6 +1525,7 @@ export function ReportsTable({
     bodies: [],
     years: [],
     frequencies: [],
+    responses: [],
     subjects: [],
     entities: [],
     reportTypes: [],
@@ -1380,6 +1533,7 @@ export function ReportsTable({
   const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [surveyResponses, setSurveyResponses] = useState<Record<string, { status: string; frequency: string | null; format: string | null }>>({});
+  const isAdmin = userRole === "admin";
   
   // Local state for optimistic updates on entity confirmations
   const [locallyConfirmed, setLocallyConfirmed] = useState<Set<string>>(new Set());
@@ -1416,6 +1570,8 @@ export function ReportsTable({
       params.set("mode", mode);
       if (entity) params.set("entity", entity);
     }
+    if (sortColumn) params.set("sortColumn", sortColumn);
+    if (sortColumn) params.set("sortDirection", sortDirection);
 
     // Unified search
     if (filters.search) params.set("filterSearch", filters.search);
@@ -1426,6 +1582,7 @@ export function ReportsTable({
     filters.bodies.forEach((b) => params.append("filterBody", b));
     filters.years.forEach((y) => params.append("filterYear", String(y)));
     filters.frequencies.forEach((f) => params.append("filterFrequency", f));
+    filters.responses.forEach((r) => params.append("filterResponse", r));
     filters.subjects.forEach((s) => params.append("filterSubject", s));
     // Entity filter (supports multiple)
     effectiveEntityFilters.forEach((e) => params.append("filterEntity", e));
@@ -1440,7 +1597,7 @@ export function ReportsTable({
         setLocallyConfirmed(new Set());
       })
       .finally(() => setLoading(false));
-  }, [page, filters, effectiveEntityFilters, mode, entity]);
+  }, [page, filters, effectiveEntityFilters, mode, entity, sortColumn, sortDirection]);
 
   // The effective entity to use for add/remove operations
   const effectiveEntity = entity || userEntity;
@@ -1558,62 +1715,11 @@ export function ReportsTable({
       }
     } else {
       setSortColumn(column);
-      setSortDirection("asc");
+      setSortDirection(column === "responseCount" ? "desc" : "asc");
     }
+    setPage(1);
   };
-
-  // Sort reports client-side
-  const sortedReports = useMemo(() => {
-    if (!data?.reports || !sortColumn) return data?.reports || [];
-
-    return [...data.reports].sort((a, b) => {
-      let comparison = 0;
-
-      switch (sortColumn) {
-        case "symbol":
-          comparison = a.symbol.localeCompare(b.symbol);
-          break;
-        case "title":
-          const titleA = a.title || "";
-          const titleB = b.title || "";
-          if (!titleA && titleB) return sortDirection === "asc" ? 1 : -1;
-          if (titleA && !titleB) return sortDirection === "asc" ? -1 : 1;
-          comparison = titleA.localeCompare(titleB);
-          break;
-        case "entity":
-          const entityA = a.entity || "";
-          const entityB = b.entity || "";
-          if (!entityA && entityB) return sortDirection === "asc" ? 1 : -1;
-          if (entityA && !entityB) return sortDirection === "asc" ? -1 : 1;
-          comparison = entityA.localeCompare(entityB);
-          break;
-        case "body":
-          const bodyA = a.body || "";
-          const bodyB = b.body || "";
-          if (!bodyA && bodyB) return sortDirection === "asc" ? 1 : -1;
-          if (bodyA && !bodyB) return sortDirection === "asc" ? -1 : 1;
-          comparison = bodyA.localeCompare(bodyB);
-          break;
-        case "year":
-          if (a.year === null && b.year !== null)
-            return sortDirection === "asc" ? 1 : -1;
-          if (a.year !== null && b.year === null)
-            return sortDirection === "asc" ? -1 : 1;
-          if (a.year === null && b.year === null) return 0;
-          comparison = (a.year ?? 0) - (b.year ?? 0);
-          break;
-        case "frequency":
-          const freqA = a.frequency || "";
-          const freqB = b.frequency || "";
-          if (!freqA && freqB) return sortDirection === "asc" ? 1 : -1;
-          if (freqA && !freqB) return sortDirection === "asc" ? -1 : 1;
-          comparison = freqA.localeCompare(freqB);
-          break;
-      }
-
-      return sortDirection === "asc" ? comparison : -comparison;
-    });
-  }, [data?.reports, sortColumn, sortDirection]);
+  const sortedReports = data?.reports || [];
 
   const totalPages = data ? Math.ceil(data.total / limit) : 0;
 
@@ -1624,6 +1730,7 @@ export function ReportsTable({
     filters.bodies.length > 0 ||
     filters.years.length > 0 ||
     filters.frequencies.length > 0 ||
+    filters.responses.length > 0 ||
     filters.subjects.length > 0 ||
     filters.entities.length > 0 ||
     filters.reportTypes.length > 0;
@@ -1672,6 +1779,7 @@ export function ReportsTable({
                   bodies: [],
                   years: [],
                   frequencies: [],
+                  responses: [],
                   subjects: [],
                   entities: [],
                   reportTypes: [],
@@ -1711,6 +1819,7 @@ export function ReportsTable({
           }}
           subjectCounts={data?.subjectCounts || []}
           mode={mode}
+          isAdmin={isAdmin}
         />
 
         <div className="divide-y divide-gray-100">
@@ -1721,8 +1830,9 @@ export function ReportsTable({
               isSelected={selectedReport?.symbol === r.symbol}
               onSelect={() => setSelectedReport(r)}
               subjectCounts={data?.subjectCounts || []}
-              surveyResponse={surveyResponses[r.title]}
+              surveyResponse={surveyResponses[getResponseMapKey(r.title, r.body)]}
               mode={mode}
+              isAdmin={isAdmin}
               entity={entity || userEntity || undefined}
               onAdd={handleAddReport}
               onRemove={handleRemoveReport}

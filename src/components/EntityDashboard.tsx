@@ -8,9 +8,10 @@ import Link from "next/link";
 interface Props {
   entity: string;
   userName?: string | null;  // Actually the user's email
+  userRole?: "user" | "admin";
 }
 
-export function EntityDashboard({ entity, userName }: Props) {
+export function EntityDashboard({ entity, userName, userRole = "user" }: Props) {
   const userEmail = userName;  // userName is actually the email
   
   // Single version counter - any data change triggers refetch of both tables
@@ -67,6 +68,7 @@ export function EntityDashboard({ entity, userName }: Props) {
           entity={entity}
           userEntity={entity}
           userEmail={userEmail}
+          userRole={userRole}
           showAddSearch={true}
           onDataChanged={handleDataChanged}
           refetchTrigger={dataVersion}
@@ -112,6 +114,7 @@ export function EntityDashboard({ entity, userName }: Props) {
           entity={entity}
           userEntity={entity}
           userEmail={userEmail}
+          userRole={userRole}
           onDataChanged={handleDataChanged}
           refetchTrigger={dataVersion}
         />

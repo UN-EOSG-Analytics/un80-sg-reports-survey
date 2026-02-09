@@ -16,7 +16,7 @@ export default async function Home() {
       <main className="flex-1 bg-background px-6 py-8">
         <div className="mx-auto max-w-7xl">
           {user?.entity ? (
-            <EntityDashboard entity={user.entity} userName={user.email} />
+            <EntityDashboard entity={user.entity} userName={user.email} userRole={user.role} />
           ) : (
             <div className="flex flex-col items-center justify-center py-16">
               <div className="max-w-md text-center">

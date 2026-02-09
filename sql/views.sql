@@ -13,10 +13,12 @@ DROP VIEW IF EXISTS sg_reports_survey.sg_reports;
 -- SG_REPORTS: Defines what counts as a Secretary-General report
 -- Stage 1 filtering: type-based, excludes CORR/REV, credentials, requires proper_title
 -- Filtered to 2023 to present for survey focus (historical data accessible via documents table)
+-- Manual entries (data_source = 'manual') are always included
 --------------------------------------------------------------------------------
 CREATE VIEW sg_reports_survey.sg_reports AS
 SELECT d.*,
   CASE
+    WHEN d.data_source = 'manual' THEN 'manual'
     WHEN d.resource_type_level3 @> ARRAY['Secretary-General''s Reports'] THEN 'sg_reports_metadata'
     WHEN (d.resource_type_level2 @> ARRAY['Reports'] 
           OR d.resource_type_level2 @> ARRAY['Letters and Notes Verbales'])
@@ -32,18 +34,23 @@ SELECT d.*,
     ELSE 'Other'
   END as report_type
 FROM sg_reports_survey.documents d
-WHERE (d.resource_type_level3 @> ARRAY['Secretary-General''s Reports']
-   OR ((d.resource_type_level2 @> ARRAY['Reports'] 
-        OR d.resource_type_level2 @> ARRAY['Letters and Notes Verbales'])
-       AND (d.title ILIKE '%Secretary-General%' 
-            OR array_to_string(d.subtitle, ' ') ILIKE '%Secretary-General%')))
+WHERE (
+    -- Manual entries always included
+    d.data_source = 'manual'
+    -- Library entries must match SG report criteria
+    OR d.resource_type_level3 @> ARRAY['Secretary-General''s Reports']
+    OR ((d.resource_type_level2 @> ARRAY['Reports'] 
+         OR d.resource_type_level2 @> ARRAY['Letters and Notes Verbales'])
+        AND (d.title ILIKE '%Secretary-General%' 
+             OR array_to_string(d.subtitle, ' ') ILIKE '%Secretary-General%'))
+  )
   -- Require proper_title for grouping
   AND d.proper_title IS NOT NULL
   -- Exclude corrections and revisions
   AND d.symbol NOT LIKE '%/CORR.%'
   AND d.symbol NOT LIKE '%/REV.%'
   -- Exclude credentials reports (subject term is uppercase plural)
-  AND NOT (d.subject_terms @> ARRAY['REPRESENTATIVES'' CREDENTIALS'])
+  AND NOT COALESCE(d.subject_terms @> ARRAY['REPRESENTATIVES'' CREDENTIALS'], false)
   AND NOT (d.proper_title ILIKE '%credential%')
   -- Survey focus years (2023 to present)
   AND COALESCE(d.date_year, 

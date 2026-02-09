@@ -16,6 +16,21 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ReportSidebar, ReportGroup, SubjectCount, EntitySuggestion, EntityConfirmation } from "@/components/ReportSidebar";
 import { EntityBadges } from "@/components/EntityBadges";
 import { FrequencyBadge } from "@/components/FrequencyBadge";
@@ -886,6 +901,181 @@ function ReportRow({
 export type ReportsTableMode = "all" | "my" | "suggested";
 
 // =============================================================================
+// Manual Report Entry Dialog
+// =============================================================================
+
+const UN_BODIES = [
+  "General Assembly",
+  "Security Council", 
+  "Economic and Social Council",
+  "Human Rights Council",
+  "Human Rights Bodies",
+  "Secretariat",
+];
+
+interface ManualReportDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  entity: string;
+  onAdd: (report: ReportGroup) => void;
+}
+
+function ManualReportDialog({ open, onOpenChange, entity, onAdd }: ManualReportDialogProps) {
+  const [symbol, setSymbol] = useState("");
+  const [title, setTitle] = useState("");
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [unBody, setUnBody] = useState("");
+  const [mandateResolution, setMandateResolution] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: currentYear - 2022 }, (_, i) => currentYear - i);
+
+  const resetForm = () => {
+    setSymbol("");
+    setTitle("");
+    setYear(currentYear);
+    setUnBody("");
+    setMandateResolution("");
+    setError(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
+
+    const response = await fetch("/api/reports/manual", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        symbol: symbol.trim(),
+        properTitle: title.trim(),
+        title: title.trim(),
+        dateYear: year,
+        unBody,
+        mandateResolutions: mandateResolution.trim() ? [mandateResolution.trim()] : undefined,
+      }),
+    });
+
+    const data = await response.json();
+    setIsSubmitting(false);
+
+    if (!response.ok) {
+      setError(data.error || "Failed to add report");
+      return;
+    }
+
+    const reportGroup: ReportGroup = {
+      symbol: data.document.symbol,
+      title: data.document.properTitle,
+      body: data.document.unBody,
+      year: data.document.dateYear,
+      entity: null,
+      count: 1,
+      latestYear: data.document.dateYear,
+      frequency: null,
+      subjectTerms: [],
+      suggestions: [],
+      confirmedEntities: [],
+      versions: [{
+        symbol: data.document.symbol,
+        year: data.document.dateYear,
+        publicationDate: null,
+        recordNumber: null,
+        wordCount: null,
+      }],
+    };
+
+    onAdd(reportGroup);
+    resetForm();
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) resetForm(); onOpenChange(v); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add Report Manually</DialogTitle>
+          <DialogDescription>
+            Add a report that isn&apos;t in the UN Digital Library to {entity}&apos;s list.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Symbol *</label>
+            <Input
+              placeholder="e.g., A/79/123"
+              value={symbol}
+              onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Title *</label>
+            <Input
+              placeholder="Full document title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Year *</label>
+              <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {years.map((y) => (
+                    <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">UN Body *</label>
+              <Select value={unBody} onValueChange={setUnBody} required>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {UN_BODIES.map((body) => (
+                    <SelectItem key={body} value={body}>{body}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-600">Mandating Resolution <span className="text-gray-400 font-normal">(optional)</span></label>
+            <Input
+              placeholder="e.g., A/RES/78/123"
+              value={mandateResolution}
+              onChange={(e) => setMandateResolution(e.target.value.toUpperCase())}
+            />
+          </div>
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{error}</p>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting || !symbol.trim() || !title.trim() || !unBody}>
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Add Report
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// =============================================================================
 // Add Report Search Component
 // =============================================================================
 
@@ -910,6 +1100,7 @@ function AddReportSearch({
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [showManualDialog, setShowManualDialog] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
@@ -1053,14 +1244,14 @@ function AddReportSearch({
 
       {/* Search Results Dropdown */}
       {showResults && results.length > 0 && (
-        <div ref={resultsRef} className="absolute left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
+        <div ref={resultsRef} className="absolute left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-50 max-h-72 overflow-y-auto">
           {results.map((result, index) => {
             const isAlreadyAdded = result.title && existingTitles.has(result.title);
             const isHighlighted = index === highlightedIndex;
             return (
               <div
                 key={result.symbol}
-                className={`flex items-center gap-3 px-4 py-2.5 border-b last:border-b-0 ${
+                className={`flex items-center gap-3 px-4 py-2.5 border-b ${
                   isAlreadyAdded 
                     ? "bg-gray-50" 
                     : isHighlighted 
@@ -1110,14 +1301,35 @@ function AddReportSearch({
               </div>
             );
           })}
+          <button
+            type="button"
+            onClick={() => { setShowResults(false); setShowManualDialog(true); }}
+            className="w-full px-4 py-2 text-xs text-gray-500 hover:text-un-blue hover:bg-gray-50 text-left border-t"
+          >
+            Can&apos;t find it? Add report manually
+          </button>
         </div>
       )}
 
       {showResults && searchQuery.length >= 2 && results.length === 0 && !isSearching && (
-        <div className="absolute left-4 right-4 mt-1 bg-white border rounded-lg shadow-lg z-50 p-3 text-sm text-gray-500">
-          No reports found
+        <div className="absolute left-4 right-4 mt-1 bg-white border rounded-lg shadow-lg z-50 p-3">
+          <p className="text-sm text-gray-500">No reports found</p>
+          <button
+            type="button"
+            onClick={() => { setShowResults(false); setShowManualDialog(true); }}
+            className="mt-2 text-sm text-un-blue hover:underline"
+          >
+            Add report manually
+          </button>
         </div>
       )}
+
+      <ManualReportDialog
+        open={showManualDialog}
+        onOpenChange={setShowManualDialog}
+        entity={entity}
+        onAdd={onAdd}
+      />
     </div>
   );
 }

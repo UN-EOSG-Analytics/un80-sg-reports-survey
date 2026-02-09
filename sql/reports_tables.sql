@@ -75,6 +75,10 @@ CREATE TABLE IF NOT EXISTS sg_reports_survey.documents (
   -- Complete raw JSON dump of the original record
   raw_json JSONB,
   
+  -- Data origin tracking
+  data_source TEXT NOT NULL DEFAULT 'library' CHECK (data_source IN ('library', 'manual')),
+  created_by_user_id UUID REFERENCES sg_reports_survey.users(id),
+  
   -- Timestamps
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -93,6 +97,7 @@ CREATE INDEX IF NOT EXISTS idx_documents_based_on_resolution_symbols ON sg_repor
 CREATE INDEX IF NOT EXISTS idx_documents_raw_json ON sg_reports_survey.documents USING GIN (raw_json);
 CREATE INDEX IF NOT EXISTS idx_documents_text_search ON sg_reports_survey.documents USING GIN (to_tsvector('english', COALESCE(text, '')));
 CREATE INDEX IF NOT EXISTS idx_documents_embedding ON sg_reports_survey.documents USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
+CREATE INDEX IF NOT EXISTS idx_documents_data_source ON sg_reports_survey.documents (data_source);
 
 --------------------------------------------------------------------------------
 -- REPORT ENTITY SUGGESTIONS

@@ -1343,6 +1343,7 @@ export function ReportSidebar({
   const [loadingExisting, setLoadingExisting] = useState(true);
   const [responseCount, setResponseCount] = useState(0);
   const [entityResponseCounts, setEntityResponseCounts] = useState<EntityResponseCount[]>([]);
+  const [ownEntityResponders, setOwnEntityResponders] = useState<string[]>([]);
   const [allResponses, setAllResponses] = useState<VisibleSurveyResponse[]>([]);
   
   // Entity confirmation state (optimistic updates)
@@ -1402,6 +1403,7 @@ export function ReportSidebar({
     setMandatingParagraphsExpanded(false);
     setResponseCount(0);
     setEntityResponseCounts([]);
+    setOwnEntityResponders([]);
     setAllResponses([]);
   }, [report?.title]);
 
@@ -1560,6 +1562,7 @@ export function ReportSidebar({
       .then((data) => {
         setResponseCount(typeof data.responseCount === "number" ? data.responseCount : 0);
         setEntityResponseCounts(Array.isArray(data.entityResponseCounts) ? data.entityResponseCounts : []);
+        setOwnEntityResponders(Array.isArray(data.ownEntityResponders) ? data.ownEntityResponders : []);
         setAllResponses(Array.isArray(data.allResponses) ? data.allResponses : []);
         if (data.response) {
           // Map old "continue" with frequency/format to "continue_with_changes"
@@ -1651,6 +1654,7 @@ export function ReportSidebar({
           .then((data) => {
             setResponseCount(typeof data.responseCount === "number" ? data.responseCount : 0);
             setEntityResponseCounts(Array.isArray(data.entityResponseCounts) ? data.entityResponseCounts : []);
+            setOwnEntityResponders(Array.isArray(data.ownEntityResponders) ? data.ownEntityResponders : []);
             setAllResponses(Array.isArray(data.allResponses) ? data.allResponses : []);
           })
           .catch(() => {});
@@ -1860,6 +1864,14 @@ export function ReportSidebar({
                   ))
                 ) : (
                   <span>{responseCount}</span>
+                )}
+                {ownEntityResponders.length > 0 && (
+                  <>
+                    <span className="text-gray-400">|</span>
+                    <span>
+                      Your entity respondents: {ownEntityResponders.join(", ")}
+                    </span>
+                  </>
                 )}
               </div>
 

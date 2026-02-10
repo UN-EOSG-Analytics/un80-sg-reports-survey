@@ -44,6 +44,10 @@ interface EntityResponseCountRow {
   count: string;
 }
 
+interface OwnEntityResponderRow {
+  email: string | null;
+}
+
 function normalizeBodyKey(value: string | null | undefined): string {
   return value?.trim() || "";
 }
@@ -86,7 +90,7 @@ export async function GET(req: NextRequest) {
   const isAdmin = user.role === "admin";
 
   try {
-    const [ownRows, countRows, entityCountRows, adminRows] = await Promise.all([
+    const [ownRows, countRows, entityCountRows, ownEntityResponderRows, adminRows] = await Promise.all([
       query<SurveyResponseRow>(
         `SELECT * FROM ${DB_SCHEMA}.survey_responses
          WHERE proper_title = $1 AND normalized_body = $2 AND responded_by_user_id = $3`,
@@ -106,6 +110,18 @@ export async function GET(req: NextRequest) {
          ORDER BY user_entity ASC`,
         [properTitle, normalizedBody]
       ),
+      user.entity
+        ? query<OwnEntityResponderRow>(
+            `SELECT DISTINCT u.email
+             FROM ${DB_SCHEMA}.survey_responses sr
+             LEFT JOIN ${DB_SCHEMA}.users u ON u.id = sr.responded_by_user_id
+             WHERE sr.proper_title = $1
+               AND sr.normalized_body = $2
+               AND sr.user_entity = $3
+             ORDER BY u.email ASC`,
+            [properTitle, normalizedBody, user.entity]
+          )
+        : Promise.resolve([] as OwnEntityResponderRow[]),
       isAdmin
         ? query<AdminResponseRow>(
             `SELECT sr.*, u.email as responder_email
@@ -128,6 +144,9 @@ export async function GET(req: NextRequest) {
         entity: row.entity,
         count: parseInt(row.count, 10),
       })),
+      ownEntityResponders: ownEntityResponderRows
+        .map((row) => row.email)
+        .filter((email): email is string => typeof email === "string" && email.length > 0),
       allResponses: isAdmin
         ? adminRows.map((row) => ({
             ...toPublicResponse(row),

@@ -13,10 +13,12 @@ const roboto = Roboto({
 
 export const metadata: Metadata = {
   title: "SG Reports Survey",
-  description: "A modern web application for the United Nations.",
+  description:
+    "Survey platform for UN entities to provide recommendations on Secretary-General reports.",
   openGraph: {
     title: "SG Reports Survey",
-    description: "A modern web application for the United Nations.",
+    description:
+      "Survey platform for UN entities to provide recommendations on Secretary-General reports.",
     type: "website",
     locale: "en_US",
   },

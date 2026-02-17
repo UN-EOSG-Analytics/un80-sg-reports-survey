@@ -187,9 +187,6 @@ export default async function AnalysisPage() {
 
   const data = await getAnalysisData();
 
-  const entitiesWithReports = data.entities.filter((e) => e.suggestedReports > 0 || e.confirmedReports > 0);
-  const entitiesNoReports = data.entities.filter((e) => e.suggestedReports === 0 && e.confirmedReports === 0);
-
   return (
     <div className="flex min-h-screen flex-col">
       <Header user={user} />
@@ -265,18 +262,8 @@ export default async function AnalysisPage() {
 
           {/* Entity table */}
           <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="px-5 py-4 border-b border-gray-100">
               <h2 className="text-sm font-semibold text-gray-900">Entity Progress</h2>
-              <div className="flex items-center gap-4 text-xs text-gray-500">
-                <span className="flex items-center gap-1.5">
-                  <span className="inline-block h-2 w-2 rounded-full bg-un-blue" />
-                  With reports ({entitiesWithReports.length})
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="inline-block h-2 w-2 rounded-full bg-gray-300" />
-                  No reports ({entitiesNoReports.length})
-                </span>
-              </div>
             </div>
 
             <table className="w-full text-sm">
@@ -301,7 +288,7 @@ export default async function AnalysisPage() {
                   </th>
                   <th className="px-5 py-3 font-medium" title="Survey responses submitted / Confirmed reports">
                     <div className="text-[10px] text-gray-400 font-normal normal-case tracking-normal">Responses</div>
-                    Progress
+                    Progress on Confirmed
                   </th>
                 </tr>
               </thead>

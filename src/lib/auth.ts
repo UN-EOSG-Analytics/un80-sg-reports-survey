@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { randomBytes, createHmac, timingSafeEqual } from "crypto";
 import { query } from "./db";
@@ -117,11 +118,19 @@ export interface CurrentUser {
   role: "user" | "admin";
 }
 
-export async function getCurrentUser(): Promise<CurrentUser | null> {
+// Cached per-request: React deduplicates repeated calls within one render tree
+// so the DB is hit at most once per server request regardless of how many
+// server components or route handlers call getCurrentUser().
+export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const session = await getSession();
   if (!session) return null;
-  const rows = await query<{ id: string; email: string; entity: string | null; role: string }>(
-    `SELECT id, email, entity, role FROM ${tables.users} WHERE id = $1`,
+  // Single query: LEFT JOIN admin_emails derives the role without a separate lookup
+  const rows = await query<{ id: string; email: string; entity: string | null; role: "admin" | "user" }>(
+    `SELECT u.id, u.email, u.entity,
+            CASE WHEN ae.email IS NOT NULL THEN 'admin' ELSE 'user' END AS role
+     FROM   ${tables.users} u
+     LEFT JOIN ${tables.admin_emails} ae ON ae.email = u.email
+     WHERE  u.id = $1`,
     [session.userId]
   );
   if (!rows[0]) return null;
@@ -129,6 +138,6 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     id: rows[0].id,
     email: rows[0].email,
     entity: rows[0].entity,
-    role: rows[0].role === "admin" ? "admin" : "user",
+    role: rows[0].role,
   };
-}
+});

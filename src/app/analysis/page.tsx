@@ -2,6 +2,7 @@ import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { EntityTableExport } from "@/components/EntityTableExport";
 import { getCurrentUser } from "@/lib/auth";
+import { notAdminSQL } from "@/lib/config";
 import { query } from "@/lib/db";
 import { BarChart3, CheckCircle2, Circle, Clock, FileText, Users } from "lucide-react";
 import { redirect } from "next/navigation";
@@ -79,8 +80,9 @@ async function getAnalysisData() {
     // User counts per entity
     query<UserCountRow>(
       `SELECT entity, COUNT(*) AS user_count
-         FROM ${DB_SCHEMA}.users
-         WHERE entity IS NOT NULL AND role != 'admin'
+         FROM ${DB_SCHEMA}.users u
+         WHERE entity IS NOT NULL
+           AND ${notAdminSQL()}
          GROUP BY entity`,
     ),
     // Per-entity progress: suggested vs confirmed vs responded
@@ -148,7 +150,7 @@ async function getAnalysisData() {
          ORDER BY confirmed_reports DESC, suggested_reports DESC, entity`,
     ),
     query<TotalUsersRow>(
-      `SELECT COUNT(*) AS total_users FROM ${DB_SCHEMA}.users WHERE role != 'admin'`,
+      `SELECT COUNT(*) AS total_users FROM ${DB_SCHEMA}.users u WHERE ${notAdminSQL()}`,
     ),
     query<ActiveUsersRow>(
       `SELECT COUNT(DISTINCT responded_by_user_id) AS active_users FROM ${DB_SCHEMA}.survey_responses`,

@@ -1,6 +1,7 @@
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { EntityTableExport } from "@/components/EntityTableExport";
+import { SurveyExportButton } from "@/components/SurveyExportButton";
 import { getCurrentUser } from "@/lib/auth";
 import { notAdminSQL } from "@/lib/config";
 import { query } from "@/lib/db";
@@ -281,14 +282,19 @@ export default async function AnalysisPage() {
       <main className="flex-1 bg-gray-50 py-8">
         <div className="mx-auto max-w-7xl space-y-8 px-3 sm:px-4">
           {/* Page header */}
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Survey Response Analysis
-            </h1>
-            <p className="mt-1 text-sm text-gray-500">
-              Overview of survey response coverage across report groups and
-              entities.
-            </p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                Survey Response Analysis
+              </h1>
+              <p className="mt-1 text-sm text-gray-500">
+                Overview of survey response coverage across report groups and
+                entities.
+              </p>
+            </div>
+            <div className="shrink-0 pt-1">
+              <SurveyExportButton />
+            </div>
           </div>
 
           {/* Stat cards */}

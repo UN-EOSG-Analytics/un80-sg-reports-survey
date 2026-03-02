@@ -39,6 +39,11 @@ interface EntityProgressRow {
   reports_with_response: string;
   responding_users: string;
 }
+interface EntitySourceRow {
+  entity: string;
+  source: string;
+  cnt: string;
+}
 
 const STATUS_LABELS: Record<string, string> = {
   continue: "Continue",
@@ -61,6 +66,7 @@ async function getAnalysisData() {
     entityProgressRows,
     totalUsersRows,
     activeUsersRows,
+    entitySourceRows,
   ] = await Promise.all([
     query<TotalRow>(
       `SELECT COUNT(*) AS total_groups FROM ${DB_SCHEMA}.report_frequencies`,
@@ -155,6 +161,16 @@ async function getAnalysisData() {
     query<ActiveUsersRow>(
       `SELECT COUNT(DISTINCT responded_by_user_id) AS active_users FROM ${DB_SCHEMA}.survey_responses`,
     ),
+    // Per-entity suggestion counts broken down by source (dgacm / dri / ai)
+    query<EntitySourceRow>(
+      `SELECT
+           res.entity,
+           res.source,
+           COUNT(DISTINCT (rf.proper_title, rf.normalized_body)) AS cnt
+         FROM ${DB_SCHEMA}.report_entity_suggestions res
+         JOIN ${DB_SCHEMA}.report_frequencies rf ON rf.proper_title = res.proper_title
+         GROUP BY res.entity, res.source`,
+    ),
   ]);
 
   const totalGroups = parseInt(totalRows[0]?.total_groups ?? "0");
@@ -178,6 +194,18 @@ async function getAnalysisData() {
     ]),
   );
 
+  // Index suggestion source counts by entity
+  const sourceByEntity = new Map<string, { dgacm: number; dri: number; ai: number }>();
+  for (const r of entitySourceRows) {
+    if (!sourceByEntity.has(r.entity)) {
+      sourceByEntity.set(r.entity, { dgacm: 0, dri: 0, ai: 0 });
+    }
+    const bucket = sourceByEntity.get(r.entity)!;
+    if (r.source === "dgacm" || r.source === "dri" || r.source === "ai") {
+      bucket[r.source] = parseInt(r.cnt);
+    }
+  }
+
   // Union of all entities from users table and those with assigned reports
   const allEntities = new Set([
     ...userCountRows.map((r) => r.entity),
@@ -190,10 +218,12 @@ async function getAnalysisData() {
   const entities = Array.from(allEntities)
     .map((entity) => {
       const progress = progressByEntity.get(entity);
+      const sources = sourceByEntity.get(entity) ?? { dgacm: 0, dri: 0, ai: 0 };
       return {
         entity,
         userCount: userCountMap.get(entity) ?? 0,
         suggestedReports: progress?.suggestedReports ?? 0,
+        suggestedBySource: sources,
         confirmedReports: progress?.confirmedReports ?? 0,
         reportsWithResponse: progress?.reportsWithResponse ?? 0,
         respondingUsers: progress?.respondingUsers ?? 0,
@@ -407,12 +437,19 @@ export default async function AnalysisPage() {
                   </th>
                   <th
                     className="px-5 py-3 text-right font-medium"
-                    title="Reports suggested to this entity (AI/DGACM/DRI)"
+                    title="Reports suggested to this entity — broken down by source (DGACM / DRI / AI)"
                   >
                     <div className="text-[10px] font-normal tracking-normal text-gray-400 normal-case">
                       Reports
                     </div>
                     Suggested
+                    <div className="mt-0.5 flex justify-end gap-1 text-[9px] font-normal normal-case tracking-normal text-gray-400">
+                      <span>DGACM</span>
+                      <span>·</span>
+                      <span>DRI</span>
+                      <span>·</span>
+                      <span>AI</span>
+                    </div>
                   </th>
                   <th
                     className="px-5 py-3 text-right font-medium"
@@ -488,26 +525,34 @@ export default async function AnalysisPage() {
                         </span>
                       </td>
                       <td className="px-5 py-3 text-right">
-                        <span
-                          className={
-                            e.suggestedReports > 0
-                              ? "text-gray-500"
-                              : "text-gray-400"
-                          }
-                        >
-                          {e.suggestedReports || "—"}
-                        </span>
+                        {e.suggestedReports > 0 ? (
+                          <>
+                            <span className="font-medium text-gray-900">{e.suggestedReports}</span>
+                            <div className="mt-0.5 flex justify-end gap-1 text-[10px] text-gray-400">
+                              <span>{e.suggestedBySource.dgacm || "—"}</span>
+                              <span>·</span>
+                              <span>{e.suggestedBySource.dri || "—"}</span>
+                              <span>·</span>
+                              <span>{e.suggestedBySource.ai || "—"}</span>
+                            </div>
+                          </>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
                       </td>
                       <td className="px-5 py-3 text-right">
-                        <span
-                          className={
-                            e.confirmedReports > 0
-                              ? "font-medium text-gray-900"
-                              : "text-gray-400"
-                          }
-                        >
-                          {e.confirmedReports || "—"}
-                        </span>
+                        {e.confirmedReports > 0 ? (
+                          <>
+                            <span className="font-medium text-gray-900">{e.confirmedReports}</span>
+                            {e.suggestedReports > 0 && (
+                              <div className="mt-0.5 text-[10px] text-gray-400">
+                                {Math.round((e.confirmedReports / e.suggestedReports) * 100)}%
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
                       </td>
                       <td className="px-5 py-3">
                         {e.confirmedReports > 0 ? (

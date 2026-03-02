@@ -1,12 +1,12 @@
 "use client";
 
 import { Download } from "lucide-react";
-import * as XLSX from "xlsx";
 
 interface EntityRow {
   entity: string;
   userCount: number;
   suggestedReports: number;
+  suggestedBySource: { dgacm: number; dri: number; ai: number };
   confirmedReports: number;
   reportsWithResponse: number;
   respondingUsers: number;
@@ -26,6 +26,9 @@ function toRows(entities: EntityRow[]) {
     "Users Signed In": e.userCount,
     "Users Active": e.respondingUsers,
     "Reports Suggested": e.suggestedReports,
+    "Suggested (DGACM)": e.suggestedBySource.dgacm,
+    "Suggested (DRI)": e.suggestedBySource.dri,
+    "Suggested (AI)": e.suggestedBySource.ai,
     "Reports Confirmed": e.confirmedReports,
     "Reports with Response": e.reportsWithResponse,
   }));
@@ -51,17 +54,25 @@ export function EntityTableExport({ entities }: { entities: EntityRow[] }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "entity-progress.csv";
+    a.download = `entity-progress_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
 
-  function downloadExcel() {
+  async function downloadExcel() {
     const rows = toRows(entities);
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Entity Progress");
-    XLSX.writeFile(wb, "entity-progress.xlsx");
+    const res = await fetch("/api/export/entities", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(rows),
+    });
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `entity-progress_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   return (

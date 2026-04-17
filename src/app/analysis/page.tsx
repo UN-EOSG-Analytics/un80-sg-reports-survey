@@ -56,6 +56,10 @@ interface FormatBreakdownRow {
 interface WithCommentsRow {
   with_comments: string;
 }
+interface FreqDirectionRow {
+  direction: string;
+  count: string;
+}
 
 const STATUS_LABELS: Record<string, string> = {
   continue: "Continue as is",
@@ -112,6 +116,7 @@ async function getAnalysisData() {
     frequencyBreakdownRows,
     formatBreakdownRows,
     withCommentsRows,
+    freqDirectionRows,
   ] = await Promise.all([
     query<TotalRow>(
       `SELECT COUNT(*) AS total_groups FROM ${DB_SCHEMA}.report_frequencies`,
@@ -246,6 +251,33 @@ async function getAnalysisData() {
          FROM ${DB_SCHEMA}.survey_responses
          WHERE comments IS NOT NULL AND TRIM(comments) != ''`,
     ),
+    // Frequency directionality: compare preferred vs current frequency
+    query<FreqDirectionRow>(
+      `WITH freq_order(freq, ord) AS (
+           VALUES
+             ('multiple-per-year', 1),
+             ('annual', 2),
+             ('biennial', 3),
+             ('triennial', 4),
+             ('quadrennial', 5),
+             ('one-time', 6)
+         )
+         SELECT
+           CASE
+             WHEN fo_pref.ord < fo_curr.ord THEN 'increase'
+             WHEN fo_pref.ord > fo_curr.ord THEN 'decrease'
+             ELSE 'same'
+           END AS direction,
+           COUNT(*) AS count
+         FROM ${DB_SCHEMA}.survey_responses sr
+         JOIN ${DB_SCHEMA}.report_frequencies rf
+           ON rf.proper_title = sr.proper_title AND rf.normalized_body = sr.normalized_body
+         JOIN freq_order fo_pref ON fo_pref.freq = sr.frequency
+         JOIN freq_order fo_curr ON fo_curr.freq = rf.calculated_frequency
+         WHERE sr.frequency IS NOT NULL
+         GROUP BY 1
+         ORDER BY 1`,
+    ),
   ]);
 
   const totalGroups = parseInt(totalRows[0]?.total_groups ?? "0");
@@ -328,6 +360,12 @@ async function getAnalysisData() {
 
   const withComments = parseInt(withCommentsRows[0]?.with_comments ?? "0");
 
+  const freqDirection = (["increase", "same", "decrease"] as const).map((dir) => ({
+    direction: dir,
+    count: parseInt(freqDirectionRows.find((r) => r.direction === dir)?.count ?? "0"),
+  }));
+  const totalFreqDirection = freqDirection.reduce((s, r) => s + r.count, 0);
+
   const frequencyBreakdown = frequencyBreakdownRows.map((r) => ({
     frequency: r.frequency ?? "__none__",
     count: parseInt(r.count),
@@ -360,6 +398,8 @@ async function getAnalysisData() {
     frequencyBreakdown,
     totalContinueResponses,
     formatBreakdown,
+    freqDirection,
+    totalFreqDirection,
     entities,
   };
 }
@@ -518,10 +558,19 @@ export default async function AnalysisPage() {
                 ))}
               </div>
 
-              {/* Frequency & format sub-breakdowns for continue responses */}
+              {/* Comments note */}
+              {data.withComments > 0 && (
+                <p className="mt-3 text-xs text-gray-400">
+                  <span className="font-medium text-gray-600">{data.withComments}</span> of{" "}
+                  {data.totalResponses} responses include written comments (
+                  {Math.round((data.withComments / data.totalResponses) * 100)}%)
+                </p>
+              )}
+
+              {/* Frequency / direction / format sub-breakdowns */}
               {data.totalContinueResponses > 0 && (
-                <div className="mt-5 border-t border-gray-100 pt-5 grid grid-cols-1 gap-5 sm:grid-cols-2">
-                  {/* Frequency breakdown */}
+                <div className="mt-5 border-t border-gray-100 pt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
+                  {/* Frequency preference */}
                   <div>
                     <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
                       Frequency preference
@@ -538,9 +587,7 @@ export default async function AnalysisPage() {
                           <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100">
                             <div
                               className={`h-full rounded-full ${f.frequency === "__none__" ? "bg-slate-200" : "bg-sky-400"}`}
-                              style={{
-                                width: `${Math.round((f.count / data.totalContinueResponses) * 100)}%`,
-                              }}
+                              style={{ width: `${Math.round((f.count / data.totalContinueResponses) * 100)}%` }}
                             />
                           </div>
                           <div className="w-14 shrink-0 text-right text-xs text-gray-400">
@@ -554,7 +601,45 @@ export default async function AnalysisPage() {
                     </div>
                   </div>
 
-                  {/* Format breakdown */}
+                  {/* Frequency direction */}
+                  {data.totalFreqDirection > 0 && (
+                    <div>
+                      <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                        Frequency direction
+                        <span className="ml-1.5 font-normal normal-case tracking-normal text-gray-300">
+                          vs. current
+                        </span>
+                      </p>
+                      <div className="space-y-1.5">
+                        {data.freqDirection.map((d) => {
+                          const cfg = {
+                            increase: { label: "↑ More frequent", color: "bg-emerald-400" },
+                            same:     { label: "→ Same",          color: "bg-slate-300"   },
+                            decrease: { label: "↓ Less frequent", color: "bg-rose-400"    },
+                          }[d.direction];
+                          return (
+                            <div key={d.direction} className="flex items-center gap-2">
+                              <div className="w-28 shrink-0 text-xs text-gray-600">{cfg.label}</div>
+                              <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100">
+                                <div
+                                  className={`h-full rounded-full ${cfg.color}`}
+                                  style={{ width: `${Math.round((d.count / data.totalFreqDirection) * 100)}%` }}
+                                />
+                              </div>
+                              <div className="w-14 shrink-0 text-right text-xs text-gray-400">
+                                {d.count}
+                                <span className="ml-1 text-gray-300">
+                                  ({Math.round((d.count / data.totalFreqDirection) * 100)}%)
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Format preference */}
                   <div>
                     <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
                       Format preference
@@ -571,9 +656,7 @@ export default async function AnalysisPage() {
                           <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100">
                             <div
                               className={`h-full rounded-full ${f.format === "__none__" ? "bg-slate-200" : "bg-sky-400"}`}
-                              style={{
-                                width: `${Math.round((f.count / data.totalContinueResponses) * 100)}%`,
-                              }}
+                              style={{ width: `${Math.round((f.count / data.totalContinueResponses) * 100)}%` }}
                             />
                           </div>
                           <div className="w-14 shrink-0 text-right text-xs text-gray-400">
@@ -589,14 +672,6 @@ export default async function AnalysisPage() {
                 </div>
               )}
 
-              {/* Comments note */}
-              {data.withComments > 0 && (
-                <p className="mt-4 text-xs text-gray-400">
-                  <span className="font-medium text-gray-600">{data.withComments}</span> of{" "}
-                  {data.totalResponses} responses include written comments (
-                  {Math.round((data.withComments / data.totalResponses) * 100)}%)
-                </p>
-              )}
             </div>
           )}
 

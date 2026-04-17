@@ -45,17 +45,58 @@ interface EntitySourceRow {
   source: string;
   cnt: string;
 }
+interface FrequencyBreakdownRow {
+  frequency: string | null;
+  count: string;
+}
+interface FormatBreakdownRow {
+  format: string | null;
+  count: string;
+}
+interface WithCommentsRow {
+  with_comments: string;
+}
 
 const STATUS_LABELS: Record<string, string> = {
-  continue: "Continue",
+  continue: "Continue as is",
+  continue_with_changes: "Continue with changes",
   merge: "Merge",
   discontinue: "Discontinue",
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  continue: "bg-green-100 text-green-800",
-  merge: "bg-yellow-100 text-yellow-800",
-  discontinue: "bg-red-100 text-red-800",
+  continue: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
+  continue_with_changes: "bg-sky-50 text-sky-700 ring-1 ring-sky-200",
+  merge: "bg-slate-50 text-slate-600 ring-1 ring-slate-200",
+  discontinue: "bg-rose-50 text-rose-600 ring-1 ring-rose-200",
+};
+
+const STATUS_BAR_COLORS: Record<string, string> = {
+  continue: "bg-emerald-400",
+  continue_with_changes: "bg-sky-400",
+  merge: "bg-slate-400",
+  discontinue: "bg-rose-400",
+};
+
+const STATUS_ORDER = ["continue", "continue_with_changes", "merge", "discontinue"];
+
+const FREQUENCY_LABELS: Record<string, string> = {
+  "multiple-per-year": "Multiple/year",
+  annual: "Annual",
+  biennial: "Biennial",
+  triennial: "Triennial",
+  quadrennial: "Quadrennial",
+  "one-time": "One-time",
+  __none__: "No change",
+};
+
+const FORMAT_LABELS: Record<string, string> = {
+  shorter: "Shorter",
+  oral: "Oral presentation",
+  dashboard: "Dashboard",
+  other: "Other format",
+  "no-change": "No change",
+  __none__: "No change",
 };
 
 async function getAnalysisData() {
@@ -68,6 +109,9 @@ async function getAnalysisData() {
     totalUsersRows,
     activeUsersRows,
     entitySourceRows,
+    frequencyBreakdownRows,
+    formatBreakdownRows,
+    withCommentsRows,
   ] = await Promise.all([
     query<TotalRow>(
       `SELECT COUNT(*) AS total_groups FROM ${DB_SCHEMA}.report_frequencies`,
@@ -79,9 +123,15 @@ async function getAnalysisData() {
          FROM ${DB_SCHEMA}.survey_responses`,
     ),
     query<StatusRow>(
-      `SELECT status, COUNT(*) AS count
+      `SELECT
+           CASE
+             WHEN status = 'continue' AND (frequency IS NOT NULL OR format IS NOT NULL)
+               THEN 'continue_with_changes'
+             ELSE status
+           END AS status,
+           COUNT(*) AS count
          FROM ${DB_SCHEMA}.survey_responses
-         GROUP BY status
+         GROUP BY 1
          ORDER BY count DESC`,
     ),
     // User counts per entity
@@ -172,6 +222,30 @@ async function getAnalysisData() {
          JOIN ${DB_SCHEMA}.report_frequencies rf ON rf.proper_title = res.proper_title
          GROUP BY res.entity, res.source`,
     ),
+    // Frequency preferences for continue-with-changes responses only
+    query<FrequencyBreakdownRow>(
+      `SELECT COALESCE(frequency, '__none__') AS frequency, COUNT(*) AS count
+         FROM ${DB_SCHEMA}.survey_responses
+         WHERE status = 'continue' AND (frequency IS NOT NULL OR format IS NOT NULL)
+         GROUP BY 1
+         ORDER BY count DESC`,
+    ),
+    // Format preferences for continue-with-changes responses only
+    query<FormatBreakdownRow>(
+      `SELECT
+           CASE WHEN format IS NULL OR format = 'no-change' THEN '__none__' ELSE format END AS format,
+           COUNT(*) AS count
+         FROM ${DB_SCHEMA}.survey_responses
+         WHERE status = 'continue' AND (frequency IS NOT NULL OR format IS NOT NULL)
+         GROUP BY 1
+         ORDER BY count DESC`,
+    ),
+    // Responses with comments
+    query<WithCommentsRow>(
+      `SELECT COUNT(*) AS with_comments
+         FROM ${DB_SCHEMA}.survey_responses
+         WHERE comments IS NOT NULL AND TRIM(comments) != ''`,
+    ),
   ]);
 
   const totalGroups = parseInt(totalRows[0]?.total_groups ?? "0");
@@ -252,6 +326,24 @@ async function getAnalysisData() {
       e.reportsWithResponse === 0,
   ).length;
 
+  const withComments = parseInt(withCommentsRows[0]?.with_comments ?? "0");
+
+  const frequencyBreakdown = frequencyBreakdownRows.map((r) => ({
+    frequency: r.frequency ?? "__none__",
+    count: parseInt(r.count),
+  }));
+  const totalContinueResponses = frequencyBreakdown.reduce((s, r) => s + r.count, 0);
+
+  const formatBreakdown = formatBreakdownRows.map((r) => ({
+    format: r.format ?? "__none__",
+    count: parseInt(r.count),
+  }));
+
+  const byStatus = statusRows.map((r) => ({ status: r.status, count: parseInt(r.count) }));
+  const byStatusOrdered = STATUS_ORDER
+    .map((s) => byStatus.find((r) => r.status === s))
+    .filter(Boolean) as { status: string; count: number }[];
+
   return {
     totalGroups,
     respondedGroups,
@@ -262,10 +354,12 @@ async function getAnalysisData() {
     entitiesResponded,
     entitiesInProgress,
     entitiesNotStarted,
-    byStatus: statusRows.map((r) => ({
-      status: r.status,
-      count: parseInt(r.count),
-    })),
+    withComments,
+    byStatus,
+    byStatusOrdered,
+    frequencyBreakdown,
+    totalContinueResponses,
+    formatBreakdown,
     entities,
   };
 }
@@ -395,17 +489,114 @@ export default async function AnalysisPage() {
               <h2 className="mb-4 text-sm font-semibold text-gray-900">
                 Responses by Recommendation
               </h2>
+
+              {/* Stacked proportion bar */}
+              <div className="mb-4 flex h-5 w-full overflow-hidden rounded-full bg-gray-100">
+                {data.byStatusOrdered.map((s) => (
+                  <div
+                    key={s.status}
+                    className={`h-full transition-all ${STATUS_BAR_COLORS[s.status] ?? "bg-gray-400"}`}
+                    style={{ width: `${(s.count / data.totalResponses) * 100}%` }}
+                    title={`${STATUS_LABELS[s.status] ?? s.status}: ${s.count} (${Math.round((s.count / data.totalResponses) * 100)}%)`}
+                  />
+                ))}
+              </div>
+
+              {/* Pills with counts and percentages */}
               <div className="flex flex-wrap gap-3">
-                {data.byStatus.map((s) => (
+                {data.byStatusOrdered.map((s) => (
                   <div
                     key={s.status}
                     className={`inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium ${STATUS_COLORS[s.status] ?? "bg-gray-100 text-gray-800"}`}
                   >
                     {STATUS_LABELS[s.status] ?? s.status}
                     <span className="font-bold">{s.count}</span>
+                    <span className="opacity-50 text-xs">
+                      {Math.round((s.count / data.totalResponses) * 100)}%
+                    </span>
                   </div>
                 ))}
               </div>
+
+              {/* Frequency & format sub-breakdowns for continue responses */}
+              {data.totalContinueResponses > 0 && (
+                <div className="mt-5 border-t border-gray-100 pt-5 grid grid-cols-1 gap-5 sm:grid-cols-2">
+                  {/* Frequency breakdown */}
+                  <div>
+                    <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                      Frequency preference
+                      <span className="ml-1.5 font-normal normal-case tracking-normal text-gray-300">
+                        (continue with changes)
+                      </span>
+                    </p>
+                    <div className="space-y-1.5">
+                      {data.frequencyBreakdown.map((f) => (
+                        <div key={f.frequency} className="flex items-center gap-2">
+                          <div className="w-28 shrink-0 truncate text-xs text-gray-600">
+                            {FREQUENCY_LABELS[f.frequency] ?? f.frequency}
+                          </div>
+                          <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100">
+                            <div
+                              className={`h-full rounded-full ${f.frequency === "__none__" ? "bg-slate-200" : "bg-sky-400"}`}
+                              style={{
+                                width: `${Math.round((f.count / data.totalContinueResponses) * 100)}%`,
+                              }}
+                            />
+                          </div>
+                          <div className="w-14 shrink-0 text-right text-xs text-gray-400">
+                            {f.count}
+                            <span className="ml-1 text-gray-300">
+                              ({Math.round((f.count / data.totalContinueResponses) * 100)}%)
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Format breakdown */}
+                  <div>
+                    <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                      Format preference
+                      <span className="ml-1.5 font-normal normal-case tracking-normal text-gray-300">
+                        (continue with changes)
+                      </span>
+                    </p>
+                    <div className="space-y-1.5">
+                      {data.formatBreakdown.map((f) => (
+                        <div key={f.format} className="flex items-center gap-2">
+                          <div className="w-28 shrink-0 truncate text-xs text-gray-600">
+                            {FORMAT_LABELS[f.format] ?? f.format}
+                          </div>
+                          <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100">
+                            <div
+                              className={`h-full rounded-full ${f.format === "__none__" ? "bg-slate-200" : "bg-sky-400"}`}
+                              style={{
+                                width: `${Math.round((f.count / data.totalContinueResponses) * 100)}%`,
+                              }}
+                            />
+                          </div>
+                          <div className="w-14 shrink-0 text-right text-xs text-gray-400">
+                            {f.count}
+                            <span className="ml-1 text-gray-300">
+                              ({Math.round((f.count / data.totalContinueResponses) * 100)}%)
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Comments note */}
+              {data.withComments > 0 && (
+                <p className="mt-4 text-xs text-gray-400">
+                  <span className="font-medium text-gray-600">{data.withComments}</span> of{" "}
+                  {data.totalResponses} responses include written comments (
+                  {Math.round((data.withComments / data.totalResponses) * 100)}%)
+                </p>
+              )}
             </div>
           )}
 
@@ -495,15 +686,15 @@ export default async function AnalysisPage() {
                       </td>
                       <td className="px-5 py-3">
                         {e.reportsWithResponse > 0 ? (
-                          <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-700">
+                          <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-200">
                             Responded
                           </span>
                         ) : e.confirmedReports > 0 ? (
-                          <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+                          <span className="inline-flex items-center rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700 ring-1 ring-sky-200">
                             In Progress
                           </span>
                         ) : e.suggestedReports > 0 ? (
-                          <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                          <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
                             Not Started
                           </span>
                         ) : (

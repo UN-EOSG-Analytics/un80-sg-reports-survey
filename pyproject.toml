@@ -1,7 +1,7 @@
 [project]
-name = "un-website-boilerplate"
+name = "un80-sg-reports-survey"
 version = "0.1.0"
-description = "UN Website Boilerplate"
+description = "UN80 SG Reports Survey"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

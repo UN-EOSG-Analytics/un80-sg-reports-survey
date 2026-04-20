@@ -1,11 +1,18 @@
+import { EntityTableExport } from "@/components/EntityTableExport";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
-import { EntityTableExport } from "@/components/EntityTableExport";
 import { SurveyExportButton } from "@/components/SurveyExportButton";
 import { getCurrentUser } from "@/lib/auth";
 import { notAdminSQL } from "@/lib/config";
 import { query } from "@/lib/db";
-import { BarChart3, CheckCircle2, Circle, Clock, FileText, Users } from "lucide-react";
+import {
+  BarChart3,
+  CheckCircle2,
+  Circle,
+  Clock,
+  FileText,
+  Users,
+} from "lucide-react";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -82,7 +89,12 @@ const STATUS_BAR_COLORS: Record<string, string> = {
   discontinue: "bg-rose-400",
 };
 
-const STATUS_ORDER = ["continue", "continue_with_changes", "merge", "discontinue"];
+const STATUS_ORDER = [
+  "continue",
+  "continue_with_changes",
+  "merge",
+  "discontinue",
+];
 
 const FREQUENCY_LABELS: Record<string, string> = {
   "multiple-per-year": "Multiple/year",
@@ -123,7 +135,15 @@ async function getAnalysisData() {
     ),
     query<RespondedRow>(
       `SELECT
-           COUNT(DISTINCT (proper_title, normalized_body)) AS responded_groups,
+           (
+             SELECT COUNT(DISTINCT (proper_title, normalized_body))
+             FROM (
+               SELECT proper_title, normalized_body FROM ${DB_SCHEMA}.survey_responses
+               UNION
+               SELECT proper_title, normalized_body FROM ${DB_SCHEMA}.report_frequency_confirmations
+               WHERE frequency = 'one-time'
+             ) AS completed
+           ) AS responded_groups,
            COUNT(*) AS total_responses
          FROM ${DB_SCHEMA}.survey_responses`,
     ),
@@ -179,6 +199,16 @@ async function getAnalysisData() {
              normalized_body,
              responded_by_user_id
            FROM ${DB_SCHEMA}.survey_responses
+           UNION
+           SELECT DISTINCT
+             u.entity,
+             rfc.proper_title,
+             rfc.normalized_body,
+             rfc.confirmed_by_user_id
+           FROM ${DB_SCHEMA}.report_frequency_confirmations rfc
+           JOIN ${DB_SCHEMA}.users u ON u.id = rfc.confirmed_by_user_id
+           WHERE rfc.frequency = 'one-time'
+             AND u.entity IS NOT NULL
          ),
          suggested_counts AS (
            SELECT entity, COUNT(DISTINCT (proper_title, normalized_body)) AS cnt
@@ -260,7 +290,7 @@ async function getAnalysisData() {
              ('biennial', 3),
              ('triennial', 4),
              ('quadrennial', 5),
-             ('one-time', 6)
+             ('quinquennial', 6)
          )
          SELECT
            CASE
@@ -302,7 +332,10 @@ async function getAnalysisData() {
   );
 
   // Index suggestion source counts by entity
-  const sourceByEntity = new Map<string, { dgacm: number; dri: number; ai: number }>();
+  const sourceByEntity = new Map<
+    string,
+    { dgacm: number; dri: number; ai: number }
+  >();
   for (const r of entitySourceRows) {
     if (!sourceByEntity.has(r.entity)) {
       sourceByEntity.set(r.entity, { dgacm: 0, dri: 0, ai: 0 });
@@ -360,27 +393,54 @@ async function getAnalysisData() {
 
   const withComments = parseInt(withCommentsRows[0]?.with_comments ?? "0");
 
-  const freqDirection = (["increase", "same", "decrease"] as const).map((dir) => ({
-    direction: dir,
-    count: parseInt(freqDirectionRows.find((r) => r.direction === dir)?.count ?? "0"),
-  }));
+  const freqDirection = (["increase", "same", "decrease"] as const).map(
+    (dir) => ({
+      direction: dir,
+      count: parseInt(
+        freqDirectionRows.find((r) => r.direction === dir)?.count ?? "0",
+      ),
+    }),
+  );
   const totalFreqDirection = freqDirection.reduce((s, r) => s + r.count, 0);
 
-  const frequencyBreakdown = frequencyBreakdownRows.map((r) => ({
-    frequency: r.frequency ?? "__none__",
+  const FREQUENCY_ORDER = [
+    "multiple-per-year",
+    "annual",
+    "biennial",
+    "triennial",
+    "quadrennial",
+    "one-time",
+    "__none__",
+  ];
+  const FORMAT_ORDER = ["shorter", "oral", "dashboard", "other", "__none__"];
+
+  const freqCountMap = new Map(
+    frequencyBreakdownRows.map((r) => [r.frequency ?? "__none__", parseInt(r.count)]),
+  );
+  const frequencyBreakdown = FREQUENCY_ORDER.map((f) => ({
+    frequency: f,
+    count: freqCountMap.get(f) ?? 0,
+  }));
+  const totalContinueResponses = frequencyBreakdown.reduce(
+    (s, r) => s + r.count,
+    0,
+  );
+
+  const formatCountMap = new Map(
+    formatBreakdownRows.map((r) => [r.format ?? "__none__", parseInt(r.count)]),
+  );
+  const formatBreakdown = FORMAT_ORDER.map((f) => ({
+    format: f,
+    count: formatCountMap.get(f) ?? 0,
+  }));
+
+  const byStatus = statusRows.map((r) => ({
+    status: r.status,
     count: parseInt(r.count),
   }));
-  const totalContinueResponses = frequencyBreakdown.reduce((s, r) => s + r.count, 0);
-
-  const formatBreakdown = formatBreakdownRows.map((r) => ({
-    format: r.format ?? "__none__",
-    count: parseInt(r.count),
-  }));
-
-  const byStatus = statusRows.map((r) => ({ status: r.status, count: parseInt(r.count) }));
-  const byStatusOrdered = STATUS_ORDER
-    .map((s) => byStatus.find((r) => r.status === s))
-    .filter(Boolean) as { status: string; count: number }[];
+  const byStatusOrdered = STATUS_ORDER.map((s) =>
+    byStatus.find((r) => r.status === s),
+  ).filter(Boolean) as { status: string; count: number }[];
 
   return {
     totalGroups,
@@ -438,24 +498,25 @@ export default async function AnalysisPage() {
               label="Total Report Groups"
               value={data.totalGroups}
               sub="unique report (series) title / UN body combinations"
+              href="/reports"
             />
             <StatCard
               icon={<CheckCircle2 className="h-5 w-5 text-un-blue" />}
-              label="Groups with Response"
+              label="Report Groups with Responses"
               value={data.respondedGroups}
-              sub="have at least one survey response"
+              sub="completed by at least one entity (incl. one-time confirmations)"
             />
             <StatCard
               icon={<BarChart3 className="h-5 w-5 text-un-blue" />}
               label="Coverage"
               value={`${data.coveragePct}%`}
-              sub="of report groups covered"
+              sub="report groups with at least one completion"
             />
             <StatCard
               icon={<Users className="h-5 w-5 text-un-blue" />}
               label="Total Responses"
               value={data.totalResponses}
-              sub="individual survey submissions"
+              sub="survey form submissions (excludes one-time reports)"
             />
             <StatCard
               icon={<Users className="h-5 w-5 text-un-blue" />}
@@ -467,33 +528,33 @@ export default async function AnalysisPage() {
               icon={<CheckCircle2 className="h-5 w-5 text-green-600" />}
               label="Users Active"
               value={data.activeUsers}
-              sub="submitted at least one response"
+              sub="submitted at least one survey response"
             />
             <StatCard
               icon={<CheckCircle2 className="h-5 w-5 text-green-600" />}
               label="Entities Responded"
               value={data.entitiesResponded}
-              sub="submitted at least one response"
+              sub="submitted at least one response or one-time confirmation"
             />
             <StatCard
               icon={<Clock className="h-5 w-5 text-un-blue" />}
               label="Entities In Progress"
               value={data.entitiesInProgress}
-              sub="confirmed, no responses yet"
+              sub="have reports listed but no submissions yet"
             />
             <StatCard
               icon={<Circle className="h-5 w-5 text-amber-500" />}
               label="Entities Not Started"
               value={data.entitiesNotStarted}
-              sub="suggested, nothing confirmed"
+              sub="have report suggestions but haven't set up their list"
             />
           </div>
 
           {/* Coverage bar */}
-          <div className="rounded-lg border border-un-blue/20 bg-gradient-to-br from-un-blue/5 to-white p-6">
+          <div className="rounded-lg border border-un-blue/20 bg-linear-to-br from-un-blue/5 to-white p-6">
             <div className="mb-4 flex items-end justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-widest text-un-blue/70">
+                <p className="text-xs font-semibold tracking-widest text-un-blue/70 uppercase">
                   Response Coverage
                 </p>
                 <p className="mt-0.5 text-4xl font-bold text-un-blue">
@@ -513,7 +574,7 @@ export default async function AnalysisPage() {
             </div>
             <div className="h-4 w-full overflow-hidden rounded-full bg-un-blue/10">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-un-blue to-sky-400 shadow-sm transition-all duration-700"
+                className="h-full rounded-full bg-linear-to-r from-un-blue to-sky-400 shadow-sm transition-all duration-700"
                 style={{ width: `${data.coveragePct}%` }}
               />
             </div>
@@ -536,7 +597,9 @@ export default async function AnalysisPage() {
                   <div
                     key={s.status}
                     className={`h-full transition-all ${STATUS_BAR_COLORS[s.status] ?? "bg-gray-400"}`}
-                    style={{ width: `${(s.count / data.totalResponses) * 100}%` }}
+                    style={{
+                      width: `${(s.count / data.totalResponses) * 100}%`,
+                    }}
                     title={`${STATUS_LABELS[s.status] ?? s.status}: ${s.count} (${Math.round((s.count / data.totalResponses) * 100)}%)`}
                   />
                 ))}
@@ -551,7 +614,7 @@ export default async function AnalysisPage() {
                   >
                     {STATUS_LABELS[s.status] ?? s.status}
                     <span className="font-bold">{s.count}</span>
-                    <span className="opacity-50 text-xs">
+                    <span className="text-xs opacity-50">
                       {Math.round((s.count / data.totalResponses) * 100)}%
                     </span>
                   </div>
@@ -561,39 +624,51 @@ export default async function AnalysisPage() {
               {/* Comments note */}
               {data.withComments > 0 && (
                 <p className="mt-3 text-xs text-gray-400">
-                  <span className="font-medium text-gray-600">{data.withComments}</span> of{" "}
-                  {data.totalResponses} responses include written comments (
-                  {Math.round((data.withComments / data.totalResponses) * 100)}%)
+                  <span className="font-medium text-gray-600">
+                    {data.withComments}
+                  </span>{" "}
+                  of {data.totalResponses} responses include written comments (
+                  {Math.round((data.withComments / data.totalResponses) * 100)}
+                  %)
                 </p>
               )}
 
               {/* Frequency / direction / format sub-breakdowns */}
               {data.totalContinueResponses > 0 && (
-                <div className="mt-5 border-t border-gray-100 pt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
+                <div className="mt-5 grid grid-cols-1 gap-5 border-t border-gray-100 pt-5 sm:grid-cols-3">
                   {/* Frequency preference */}
                   <div>
-                    <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                    <p className="mb-2.5 text-xs font-semibold tracking-wider text-gray-400 uppercase">
                       Frequency preference
-                      <span className="ml-1.5 font-normal normal-case tracking-normal text-gray-300">
+                      <span className="ml-1.5 font-normal tracking-normal text-gray-300 normal-case">
                         (continue with changes)
                       </span>
                     </p>
                     <div className="space-y-1.5">
                       {data.frequencyBreakdown.map((f) => (
-                        <div key={f.frequency} className="flex items-center gap-2">
+                        <div
+                          key={f.frequency}
+                          className="flex items-center gap-2"
+                        >
                           <div className="w-28 shrink-0 truncate text-xs text-gray-600">
                             {FREQUENCY_LABELS[f.frequency] ?? f.frequency}
                           </div>
                           <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100">
                             <div
                               className={`h-full rounded-full ${f.frequency === "__none__" ? "bg-slate-200" : "bg-sky-400"}`}
-                              style={{ width: `${Math.round((f.count / data.totalContinueResponses) * 100)}%` }}
+                              style={{
+                                width: `${Math.round((f.count / data.totalContinueResponses) * 100)}%`,
+                              }}
                             />
                           </div>
                           <div className="w-14 shrink-0 text-right text-xs text-gray-400">
                             {f.count}
                             <span className="ml-1 text-gray-300">
-                              ({Math.round((f.count / data.totalContinueResponses) * 100)}%)
+                              (
+                              {Math.round(
+                                (f.count / data.totalContinueResponses) * 100,
+                              )}
+                              %)
                             </span>
                           </div>
                         </div>
@@ -604,32 +679,49 @@ export default async function AnalysisPage() {
                   {/* Frequency direction */}
                   {data.totalFreqDirection > 0 && (
                     <div>
-                      <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                      <p className="mb-2.5 text-xs font-semibold tracking-wider text-gray-400 uppercase">
                         Frequency direction
-                        <span className="ml-1.5 font-normal normal-case tracking-normal text-gray-300">
+                        <span className="ml-1.5 font-normal tracking-normal text-gray-300 normal-case">
                           vs. current
                         </span>
                       </p>
                       <div className="space-y-1.5">
                         {data.freqDirection.map((d) => {
                           const cfg = {
-                            increase: { label: "↑ More frequent", color: "bg-emerald-400" },
-                            same:     { label: "→ Same",          color: "bg-slate-300"   },
-                            decrease: { label: "↓ Less frequent", color: "bg-rose-400"    },
+                            increase: {
+                              label: "↑ More frequent",
+                              color: "bg-emerald-400",
+                            },
+                            same: { label: "→ Same", color: "bg-slate-300" },
+                            decrease: {
+                              label: "↓ Less frequent",
+                              color: "bg-rose-400",
+                            },
                           }[d.direction];
                           return (
-                            <div key={d.direction} className="flex items-center gap-2">
-                              <div className="w-28 shrink-0 text-xs text-gray-600">{cfg.label}</div>
+                            <div
+                              key={d.direction}
+                              className="flex items-center gap-2"
+                            >
+                              <div className="w-28 shrink-0 text-xs text-gray-600">
+                                {cfg.label}
+                              </div>
                               <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100">
                                 <div
                                   className={`h-full rounded-full ${cfg.color}`}
-                                  style={{ width: `${Math.round((d.count / data.totalFreqDirection) * 100)}%` }}
+                                  style={{
+                                    width: `${Math.round((d.count / data.totalFreqDirection) * 100)}%`,
+                                  }}
                                 />
                               </div>
                               <div className="w-14 shrink-0 text-right text-xs text-gray-400">
                                 {d.count}
                                 <span className="ml-1 text-gray-300">
-                                  ({Math.round((d.count / data.totalFreqDirection) * 100)}%)
+                                  (
+                                  {Math.round(
+                                    (d.count / data.totalFreqDirection) * 100,
+                                  )}
+                                  %)
                                 </span>
                               </div>
                             </div>
@@ -641,9 +733,9 @@ export default async function AnalysisPage() {
 
                   {/* Format preference */}
                   <div>
-                    <p className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                    <p className="mb-2.5 text-xs font-semibold tracking-wider text-gray-400 uppercase">
                       Format preference
-                      <span className="ml-1.5 font-normal normal-case tracking-normal text-gray-300">
+                      <span className="ml-1.5 font-normal tracking-normal text-gray-300 normal-case">
                         (continue with changes)
                       </span>
                     </p>
@@ -656,13 +748,19 @@ export default async function AnalysisPage() {
                           <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100">
                             <div
                               className={`h-full rounded-full ${f.format === "__none__" ? "bg-slate-200" : "bg-sky-400"}`}
-                              style={{ width: `${Math.round((f.count / data.totalContinueResponses) * 100)}%` }}
+                              style={{
+                                width: `${Math.round((f.count / data.totalContinueResponses) * 100)}%`,
+                              }}
                             />
                           </div>
                           <div className="w-14 shrink-0 text-right text-xs text-gray-400">
                             {f.count}
                             <span className="ml-1 text-gray-300">
-                              ({Math.round((f.count / data.totalContinueResponses) * 100)}%)
+                              (
+                              {Math.round(
+                                (f.count / data.totalContinueResponses) * 100,
+                              )}
+                              %)
                             </span>
                           </div>
                         </div>
@@ -671,7 +769,6 @@ export default async function AnalysisPage() {
                   </div>
                 </div>
               )}
-
             </div>
           )}
 
@@ -715,7 +812,7 @@ export default async function AnalysisPage() {
                       Reports
                     </div>
                     Suggested
-                    <div className="mt-0.5 flex justify-end gap-1 text-[9px] font-normal normal-case tracking-normal text-gray-400">
+                    <div className="mt-0.5 flex justify-end gap-1 text-[9px] font-normal tracking-normal text-gray-400 normal-case">
                       <span>DGACM</span>
                       <span>·</span>
                       <span>DRI</span>
@@ -799,7 +896,9 @@ export default async function AnalysisPage() {
                       <td className="px-5 py-3 text-right">
                         {e.suggestedReports > 0 ? (
                           <>
-                            <span className="font-medium text-gray-900">{e.suggestedReports}</span>
+                            <span className="font-medium text-gray-900">
+                              {e.suggestedReports}
+                            </span>
                             <div className="mt-0.5 flex justify-end gap-1 text-[10px] text-gray-400">
                               <span>{e.suggestedBySource.dgacm || "—"}</span>
                               <span>·</span>
@@ -815,10 +914,16 @@ export default async function AnalysisPage() {
                       <td className="px-5 py-3 text-right">
                         {e.confirmedReports > 0 ? (
                           <>
-                            <span className="font-medium text-gray-900">{e.confirmedReports}</span>
+                            <span className="font-medium text-gray-900">
+                              {e.confirmedReports}
+                            </span>
                             {e.suggestedReports > 0 && (
                               <div className="mt-0.5 text-[10px] text-gray-400">
-                                {Math.round((e.confirmedReports / e.suggestedReports) * 100)}%
+                                {Math.round(
+                                  (e.confirmedReports / e.suggestedReports) *
+                                    100,
+                                )}
+                                %
                               </div>
                             )}
                           </>
@@ -873,20 +978,37 @@ function StatCard({
   label,
   value,
   sub,
+  href,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string | number;
   sub?: string;
+  href?: string;
 }) {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white px-5 py-4">
+  const inner = (
+    <>
       <div className="mb-2 flex items-center gap-2">
         {icon}
         <span className="text-sm font-medium text-gray-500">{label}</span>
       </div>
       <p className="text-2xl font-bold text-gray-900">{value}</p>
       {sub && <p className="mt-0.5 text-xs text-gray-400">{sub}</p>}
+    </>
+  );
+  if (href) {
+    return (
+      <a
+        href={href}
+        className="block rounded-lg border border-gray-200 bg-white px-5 py-4 transition-colors hover:border-un-blue/40 hover:bg-un-blue/5"
+      >
+        {inner}
+      </a>
+    );
+  }
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white px-5 py-4">
+      {inner}
     </div>
   );
 }

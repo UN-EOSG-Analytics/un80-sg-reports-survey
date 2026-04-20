@@ -1,0 +1,2 @@
+- Dashboard survey column (src/components/SGReportsList.tsx): still reads only my-responses → survey_responses. One-time confirmed reports still show "Go to survey" badge.
+- Multi-entity edge case: if two entities are assigned the same report and both confirm it as 'one-time', only the last confirming entity gets per-entity credit (schema limitation of report_frequency_confirmations).

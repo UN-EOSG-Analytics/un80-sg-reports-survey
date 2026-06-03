@@ -9,13 +9,13 @@ const roboto = Roboto({
 });
 
 export const metadata: Metadata = {
-  title: "SG Reports Overview",
+  title: "Secretary-General's Reports",
   description:
-    "Data and analysis about reports of the Secretary-General: catalog, publication patterns, mandates, and similar reports.",
+    "A consolidated view of Secretary-General's reports from 2023 to 2025, drawn from the United Nations Digital Library.",
   openGraph: {
-    title: "SG Reports Overview",
+    title: "Secretary-General's Reports",
     description:
-      "Data and analysis about reports of the Secretary-General: catalog, publication patterns, mandates, and similar reports.",
+      "A consolidated view of Secretary-General's reports from 2023 to 2025, drawn from the United Nations Digital Library.",
     type: "website",
     locale: "en_US",
   },

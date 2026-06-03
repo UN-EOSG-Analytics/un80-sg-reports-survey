@@ -1,48 +1,80 @@
 import Image from "next/image";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 interface Props {
   children?: React.ReactNode;
   maxWidth?: "6xl" | "7xl";
-  hideAbout?: boolean;
 }
 
-export const SITE_TITLE = "SG Reports Overview";
-export const SITE_SUBTITLE =
-  "Data and analysis about reports of the Secretary-General";
+export const SITE_TITLE = "Secretary-General's Reports";
 
-export function Header({ children, maxWidth = "7xl", hideAbout = false }: Props) {
-  const widthClass = maxWidth === "6xl" ? "max-w-6xl" : "max-w-7xl";
+export function Header({ children, maxWidth = "7xl" }: Props) {
+  const wide = maxWidth === "7xl";
+  // Container math: max-w-7xl is 1280px, max-w-6xl is 1152px. The emblem
+  // (47.9px wide) plus ~10px gap needs ~58px of free margin to one side.
+  // Outboard kicks in once (viewport - container)/2 ≥ 58px.
+  //   7xl → 1280 + 116 = 1396 → use min-[1396px]
+  //   6xl → 1152 + 116 = 1268 → use min-[1268px]
+  const outboardOnly = wide
+    ? "hidden min-[1396px]:block"
+    : "hidden min-[1268px]:block";
+  const inlineOnly = wide ? "min-[1396px]:hidden" : "min-[1268px]:hidden";
+  const widthClass = wide ? "max-w-7xl" : "max-w-6xl";
 
   return (
-    <header className="border-b border-gray-200 bg-white">
-      <div className={`mx-auto flex ${widthClass} items-center justify-between px-3 py-4 sm:px-4`}>
-        <Link href="/reports" className="flex items-center gap-3 hover:opacity-90">
+    <header className="relative border-b border-gray-200 bg-white py-3">
+      <div
+        className={cn(
+          "relative mx-auto flex items-center gap-4 px-6",
+          widthClass,
+        )}
+      >
+        {/* Outboard emblem: sits in the page margin to the LEFT of the
+            container's content edge so the wordmark lines up with body text.
+            end-[100%] places the emblem's right edge at the container's left
+            content edge; the negative me-3 nudges in a 12px visual gap. */}
+        <Link
+          href="/"
+          aria-label="Secretary-General's Reports"
+          className={cn(
+            "absolute top-1/2 end-[100%] me-3 h-10 w-[47.9px] -translate-y-1/2 transition-opacity hover:opacity-75",
+            outboardOnly,
+          )}
+        >
           <Image
-            src="/images/UN_Logo_Stacked_Colour_English.svg"
-            alt="UN Logo"
-            width={50}
-            height={50}
-            priority
-            className="h-12 w-auto select-none"
+            src="/images/un-emblem-colour.svg"
+            alt="UN emblem"
+            width={152}
+            height={127}
+            className="h-10 w-[47.9px] shrink-0 select-none"
             draggable={false}
           />
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">{SITE_TITLE}</h1>
-            <p className="text-xs text-gray-500">{SITE_SUBTITLE}</p>
-          </div>
         </Link>
-        <div className="flex items-center gap-4">
-          <Link href="/reports" className="text-sm font-medium text-gray-700 transition-colors hover:text-un-blue">
-            All Reports
-          </Link>
-          {!hideAbout && (
-            <Link href="/about" className="text-sm font-medium text-gray-700 transition-colors hover:text-un-blue">
-              About
-            </Link>
-          )}
-          {children}
-        </div>
+        <Link
+          href="/"
+          aria-label="Secretary-General's Reports"
+          className="inline-flex items-center gap-2.5 transition-opacity hover:opacity-75"
+        >
+          <Image
+            src="/images/un-emblem-colour.svg"
+            alt=""
+            width={152}
+            height={127}
+            className={cn(
+              "h-10 w-[47.9px] shrink-0 select-none",
+              inlineOnly,
+            )}
+            draggable={false}
+          />
+          <span className="text-[23.83px] leading-none tracking-tight text-gray-900">
+            <span className="font-bold">United Nations</span>{" "}
+            <span className="font-light">{SITE_TITLE}</span>
+          </span>
+        </Link>
+        {children && (
+          <div className="ms-auto flex items-center gap-4">{children}</div>
+        )}
       </div>
     </header>
   );

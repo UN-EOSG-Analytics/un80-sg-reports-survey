@@ -232,7 +232,7 @@ function VersionRow({ v }: { v: Version }) {
           className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 transition-colors"
         >
           <Search className="h-2.5 w-2.5" />
-          DL
+          Digital Library
         </a>
       </div>
     </div>

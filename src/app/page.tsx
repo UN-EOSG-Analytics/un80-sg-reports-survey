@@ -139,11 +139,29 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl space-y-8 px-4 sm:px-8">
           <section className="space-y-4">
             <p className="max-w-3xl text-sm leading-relaxed text-gray-600">
-              Developed as part of the UN80 Initiative, this list provides a
+              Developed as part of the{" "}
+              <a
+                href="https://www.un.org/un80-initiative/en"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-un-blue hover:underline"
+              >
+                UN80 Initiative
+              </a>
+              , this list provides a
               consolidated view of Secretary-General&apos;s reports published
               from 2023 to 2025. It is intended to support transparency and
               provide context for the analysis of the reporting landscape
-              pursuant to the General Assembly resolution 80/251 paragraph 16.
+              pursuant to the{" "}
+              <a
+                href="https://docs.un.org/en/A/RES/80/251#page=4"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-un-blue hover:underline"
+              >
+                General Assembly resolution 80/251 paragraph 16
+              </a>
+              .
               The list is drawn from the{" "}
               <a
                 href="https://digitallibrary.un.org"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Loader2, ChevronUp, ChevronDown, Filter, X, Search, ChevronRight } from "lucide-react";
+import { Loader2, ChevronUp, ChevronDown, Filter, X, Search, ChevronRight, ArrowRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -77,8 +77,8 @@ function abbreviateBody(body: string | null): string | null {
 type SortColumn = "symbol" | "title" | "entity" | "body" | "year" | "frequency";
 type SortDirection = "asc" | "desc";
 
-// Columns: Symbol, Title, Entity, Body, Year, Subjects, Frequency
-const GRID_COLS = "grid-cols-[120px_1fr_100px_75px_65px_120px_90px]";
+// Columns: Symbol, Title, Entity, Body, Year, Subjects, Frequency, Details
+const GRID_COLS = "grid-cols-[120px_1fr_100px_75px_65px_120px_90px_90px]";
 
 function toTitleCase(str: string): string {
   return str
@@ -605,6 +605,9 @@ function ColumnHeaders({
         )}
         <SortArrow column="frequency" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
       </div>
+      <div className="flex items-center justify-end">
+        <span>Details</span>
+      </div>
     </div>
   );
 }
@@ -676,6 +679,19 @@ function ReportRow({
           gapHistory={report.gapHistory}
           size="xs"
         />
+      </div>
+
+      <div className="flex items-center justify-end">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect();
+          }}
+          className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-un-blue transition-colors hover:bg-blue-50"
+        >
+          Details
+          <ArrowRight className="h-3 w-3" />
+        </button>
       </div>
     </div>
   );
@@ -861,7 +877,7 @@ export function ReportsTable() {
       </div>
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-2">
+        <div className="relative flex items-center justify-between pt-2">
           <Button
             variant="outline"
             size="sm"
@@ -870,7 +886,7 @@ export function ReportsTable() {
           >
             Previous
           </Button>
-          <span className="text-sm text-gray-600">
+          <span className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-sm text-gray-600">
             {((page - 1) * limit) + 1}–{Math.min(page * limit, data?.total || 0)} of {data?.total || 0}
           </span>
           <Button
@@ -888,6 +904,22 @@ export function ReportsTable() {
         report={selectedReport}
         onClose={() => setSelectedReport(null)}
         subjectCounts={data?.subjectCounts || []}
+        onSelectSymbol={async (symbol) => {
+          try {
+            const resp = await fetch(
+              `/api/sg-reports?filterSearch=${encodeURIComponent(symbol)}&limit=20`
+            );
+            const json = await resp.json();
+            const found = (json.reports || []).find(
+              (r: ReportGroup) =>
+                r.symbol === symbol ||
+                r.versions?.some((v) => v.symbol === symbol)
+            );
+            if (found) setSelectedReport(found);
+          } catch (e) {
+            console.error("Failed to load report:", e);
+          }
+        }}
       />
     </div>
   );

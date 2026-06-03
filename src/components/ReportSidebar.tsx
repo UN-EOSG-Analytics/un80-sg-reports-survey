@@ -163,7 +163,7 @@ function SubjectPill({ subject, size = "xs" }: { subject: string; size?: "xs" | 
     : "px-2 py-0.5 text-xs";
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full font-medium whitespace-nowrap bg-gray-100 text-gray-600 ${sizeClasses}`}
+      className={`inline-flex items-center gap-1 rounded-full font-medium whitespace-nowrap border border-gray-200 bg-white text-gray-700 ${sizeClasses}`}
     >
       {toTitleCase(subject)}
     </span>
@@ -212,7 +212,9 @@ function VersionRow({ v }: { v: Version }) {
       </span>
       <div className="flex items-center gap-1.5 flex-shrink-0">
         {formattedWordCount && (
-          <span className="text-[10px] text-gray-400">{formattedWordCount}</span>
+          <span className="text-[10px] text-gray-400" title="Word count">
+            {formattedWordCount} words
+          </span>
         )}
         <a
           href={buildODSLink(v.symbol)}
@@ -239,13 +241,16 @@ function VersionRow({ v }: { v: Version }) {
 
 function PublicationPattern({
   versions,
-  expanded,
-  onToggle,
+  frequencyBadge,
 }: {
   versions: Version[];
-  expanded: boolean;
-  onToggle: () => void;
+  frequencyBadge?: React.ReactNode;
 }) {
+  const [showAll, setShowAll] = useState(false);
+  const INITIAL_VISIBLE = 5;
+  const hasMore = versions.length > INITIAL_VISIBLE;
+  const visibleVersions = showAll ? versions : versions.slice(0, INITIAL_VISIBLE);
+
   const years = versions.map((v) => v.year).filter((y): y is number => y !== null);
   if (years.length === 0) return null;
 
@@ -264,56 +269,66 @@ function PublicationPattern({
 
   return (
     <div className="space-y-2">
-      <button onClick={onToggle} className="w-full text-left group">
-        <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-2">
+        <span className="flex items-center gap-2">
           <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
             Reporting Pattern
           </span>
-          <span className="text-xs text-gray-400 group-hover:text-gray-600 flex items-center gap-1">
-            {versions.length} versions
-            {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-          </span>
-        </div>
-        <div className="flex gap-2">
-          {displayYears.map((year) => {
-            const quarters = versionMap.get(year);
-            const hasPublication = !!quarters;
-            const hasUnknownQuarter = quarters?.has(0);
-            return (
-              <div key={year} className="flex-1 min-w-0">
-                <div className="flex gap-[1px] mb-1">
-                  {[1, 2, 3, 4].map((q) => {
-                    const isFilled = quarters?.has(q) || (hasUnknownQuarter && q === 1);
-                    return (
-                      <div
-                        key={q}
-                        className={`h-4 flex-1 transition-colors ${
-                          isFilled ? "bg-un-blue" : "bg-gray-100"
-                        }`}
-                      />
-                    );
-                  })}
-                </div>
-                <div
-                  className={`text-[9px] text-center ${
-                    hasPublication ? "text-gray-600 font-medium" : "text-gray-300"
-                  }`}
-                >
-                  {year}
-                </div>
+          {frequencyBadge}
+        </span>
+        <span className="text-xs text-gray-400">
+          {versions.length} versions
+        </span>
+      </div>
+      <div className="flex gap-2">
+        {displayYears.map((year) => {
+          const quarters = versionMap.get(year);
+          const hasPublication = !!quarters;
+          const hasUnknownQuarter = quarters?.has(0);
+          return (
+            <div key={year} className="flex-1 min-w-0">
+              <div className="flex gap-[1px] mb-1">
+                {[1, 2, 3, 4].map((q) => {
+                  const isFilled = quarters?.has(q) || (hasUnknownQuarter && q === 1);
+                  return (
+                    <div
+                      key={q}
+                      className={`h-4 flex-1 transition-colors ${
+                        isFilled ? "bg-un-blue" : "bg-gray-100"
+                      }`}
+                    />
+                  );
+                })}
               </div>
-            );
-          })}
-        </div>
-      </button>
+              <div
+                className={`text-[9px] text-center ${
+                  hasPublication ? "text-gray-600 font-medium" : "text-gray-300"
+                }`}
+              >
+                {year}
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
-      {expanded && (
-        <div className="mt-3 pt-3 border-t border-gray-100 space-y-0.5">
-          {versions.map((v) => (
-            <VersionRow key={v.symbol} v={v} />
-          ))}
-        </div>
-      )}
+      <div className="mt-3 pt-3 border-t border-gray-100 space-y-0.5">
+        {visibleVersions.map((v) => (
+          <VersionRow key={v.symbol} v={v} />
+        ))}
+        {hasMore && (
+          <button
+            onClick={() => setShowAll(!showAll)}
+            className="w-full text-xs text-gray-500 hover:text-gray-700 py-1 flex items-center justify-center gap-1 mt-1"
+          >
+            {showAll ? (
+              <>Show less <ChevronUp className="h-3 w-3" /></>
+            ) : (
+              <>Show {versions.length - INITIAL_VISIBLE} more <ChevronDown className="h-3 w-3" /></>
+            )}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -322,11 +337,13 @@ function SimilarReportsGrid({
   similar,
   loading,
   error,
+  onSelect,
   defaultVisible = 4,
 }: {
   similar: SimilarReport[];
   loading: boolean;
   error: string | null;
+  onSelect?: (symbol: string) => void;
   defaultVisible?: number;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -354,47 +371,39 @@ function SimilarReportsGrid({
   return (
     <div className="space-y-1">
       {visible.map((r) => (
-        <div
+        <button
           key={r.symbol}
-          className="grid grid-cols-[1fr_auto] gap-2 p-2 rounded-md border bg-white border-gray-200 hover:border-gray-300 transition-colors"
+          type="button"
+          onClick={() => onSelect?.(r.symbol)}
+          className="block w-full text-left p-2 rounded-md border bg-white border-gray-200 hover:border-un-blue hover:bg-blue-50/40 transition-colors cursor-pointer"
         >
-          <div className="min-w-0">
-            <p className="text-sm text-gray-800 truncate" title={r.title}>
-              {r.title}
-            </p>
-            <div className="flex items-center gap-2 mt-0.5">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span
-                    className="text-[10px] font-medium px-1.5 py-0.5 rounded cursor-help"
-                    style={{
-                      backgroundColor: `rgba(0, 0, 0, ${0.05 + Math.max(0, (r.similarity - 0.7) / 0.3) * 0.25})`,
-                      color: `rgba(0, 0, 0, ${0.4 + Math.max(0, (r.similarity - 0.7) / 0.3) * 0.5})`,
-                    }}
-                  >
-                    {Math.round(r.similarity * 100)}%
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  <p className="text-xs">Semantic similarity based on meaning, not word-by-word matching</p>
-                </TooltipContent>
-              </Tooltip>
-              <a
-                href={buildODSLink(r.symbol)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[11px] text-un-blue font-medium hover:underline"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {r.symbol}
-              </a>
-              <span className="text-[11px] text-gray-400">{r.year ?? "—"}</span>
-              {r.entity && (
-                <span className="text-[10px] text-gray-400 truncate">{r.entity}</span>
-              )}
-            </div>
+          <p className="text-sm text-gray-800 truncate" title={r.title}>
+            {r.title}
+          </p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  className="text-[10px] font-medium px-1.5 py-0.5 rounded cursor-help"
+                  style={{
+                    backgroundColor: `rgba(0, 0, 0, ${0.05 + Math.max(0, (r.similarity - 0.7) / 0.3) * 0.25})`,
+                    color: `rgba(0, 0, 0, ${0.4 + Math.max(0, (r.similarity - 0.7) / 0.3) * 0.5})`,
+                  }}
+                >
+                  {Math.round(r.similarity * 100)}%
+                </span>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p className="text-xs">Semantic similarity based on meaning, not word-by-word matching</p>
+              </TooltipContent>
+            </Tooltip>
+            <span className="text-[11px] font-medium text-un-blue">{r.symbol}</span>
+            <span className="text-[11px] text-gray-400">{r.year ?? "—"}</span>
+            {r.entity && (
+              <span className="text-[10px] text-gray-400 truncate">{r.entity}</span>
+            )}
           </div>
-        </div>
+        </button>
       ))}
       {hasMore && (
         <button
@@ -420,13 +429,18 @@ export interface ReportSidebarProps {
   report: ReportGroup | null;
   onClose: () => void;
   subjectCounts: SubjectCount[];
+  onSelectSymbol?: (symbol: string) => void;
 }
 
-export function ReportSidebar({ report, onClose, subjectCounts }: ReportSidebarProps) {
+export function ReportSidebar({
+  report,
+  onClose,
+  subjectCounts,
+  onSelectSymbol,
+}: ReportSidebarProps) {
   const [similar, setSimilar] = useState<SimilarReport[]>([]);
   const [similarLoading, setSimilarLoading] = useState(false);
   const [similarError, setSimilarError] = useState<string | null>(null);
-  const [versionsExpanded, setVersionsExpanded] = useState(false);
   const [resolutions, setResolutions] = useState<ResolutionInfo[]>([]);
   const [mandatingParagraphsExpanded, setMandatingParagraphsExpanded] = useState(false);
 
@@ -439,7 +453,6 @@ export function ReportSidebar({ report, onClose, subjectCounts }: ReportSidebarP
     if (!report) return;
     setSimilarLoading(true);
     setSimilarError(null);
-    setVersionsExpanded(false);
     setMandatingParagraphsExpanded(false);
     setResolutions([]);
 
@@ -475,18 +488,19 @@ export function ReportSidebar({ report, onClose, subjectCounts }: ReportSidebarP
         <div className="flex-shrink-0 border-b px-4 py-3">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0 space-y-1.5">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <DocumentSymbolBadge symbol={report.symbol} size="sm" linkToODS={true} />
+              <div className="flex flex-wrap items-center gap-2">
+                <DocumentSymbolBadge symbol={report.symbol} size="sm" linkToODS={false} />
                 {report.body && (
                   <span className="inline-block rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
                     {abbreviateBody(report.body)}
                   </span>
                 )}
-                <FrequencyBadge
-                  frequency={report.frequency}
-                  calculatedFrequency={report.calculatedFrequency}
-                  confirmedFrequency={report.confirmedFrequency}
-                  gapHistory={report.gapHistory}
+                <EntityBadges
+                  suggestions={report.suggestions}
+                  confirmedEntities={report.confirmedEntities}
+                  leadEntities={report.leadEntities}
+                  contributingEntities={report.contributingEntities}
+                  maxVisible={6}
                   size="xs"
                 />
               </div>
@@ -496,15 +510,25 @@ export function ReportSidebar({ report, onClose, subjectCounts }: ReportSidebarP
               >
                 {displayTitle}
               </h2>
-              <div className="pt-0.5">
-                <EntityBadges
-                  suggestions={report.suggestions}
-                  confirmedEntities={report.confirmedEntities}
-                  leadEntities={report.leadEntities}
-                  contributingEntities={report.contributingEntities}
-                  maxVisible={6}
-                  size="xs"
-                />
+              <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                <a
+                  href={buildODSLink(report.symbol)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs font-medium text-un-blue bg-blue-50 hover:bg-blue-100 transition-colors"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  PDF
+                </a>
+                <a
+                  href={buildDLLink(report.symbol)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+                >
+                  <Search className="h-3.5 w-3.5" />
+                  Digital Library
+                </a>
               </div>
             </div>
             <button
@@ -518,70 +542,78 @@ export function ReportSidebar({ report, onClose, subjectCounts }: ReportSidebarP
 
         <div className="flex-1 overflow-y-auto">
           <div className="p-4 space-y-5">
-            {/* Reporting pattern */}
-            <div className="bg-gray-50 rounded-lg p-3 border border-gray-100 space-y-3">
-              <div
-                className="border border-gray-200 rounded-md bg-white p-2 hover:border-gray-300 transition-colors cursor-pointer"
-                onClick={() => setVersionsExpanded(!versionsExpanded)}
-              >
-                <PublicationPattern
-                  versions={report.versions}
-                  expanded={versionsExpanded}
-                  onToggle={() => setVersionsExpanded(!versionsExpanded)}
-                />
-                {!versionsExpanded && (
-                  <p className="text-[10px] text-gray-400 mt-2 text-center">
-                    Click to expand version history
-                  </p>
-                )}
-              </div>
-
-              {/* Mandating paragraphs */}
-              {(() => {
-                const allMandates: Array<{ mandate: MandateInfo; resSymbol: string; idx: number }> = [];
-                resolutions.forEach((res) => {
-                  res.mandates?.forEach((mandate, idx) => {
-                    if (mandate.verbatim_paragraph || mandate.summary) {
-                      allMandates.push({ mandate, resSymbol: res.symbol, idx });
-                    }
-                  });
+            {/* Mandating paragraphs (its own section) */}
+            {(() => {
+              const allMandates: Array<{ mandate: MandateInfo; resSymbol: string; idx: number }> = [];
+              resolutions.forEach((res) => {
+                res.mandates?.forEach((mandate, idx) => {
+                  if (mandate.verbatim_paragraph || mandate.summary) {
+                    allMandates.push({ mandate, resSymbol: res.symbol, idx });
+                  }
                 });
+              });
 
-                if (allMandates.length === 0) return null;
+              if (allMandates.length === 0) return null;
 
-                const INITIAL_VISIBLE = 2;
-                const hasMore = allMandates.length > INITIAL_VISIBLE;
-                const visibleMandates = mandatingParagraphsExpanded
-                  ? allMandates
-                  : allMandates.slice(0, INITIAL_VISIBLE);
+              const INITIAL_VISIBLE = 2;
+              const hasMore = allMandates.length > INITIAL_VISIBLE;
+              const visibleMandates = mandatingParagraphsExpanded
+                ? allMandates
+                : allMandates.slice(0, INITIAL_VISIBLE);
 
-                return (
-                  <div className="border border-gray-200 rounded-md bg-white p-2 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Mandating Paragraphs {hasMore && `(${allMandates.length})`}
+              const uniqueSources = Array.from(
+                new Set(allMandates.map((m) => m.resSymbol))
+              );
+              const showMultiSource = uniqueSources.length > 1;
+
+              return (
+                <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                  <h3 className="mb-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Mandating Paragraphs
+                  </h3>
+
+                  <p className="text-xs leading-relaxed text-gray-600">
+                    Mandate source{uniqueSources.length > 1 ? "s" : ""}{" "}
+                    according to Digital Library metadata:{" "}
+                    {uniqueSources.map((sym, i) => (
+                      <span key={sym}>
+                        {i > 0 && ", "}
+                        <a
+                          href={buildDLLink(sym)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-block rounded bg-blue-50 px-1.5 py-0.5 text-[11px] font-medium text-un-blue hover:bg-blue-100 transition-colors"
+                        >
+                          {sym}
+                        </a>
                       </span>
-                      <span className="text-[10px] text-gray-400">AI-extracted</span>
-                    </div>
-                    <div className="space-y-2">
-                      {visibleMandates.map(({ mandate, resSymbol, idx }) => (
-                        <div key={`${resSymbol}-${idx}`} className="text-xs text-gray-600">
+                    ))}
+                  </p>
+
+                  <div className="mt-4 space-y-2">
+                    <p className="text-xs leading-relaxed text-gray-600">
+                      Potentially matching paragraphs according to AI analysis
+                      (unverified):
+                    </p>
+                    {visibleMandates.map(({ mandate, resSymbol, idx }) => (
+                      <div
+                        key={`${resSymbol}-${idx}`}
+                        className="rounded-md border border-gray-200 bg-white p-2.5 space-y-1.5"
+                      >
+                        <p className="text-xs text-gray-700 italic">
                           {mandate.verbatim_paragraph ? (
-                            <span>&quot;{mandate.verbatim_paragraph}&quot;</span>
+                            <>&quot;{mandate.verbatim_paragraph}&quot;</>
                           ) : mandate.summary ? (
-                            <span>{mandate.summary}</span>
+                            <>{mandate.summary}</>
                           ) : null}
-                          <a
-                            href={buildDLLink(resSymbol)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-block rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-un-blue ml-1.5 hover:bg-blue-100 transition-colors"
-                          >
-                            {resSymbol}
-                          </a>
-                        </div>
-                      ))}
-                    </div>
+                        </p>
+                        {showMultiSource && (
+                          <p className="text-[10px] text-gray-400">
+                            from {resSymbol}
+                          </p>
+                        )}
+                      </div>
+                    ))}
                     {hasMore && (
                       <button
                         onClick={() => setMandatingParagraphsExpanded(!mandatingParagraphsExpanded)}
@@ -595,9 +627,9 @@ export function ReportSidebar({ report, onClose, subjectCounts }: ReportSidebarP
                       </button>
                     )}
                   </div>
-                );
-              })()}
-            </div>
+                </div>
+              );
+            })()}
 
             {/* Subjects */}
             {report.subjectTerms && report.subjectTerms.length > 0 && (
@@ -609,6 +641,22 @@ export function ReportSidebar({ report, onClose, subjectCounts }: ReportSidebarP
               </div>
             )}
 
+            {/* Reporting pattern */}
+            <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+              <PublicationPattern
+                versions={report.versions}
+                frequencyBadge={
+                  <FrequencyBadge
+                    frequency={report.frequency}
+                    calculatedFrequency={report.calculatedFrequency}
+                    confirmedFrequency={report.confirmedFrequency}
+                    gapHistory={report.gapHistory}
+                    size="xs"
+                  />
+                }
+              />
+            </div>
+
             {/* Similar reports */}
             <div className="bg-gray-50 rounded-lg p-3 border border-gray-100 space-y-2">
               <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -618,6 +666,7 @@ export function ReportSidebar({ report, onClose, subjectCounts }: ReportSidebarP
                 similar={similar}
                 loading={similarLoading}
                 error={similarError}
+                onSelect={onSelectSymbol}
                 defaultVisible={4}
               />
             </div>

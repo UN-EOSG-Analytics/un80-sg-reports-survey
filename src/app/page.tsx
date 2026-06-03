@@ -135,8 +135,8 @@ export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
-      <main className="flex-1 bg-background px-6 py-8">
-        <div className="mx-auto max-w-7xl space-y-8">
+      <main className="flex-1 bg-background py-8">
+        <div className="mx-auto max-w-7xl space-y-8 px-4 sm:px-8">
           <section className="space-y-4">
             <p className="max-w-3xl text-sm leading-relaxed text-gray-600">
               Developed as part of the UN80 Initiative, this list provides a
@@ -155,48 +155,55 @@ export default function HomePage() {
               </a>
               , where official reports are stored.
             </p>
-            <dl className="max-w-3xl space-y-2 text-sm leading-relaxed text-gray-600">
-              <div>
-                <dt className="inline font-semibold text-gray-800">Year: </dt>
-                <dd className="inline">
-                  The year shown reflects the publication date recorded in the
-                  United Nations Digital Library metadata.
-                </dd>
-              </div>
-              <div>
-                <dt className="inline font-semibold text-gray-800">Subject: </dt>
-                <dd className="inline">
-                  Subjects are extracted directly from United Nations Digital
-                  Library metadata.
-                </dd>
-              </div>
-              <div>
-                <dt className="inline font-semibold text-gray-800">
-                  Frequency:{" "}
-                </dt>
-                <dd className="inline">
-                  Frequency reflects either an express recurring reporting
-                  request or a report requested for a specific session that
-                  has, in practice, been requested recurrently at regular
-                  intervals. References to annual, biennial or triennial
-                  reporting do not prejudge future decisions by the relevant
-                  intergovernmental organ.
-                </dd>
-              </div>
-              <div>
-                <dt className="inline font-semibold text-gray-800">
-                  Total download counts:{" "}
-                </dt>
-                <dd className="inline">
-                  Total downloads refer to downloads of the report in all six
-                  official languages, as displayed on the United Nations
-                  Official Document System webpage.
-                </dd>
-              </div>
-            </dl>
+            <div className="space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                About the columns
+              </h3>
+              <dl className="max-w-3xl space-y-2 text-sm leading-relaxed text-gray-600">
+                <div>
+                  <dt className="inline font-semibold text-gray-800">Year: </dt>
+                  <dd className="inline">
+                    The year shown reflects the publication date recorded in
+                    the United Nations Digital Library metadata.
+                  </dd>
+                </div>
+                <div>
+                  <dt className="inline font-semibold text-gray-800">
+                    Subject:{" "}
+                  </dt>
+                  <dd className="inline">
+                    Subjects are extracted directly from United Nations Digital
+                    Library metadata.
+                  </dd>
+                </div>
+                <div>
+                  <dt className="inline font-semibold text-gray-800">
+                    Frequency:{" "}
+                  </dt>
+                  <dd className="inline">
+                    Frequency reflects either an express recurring reporting
+                    request or a report requested for a specific session that
+                    has, in practice, been requested recurrently at regular
+                    intervals. References to annual, biennial or triennial
+                    reporting do not prejudge future decisions by the relevant
+                    intergovernmental organ.
+                  </dd>
+                </div>
+                <div>
+                  <dt className="inline font-semibold text-gray-800">
+                    Total download counts:{" "}
+                  </dt>
+                  <dd className="inline">
+                    Total downloads refer to downloads of the report in all six
+                    official languages, as displayed on the United Nations
+                    Official Document System webpage.
+                  </dd>
+                </div>
+              </dl>
+            </div>
           </section>
 
-          <section className="space-y-4">
+          <section className="space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
               What you can explore
             </h3>
@@ -209,7 +216,9 @@ export default function HomePage() {
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-2 py-1">
                     <Search className="h-3 w-3 text-gray-400" />
-                    <span className="text-[10px] text-gray-400">Search reports...</span>
+                    <span className="text-[10px] text-gray-400">
+                      Search reports...
+                    </span>
                   </div>
                   <MockReportRow
                     symbol="A/79/123"

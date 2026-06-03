@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import Link from "next/link";
-import { Loader2, ChevronUp, ChevronDown, Filter, X, Search, ChevronRight, Clock, Layers, Plus, Check, Minus, ArrowRight, Play, GitMerge, XCircle, Pencil } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Loader2, ChevronUp, ChevronDown, Filter, X, Search, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -16,33 +15,10 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { ReportSidebar, ReportGroup, SubjectCount, EntitySuggestion, EntityConfirmation } from "@/components/ReportSidebar";
+import { ReportSidebar, ReportGroup, SubjectCount } from "@/components/ReportSidebar";
 import { EntityBadges } from "@/components/EntityBadges";
 import { FrequencyBadge } from "@/components/FrequencyBadge";
-import { DocumentSymbolBadge, buildODSLink } from "@/components/DocumentSymbolBadge";
-
-interface Version {
-  symbol: string;
-  year: number | null;
-  publicationDate: string | null;
-  recordNumber: string | null;
-  wordCount: number | null;
-}
+import { DocumentSymbolBadge } from "@/components/DocumentSymbolBadge";
 
 interface CountItem {
   value: string;
@@ -67,19 +43,15 @@ interface APIResponse {
 }
 
 interface Filters {
-  search: string; // Unified search for symbol OR title
-  symbol: string;
-  title: string;
+  search: string;
   bodies: string[];
-  years: number[]; // Selected years (2023 to present)
+  years: number[];
   frequencies: string[];
-  responses: string[]; // Admin filter: with/without responses
   subjects: string[];
-  entities: string[]; // Filter by reporting entities
-  reportTypes: string[]; // Filter by report type (Report/Note/Other)
+  entities: string[];
+  reportTypes: string[];
 }
 
-// Abbreviations for common UN issuing bodies
 const BODY_ABBREVS: Record<string, string> = {
   "General Assembly": "GA",
   "Security Council": "SC",
@@ -94,9 +66,7 @@ const BODY_ABBREVS: Record<string, string> = {
 
 function abbreviateBody(body: string | null): string | null {
   if (!body) return null;
-  // Check for known abbreviations first
   if (BODY_ABBREVS[body]) return BODY_ABBREVS[body];
-  // Fallback: first letter of each word
   return body
     .split(/\s+/)
     .map((word) => word[0]?.toUpperCase())
@@ -104,23 +74,12 @@ function abbreviateBody(body: string | null): string | null {
     .join("");
 }
 
-type SortColumn = "symbol" | "title" | "subjects" | "entity" | "body" | "year" | "frequency" | "responseCount";
+type SortColumn = "symbol" | "title" | "entity" | "body" | "year" | "frequency";
 type SortDirection = "asc" | "desc";
 
-// Grid columns vary by mode:
-// All: Symbol, Title, Entity, Body, Year, Subjects, Frequency, Survey (no actions)
-// My: Actions(36px), Symbol, Title, Body, Year, Subjects, Frequency, Survey (no entity - it's the user's)
-// Suggested: Actions(36px), Symbol, Title, Entity, Body, Year, Subjects, Frequency (no survey)
-const GRID_COLS_ALL = "grid-cols-[120px_1fr_100px_75px_65px_120px_90px_150px]";
-const GRID_COLS_ALL_ADMIN = "grid-cols-[120px_1fr_100px_75px_65px_120px_90px_220px_150px]";
-const GRID_COLS_MY = "grid-cols-[36px_120px_1fr_75px_65px_100px_80px_150px]";
-const GRID_COLS_SUGGESTED = "grid-cols-[36px_120px_1fr_100px_75px_65px_120px_100px]";
+// Columns: Symbol, Title, Entity, Body, Year, Subjects, Frequency
+const GRID_COLS = "grid-cols-[120px_1fr_100px_75px_65px_120px_90px]";
 
-function getResponseMapKey(title: string, normalizedBody: string | null) {
-  return `${title}|||${normalizedBody || ""}`;
-}
-
-// Convert string to Title Case
 function toTitleCase(str: string): string {
   return str
     .toLowerCase()
@@ -159,7 +118,6 @@ function SortArrow({
   );
 }
 
-// Filter popover with counts (pill-style like subjects)
 function CountFilterPopover({
   options,
   selected,
@@ -172,7 +130,7 @@ function CountFilterPopover({
   label?: string;
 }) {
   const [searchQuery, setSearchQuery] = useState("");
-  
+
   const filtered = useMemo(() => {
     if (!searchQuery) return options;
     const q = searchQuery.toLowerCase();
@@ -244,7 +202,6 @@ function CountFilterPopover({
   );
 }
 
-// Simple frequency filter (no counts, just list)
 function FrequencyFilterPopover({
   options,
   selected,
@@ -299,84 +256,6 @@ function FrequencyFilterPopover({
   );
 }
 
-function ResponseFilterPopover({
-  selected,
-  onChange,
-}: {
-  selected: string[];
-  onChange: (values: string[]) => void;
-}) {
-  const OPTIONS = [
-    { value: "continue", label: "Continue" },
-    { value: "continue_changes", label: "Continue with changes" },
-    { value: "merge", label: "Merge" },
-    { value: "discontinue", label: "Discontinue" },
-  ];
-
-  const toggleOption = (value: string) => {
-    onChange(selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value]);
-  };
-
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <button
-          className={`inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
-            selected.length > 0
-              ? "bg-un-blue text-white"
-              : "text-gray-400 hover:bg-gray-200 hover:text-gray-600"
-          }`}
-        >
-          <Filter className="h-3 w-3" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-56 p-2" align="start">
-        <div className="space-y-1">
-          {selected.length > 0 && (
-            <button
-              onClick={() => onChange([])}
-              className="mb-2 flex w-full items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
-            >
-              <X className="h-3 w-3" /> Clear filter
-            </button>
-          )}
-          {OPTIONS.map((opt) => (
-            <label
-              key={opt.value}
-              className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 rounded cursor-pointer text-sm"
-            >
-              <Checkbox
-                checked={selected.includes(opt.value)}
-                onCheckedChange={() => toggleOption(opt.value)}
-              />
-              <span>{opt.label}</span>
-            </label>
-          ))}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-function ResponseCountBadge({
-  label,
-  count,
-  className,
-}: {
-  label: string;
-  count: number;
-  className: string;
-}) {
-  if (!count) return null;
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${className}`}>
-      <span>{label}</span>
-      <span>{count}</span>
-    </span>
-  );
-}
-
-// Year filter (multi-select for 2023 to present)
 function YearFilterPopover({
   options,
   selected,
@@ -431,7 +310,6 @@ function YearFilterPopover({
   );
 }
 
-// Helper to sort subjects by global frequency
 function sortSubjectsByFrequency(
   subjects: string[],
   subjectCounts: SubjectCount[]
@@ -440,12 +318,51 @@ function sortSubjectsByFrequency(
   return [...subjects].sort((a, b) => {
     const countA = countMap.get(a.toLowerCase()) || 0;
     const countB = countMap.get(b.toLowerCase()) || 0;
-    if (countB !== countA) return countB - countA; // Higher count first
-    return a.localeCompare(b); // Alphabetical tiebreaker
+    if (countB !== countA) return countB - countA;
+    return a.localeCompare(b);
   });
 }
 
-// Sorted subject pills component (DRY for table and sidebar)
+function SubjectPill({
+  subject,
+  count,
+  isSelected,
+  onClick,
+  size = "sm",
+}: {
+  subject: string;
+  count?: number;
+  isSelected?: boolean;
+  onClick?: () => void;
+  size?: "xs" | "sm";
+}) {
+  const sizeClasses = size === "xs"
+    ? "px-1.5 py-0.5 text-[10px]"
+    : "px-2 py-0.5 text-xs";
+
+  const Component = onClick ? "button" : "span";
+
+  return (
+    <Component
+      onClick={onClick}
+      className={`inline-flex items-center gap-1 rounded-full font-medium transition-colors whitespace-nowrap ${sizeClasses} ${
+        isSelected
+          ? "bg-un-blue text-white"
+          : onClick
+          ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
+          : "bg-gray-100 text-gray-600"
+      }`}
+    >
+      <span>{toTitleCase(subject)}</span>
+      {count !== undefined && (
+        <span className={`text-[9px] ${isSelected ? "text-blue-200" : "text-gray-400"}`}>
+          {count}
+        </span>
+      )}
+    </Component>
+  );
+}
+
 function SortedSubjectPills({
   subjects,
   subjectCounts,
@@ -469,7 +386,6 @@ function SortedSubjectPills({
     return <span className="text-gray-300 text-xs">—</span>;
   }
 
-  // If showing all (no maxVisible or showing in tooltip)
   if (!maxVisible) {
     return (
       <div className="flex flex-wrap gap-1">
@@ -480,7 +396,6 @@ function SortedSubjectPills({
     );
   }
 
-  // Table view with tooltip for overflow
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -506,48 +421,6 @@ function SortedSubjectPills({
   );
 }
 
-// Single subject pill component (reusable)
-function SubjectPill({
-  subject,
-  count,
-  isSelected,
-  onClick,
-  size = "sm",
-}: {
-  subject: string;
-  count?: number;
-  isSelected?: boolean;
-  onClick?: () => void;
-  size?: "xs" | "sm";
-}) {
-  const sizeClasses = size === "xs" 
-    ? "px-1.5 py-0.5 text-[10px]" 
-    : "px-2 py-0.5 text-xs";
-  
-  const Component = onClick ? "button" : "span";
-  
-  return (
-    <Component
-      onClick={onClick}
-      className={`inline-flex items-center gap-1 rounded-full font-medium transition-colors whitespace-nowrap ${sizeClasses} ${
-        isSelected
-          ? "bg-un-blue text-white"
-          : onClick
-          ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
-          : "bg-gray-100 text-gray-600"
-      }`}
-    >
-      <span>{toTitleCase(subject)}</span>
-      {count !== undefined && (
-        <span className={`text-[9px] ${isSelected ? "text-blue-200" : "text-gray-400"}`}>
-          {count}
-        </span>
-      )}
-    </Component>
-  );
-}
-
-// Subject filter popover with search and pills
 function SubjectFilterPopover({
   subjects,
   selectedSubjects,
@@ -559,17 +432,16 @@ function SubjectFilterPopover({
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
-  
-  // Filter subjects by search (count > 1 already filtered on backend)
+
   const filteredSubjects = useMemo(() => {
     if (!searchQuery) return subjects;
     const query = searchQuery.toLowerCase();
     return subjects.filter((s) => s.subject.toLowerCase().includes(query));
   }, [subjects, searchQuery]);
-  
+
   const DEFAULT_VISIBLE = 20;
-  const visibleSubjects = isExpanded 
-    ? filteredSubjects 
+  const visibleSubjects = isExpanded
+    ? filteredSubjects
     : filteredSubjects.slice(0, DEFAULT_VISIBLE);
   const hasMore = filteredSubjects.length > DEFAULT_VISIBLE;
 
@@ -588,7 +460,6 @@ function SubjectFilterPopover({
       </PopoverTrigger>
       <PopoverContent className="w-80 p-3" align="start">
         <div className="space-y-3">
-          {/* Search input */}
           <div className="relative">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
             <Input
@@ -598,8 +469,7 @@ function SubjectFilterPopover({
               className="h-8 text-sm pl-7"
             />
           </div>
-          
-          {/* Clear button */}
+
           {selectedSubjects.length > 0 && (
             <button
               onClick={() => selectedSubjects.forEach((s) => onToggle(s))}
@@ -608,8 +478,7 @@ function SubjectFilterPopover({
               <X className="h-3 w-3" /> Clear {selectedSubjects.length} selected
             </button>
           )}
-          
-          {/* Pills */}
+
           <div className="flex flex-wrap gap-1.5 max-h-64 overflow-y-auto">
             {visibleSubjects.map(({ subject, count }) => (
               <SubjectPill
@@ -624,8 +493,7 @@ function SubjectFilterPopover({
               <p className="text-xs text-gray-400 py-2">No subjects found</p>
             )}
           </div>
-          
-          {/* Show more/less */}
+
           {hasMore && !searchQuery && (
             <button
               onClick={() => setIsExpanded(!isExpanded)}
@@ -647,7 +515,6 @@ function SubjectFilterPopover({
   );
 }
 
-
 function ColumnHeaders({
   sortColumn,
   sortDirection,
@@ -656,8 +523,6 @@ function ColumnHeaders({
   filters,
   onFilterChange,
   subjectCounts,
-  mode = "all",
-  isAdmin = false,
 }: {
   sortColumn: SortColumn | null;
   sortDirection: SortDirection;
@@ -666,29 +531,11 @@ function ColumnHeaders({
   filters: Filters;
   onFilterChange: (filters: Filters) => void;
   subjectCounts: SubjectCount[];
-  mode?: ReportsTableMode;
-  isAdmin?: boolean;
 }) {
-  const showFeedbackColumn = mode === "all" || mode === "my";
-  const showAdminResponseCount = mode === "all" && isAdmin;
-  const showActions = mode === "my" || mode === "suggested";
-  const showEntityColumn = mode !== "my";  // Hide entity column in "my" mode
-  const showFilters = mode !== "suggested";  // Hide filter icons in suggested mode
-  const gridCols =
-    mode === "all"
-      ? showAdminResponseCount
-        ? GRID_COLS_ALL_ADMIN
-        : GRID_COLS_ALL
-      : mode === "my"
-      ? GRID_COLS_MY
-      : GRID_COLS_SUGGESTED;
-  
   return (
     <div
-      className={`grid ${gridCols} items-center gap-x-4 px-4 py-2 text-[10px] font-medium tracking-wider text-gray-400 uppercase bg-gray-50 border-b`}
+      className={`grid ${GRID_COLS} items-center gap-x-4 px-4 py-2 text-[10px] font-medium tracking-wider text-gray-400 uppercase bg-gray-50 border-b`}
     >
-      {/* Empty column for actions - only for my/suggested */}
-      {showActions && <div></div>}
       <div className="flex items-center gap-1">
         <span>Symbol</span>
         <SortArrow column="symbol" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
@@ -697,23 +544,21 @@ function ColumnHeaders({
         <span>Title</span>
         <SortArrow column="title" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
       </div>
-      {showEntityColumn && (
-        <div className="flex items-center gap-1">
-          <span>Entity</span>
-          {showFilters && filterOptions?.entities && filterOptions.entities.length > 0 && (
-            <CountFilterPopover
-              options={filterOptions.entities}
-              selected={filters.entities}
-              onChange={(v) => onFilterChange({ ...filters, entities: v })}
-              label="entities"
-            />
-          )}
-          <SortArrow column="entity" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
-        </div>
-      )}
+      <div className="flex items-center gap-1">
+        <span>Entity</span>
+        {filterOptions?.entities && filterOptions.entities.length > 0 && (
+          <CountFilterPopover
+            options={filterOptions.entities}
+            selected={filters.entities}
+            onChange={(v) => onFilterChange({ ...filters, entities: v })}
+            label="entities"
+          />
+        )}
+        <SortArrow column="entity" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
+      </div>
       <div className="flex items-center gap-1">
         <span>Body</span>
-        {showFilters && filterOptions?.bodies && filterOptions.bodies.length > 0 && (
+        {filterOptions?.bodies && filterOptions.bodies.length > 0 && (
           <CountFilterPopover
             options={filterOptions.bodies}
             selected={filters.bodies}
@@ -725,7 +570,7 @@ function ColumnHeaders({
       </div>
       <div className="flex items-center gap-1">
         <span>Year</span>
-        {showFilters && filterOptions?.years && filterOptions.years.length > 0 && (
+        {filterOptions?.years && filterOptions.years.length > 0 && (
           <YearFilterPopover
             options={filterOptions.years}
             selected={filters.years}
@@ -736,7 +581,7 @@ function ColumnHeaders({
       </div>
       <div className="flex items-center gap-1">
         <span>Subjects</span>
-        {showFilters && subjectCounts.length > 0 && (
+        {subjectCounts.length > 0 && (
           <SubjectFilterPopover
             subjects={subjectCounts}
             selectedSubjects={filters.subjects}
@@ -751,7 +596,7 @@ function ColumnHeaders({
       </div>
       <div className="flex items-center gap-1">
         <span>Frequency</span>
-        {showFilters && filterOptions?.frequencies && filterOptions.frequencies.length > 0 && (
+        {filterOptions?.frequencies && filterOptions.frequencies.length > 0 && (
           <FrequencyFilterPopover
             options={filterOptions.frequencies}
             selected={filters.frequencies}
@@ -760,183 +605,62 @@ function ColumnHeaders({
         )}
         <SortArrow column="frequency" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
       </div>
-      {showAdminResponseCount && (
-        <div className="flex items-center gap-1 justify-start">
-          <span>Responses</span>
-          {showFilters && (
-            <ResponseFilterPopover
-              selected={filters.responses}
-              onChange={(v) => onFilterChange({ ...filters, responses: v })}
-            />
-          )}
-          <SortArrow column="responseCount" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
-        </div>
-      )}
-      {showFeedbackColumn && (
-        <div className="flex items-center gap-1 justify-end">
-          <span>Survey</span>
-        </div>
-      )}
     </div>
   );
 }
-
-// Build Digital Library search link from symbol
-function buildDLLink(symbol: string): string {
-  return `https://digitallibrary.un.org/search?ln=en&p=${encodeURIComponent(symbol)}&f=&c=Resource%20Type&c=UN%20Bodies&sf=&so=d&rg=50&fti=0`;
-}
-
 
 function ReportRow({
   report,
   isSelected,
   onSelect,
   subjectCounts,
-  surveyResponse,
-  mode = "all",
-  entity,
-  onAdd,
-  onRemove,
-  isConfirmedByEntity,
-  isAdmin = false,
 }: {
   report: ReportGroup;
   isSelected: boolean;
   onSelect: () => void;
   subjectCounts: SubjectCount[];
-  surveyResponse?: { status: string; frequency: string | null; format: string | null };
-  mode?: ReportsTableMode;
-  entity?: string;
-  onAdd?: (report: ReportGroup) => void;
-  onRemove?: (report: ReportGroup) => void;
-  isConfirmedByEntity?: boolean;
-  isAdmin?: boolean;
 }) {
-  const showActions = mode === "my" || mode === "suggested";
-  const showEntityColumn = mode !== "my";  // Hide entity column in "my" mode
-  const showAdminResponseCount = mode === "all" && isAdmin;
-  const gridCols =
-    mode === "all"
-      ? showAdminResponseCount
-        ? GRID_COLS_ALL_ADMIN
-        : GRID_COLS_ALL
-      : mode === "my"
-      ? GRID_COLS_MY
-      : GRID_COLS_SUGGESTED;
-  
-  // Gray out confirmed reports in suggested mode
-  const isGrayedOut = mode === "suggested" && isConfirmedByEntity;
-  
-  // Format title for display (remove trailing colons and trim)
   const displayTitle = report.title?.replace(/\s*:\s*$/, "").trim() || null;
-  
+
   return (
     <div
-      className={`grid ${gridCols} items-center gap-x-4 px-4 py-3 text-sm border-b ${
-        isSelected ? "bg-blue-50 border-l-2 border-l-un-blue cursor-pointer" : isGrayedOut ? "bg-gray-50/80 opacity-50" : "hover:bg-gray-50 cursor-pointer"
+      className={`grid ${GRID_COLS} items-center gap-x-4 px-4 py-3 text-sm border-b cursor-pointer ${
+        isSelected ? "bg-blue-50 border-l-2 border-l-un-blue" : "hover:bg-gray-50"
       }`}
-      onClick={isGrayedOut ? undefined : onSelect}
+      onClick={onSelect}
     >
-      {/* Actions - first column, only for my/suggested modes */}
-      {showActions && (
-        <div className="flex items-center justify-center">
-          {mode === "suggested" && !isConfirmedByEntity && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAdd?.(report);
-                  }}
-                  className="inline-flex items-center justify-center w-6 h-6 text-un-blue hover:bg-blue-100 rounded-full border border-un-blue transition-colors"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <span className="text-xs">Add to {entity}&apos;s reports</span>
-              </TooltipContent>
-            </Tooltip>
-          )}
-          {mode === "suggested" && isConfirmedByEntity && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemove?.(report);
-                  }}
-                  className="inline-flex items-center justify-center w-6 h-6 text-green-600 bg-green-50 hover:bg-red-50 hover:text-red-500 rounded-full transition-colors cursor-pointer"
-                >
-                  <Check className="h-3.5 w-3.5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <span className="text-xs">Remove from {entity}&apos;s reports</span>
-              </TooltipContent>
-            </Tooltip>
-          )}
-          {mode === "my" && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemove?.(report);
-                  }}
-                  className="inline-flex items-center justify-center w-6 h-6 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full border border-gray-300 hover:border-red-300 transition-colors"
-                >
-                  <Minus className="h-3.5 w-3.5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <span className="text-xs">Remove from {entity}&apos;s reports</span>
-              </TooltipContent>
-            </Tooltip>
-          )}
-        </div>
-      )}
-
-      {/* Symbol */}
       <div className="flex items-center">
-        <DocumentSymbolBadge 
-          symbol={report.symbol} 
-          size="xs" 
+        <DocumentSymbolBadge
+          symbol={report.symbol}
+          size="xs"
           maxLength={14}
           className="max-w-[120px]"
         />
       </div>
 
-      {/* Title */}
       <div className="truncate text-gray-700" title={displayTitle || undefined}>
         {displayTitle || <span className="text-gray-400 italic">No title</span>}
       </div>
 
-      {/* Entity - hidden in "my" mode */}
-      {showEntityColumn && (
-        <div className="overflow-hidden">
-          <EntityBadges
-            suggestions={report.suggestions}
-            confirmedEntities={report.confirmedEntities}
-            leadEntities={report.leadEntities}
-            contributingEntities={report.contributingEntities}
-            maxVisible={2}
-            size="xs"
-          />
-        </div>
-      )}
+      <div className="overflow-hidden">
+        <EntityBadges
+          suggestions={report.suggestions}
+          confirmedEntities={report.confirmedEntities}
+          leadEntities={report.leadEntities}
+          contributingEntities={report.contributingEntities}
+          maxVisible={2}
+          size="xs"
+        />
+      </div>
 
-      {/* Body */}
       <div className="text-xs text-gray-500" title={report.body ?? undefined}>
         {abbreviateBody(report.body) ?? "—"}
       </div>
 
-      {/* Year */}
       <div className="text-xs text-gray-600">
         {report.year ?? <span className="text-gray-300">—</span>}
       </div>
 
-      {/* Subjects */}
       <SortedSubjectPills
         subjects={report.subjectTerms || []}
         subjectCounts={subjectCounts}
@@ -944,7 +668,6 @@ function ReportRow({
         size="xs"
       />
 
-      {/* Frequency */}
       <div>
         <FrequencyBadge
           frequency={report.frequency}
@@ -954,609 +677,29 @@ function ReportRow({
           size="xs"
         />
       </div>
-
-      {showAdminResponseCount && (
-        <div className="flex items-center justify-start">
-          {report.responseStats ? (
-            <div className="flex flex-wrap items-center justify-start gap-1">
-              <ResponseCountBadge
-                label="Continue"
-                count={report.responseStats.continue || 0}
-                className="bg-green-50 border-green-200 text-green-700"
-              />
-              <ResponseCountBadge
-                label="Continue with changes"
-                count={report.responseStats.continueWithChanges || 0}
-                className="bg-blue-50 border-blue-200 text-blue-700"
-              />
-              <ResponseCountBadge
-                label="Merge"
-                count={report.responseStats.merge || 0}
-                className="bg-amber-50 border-amber-200 text-amber-700"
-              />
-              <ResponseCountBadge
-                label="Discontinue"
-                count={report.responseStats.discontinue || 0}
-                className="bg-red-50 border-red-200 text-red-700"
-              />
-            </div>
-          ) : report.responseCount && report.responseCount > 0 ? (
-            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-un-blue/10 px-2 text-xs font-semibold text-un-blue">
-              {report.responseCount}
-            </span>
-          ) : (
-            <span className="text-xs text-gray-300">-</span>
-          )}
-        </div>
-      )}
-
-      {/* Survey column - for mode="my" and mode="all" */}
-      {(mode === "my" || mode === "all") && (
-        <div className="flex items-center justify-end">
-          {surveyResponse ? (
-            <div className="inline-flex h-7 w-[148px]">
-              <span className="inline-flex items-center gap-1.5 rounded-l border border-r-0 border-gray-200 bg-gray-50 px-2.5 text-xs font-medium text-gray-500 flex-1">
-                <Check className="h-3 w-3 flex-shrink-0" />
-                <span className="truncate">Completed</span>
-              </span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className={`inline-flex items-center justify-center w-7 h-7 rounded-r border flex-shrink-0 ${
-                    surveyResponse.status === "continue" && !surveyResponse.frequency && !surveyResponse.format
-                      ? "bg-green-50 border-green-200 text-green-600"
-                      : surveyResponse.status === "continue"
-                      ? "bg-blue-50 border-blue-200 text-blue-600"
-                      : surveyResponse.status === "merge"
-                      ? "bg-amber-50 border-amber-200 text-amber-600"
-                      : "bg-red-50 border-red-200 text-red-600"
-                  }`}>
-                    {surveyResponse.status === "continue" && !surveyResponse.frequency && !surveyResponse.format ? (
-                      <Play className="h-3.5 w-3.5" />
-                    ) : surveyResponse.status === "continue" ? (
-                      <Pencil className="h-3.5 w-3.5" />
-                    ) : surveyResponse.status === "merge" ? (
-                      <GitMerge className="h-3.5 w-3.5" />
-                    ) : (
-                      <XCircle className="h-3.5 w-3.5" />
-                    )}
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {surveyResponse.status === "continue" && !surveyResponse.frequency && !surveyResponse.format
-                    ? "Continue as-is"
-                    : surveyResponse.status === "continue"
-                    ? "Continue with changes"
-                    : surveyResponse.status === "merge"
-                    ? "Merge with another report"
-                    : "Discontinue"}
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          ) : isConfirmedByEntity ? (
-            <span className="inline-flex items-center justify-center gap-1.5 h-7 w-[148px] rounded border border-blue-200 bg-blue-50 px-3 text-xs font-medium text-un-blue whitespace-nowrap hover:bg-blue-100 transition-colors">
-              Go to survey
-              <ArrowRight className="h-3 w-3 flex-shrink-0" />
-            </span>
-          ) : (
-            <span className="inline-flex items-center justify-center h-7 w-[148px] rounded border border-gray-200 bg-gray-50 px-3 text-xs text-gray-400 whitespace-nowrap">
-              Not completed
-            </span>
-          )}
-        </div>
-      )}
     </div>
   );
 }
 
-export type ReportsTableMode = "all" | "my" | "suggested";
-
-// =============================================================================
-// Manual Report Entry Dialog
-// =============================================================================
-
-const UN_BODIES = [
-  "General Assembly",
-  "Security Council", 
-  "Economic and Social Council",
-  "Human Rights Council",
-  "Human Rights Bodies",
-  "Secretariat",
-];
-
-interface ManualReportDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  entity: string;
-  onAdd: (report: ReportGroup) => void;
-}
-
-function ManualReportDialog({ open, onOpenChange, entity, onAdd }: ManualReportDialogProps) {
-  const [symbol, setSymbol] = useState("");
-  const [title, setTitle] = useState("");
-  const [year, setYear] = useState(new Date().getFullYear());
-  const [unBody, setUnBody] = useState("");
-  const [mandateResolution, setMandateResolution] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: currentYear - 2022 }, (_, i) => currentYear - i);
-
-  const resetForm = () => {
-    setSymbol("");
-    setTitle("");
-    setYear(currentYear);
-    setUnBody("");
-    setMandateResolution("");
-    setError(null);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setIsSubmitting(true);
-
-    const response = await fetch("/api/reports/manual", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        symbol: symbol.trim(),
-        properTitle: title.trim(),
-        title: title.trim(),
-        dateYear: year,
-        unBody,
-        mandateResolutions: mandateResolution.trim() ? [mandateResolution.trim()] : undefined,
-      }),
-    });
-
-    const data = await response.json();
-    setIsSubmitting(false);
-
-    if (!response.ok) {
-      setError(data.error || "Failed to add report");
-      return;
-    }
-
-    const reportGroup: ReportGroup = {
-      symbol: data.document.symbol,
-      title: data.document.properTitle,
-      body: data.document.unBody,
-      year: data.document.dateYear,
-      entity: null,
-      count: 1,
-      latestYear: data.document.dateYear,
-      frequency: null,
-      subjectTerms: [],
-      suggestions: [],
-      confirmedEntities: [],
-      versions: [{
-        symbol: data.document.symbol,
-        year: data.document.dateYear,
-        publicationDate: null,
-        recordNumber: null,
-        wordCount: null,
-      }],
-    };
-
-    onAdd(reportGroup);
-    resetForm();
-    onOpenChange(false);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) resetForm(); onOpenChange(v); }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Add Report Manually</DialogTitle>
-          <DialogDescription>
-            Add a report that isn&apos;t in the UN Digital Library to {entity}&apos;s list.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Symbol *</label>
-            <Input
-              placeholder="e.g., A/79/123"
-              value={symbol}
-              onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Title *</label>
-            <Input
-              placeholder="Full document title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Year *</label>
-              <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {years.map((y) => (
-                    <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">UN Body *</label>
-              <Select value={unBody} onValueChange={setUnBody} required>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {UN_BODIES.map((body) => (
-                    <SelectItem key={body} value={body}>{body}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-600">Mandating Resolution <span className="text-gray-400 font-normal">(optional)</span></label>
-            <Input
-              placeholder="e.g., A/RES/78/123"
-              value={mandateResolution}
-              onChange={(e) => setMandateResolution(e.target.value.toUpperCase())}
-            />
-          </div>
-          {error && (
-            <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{error}</p>
-          )}
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting || !symbol.trim() || !title.trim() || !unBody}>
-              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Add Report
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// =============================================================================
-// Add Report Search Component
-// =============================================================================
-
-interface SearchResult {
-  symbol: string;
-  title: string | null;
-  body: string | null;
-  year: number | null;
-}
-
-function AddReportSearch({
-  entity,
-  onAdd,
-  existingTitles,
-}: {
-  entity: string;
-  onAdd: (report: ReportGroup) => void;
-  existingTitles: Set<string>;
-}) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [showResults, setShowResults] = useState(false);
-  const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const [showManualDialog, setShowManualDialog] = useState(false);
-  const searchRef = useRef<HTMLDivElement>(null);
-  const resultsRef = useRef<HTMLDivElement>(null);
-
-  // Debounced search
-  useEffect(() => {
-    if (searchQuery.length < 2) {
-      setResults([]);
-      setHighlightedIndex(-1);
-      return;
-    }
-
-      const timer = setTimeout(async () => {
-      setIsSearching(true);
-      try {
-        // Use /api/reports/search which queries the sg_reports view (SG reports only)
-        // not /api/documents/search which queries all documents including resolutions
-        const response = await fetch(`/api/reports/search?q=${encodeURIComponent(searchQuery)}`);
-        if (response.ok) {
-          const data = await response.json();
-          // Map properTitle -> title for SearchResult interface
-          setResults((data.results || []).map((r: { properTitle: string; symbol: string; body: string | null; year: number | null }) => ({
-            symbol: r.symbol,
-            title: r.properTitle,
-            body: r.body,
-            year: r.year,
-          })));
-          setShowResults(true);
-          setHighlightedIndex(-1);
-        }
-      } catch (error) {
-        console.error("Search failed:", error);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  // Close results when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
-        setShowResults(false);
-        setHighlightedIndex(-1);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // Scroll highlighted item into view
-  useEffect(() => {
-    if (highlightedIndex >= 0 && resultsRef.current) {
-      const item = resultsRef.current.children[highlightedIndex] as HTMLElement;
-      if (item) {
-        item.scrollIntoView({ block: "nearest" });
-      }
-    }
-  }, [highlightedIndex]);
-
-  const handleAdd = (result: SearchResult) => {
-    // Don't add if already exists
-    if (result.title && existingTitles.has(result.title)) return;
-    
-    // Convert SearchResult to ReportGroup format
-    const reportGroup: ReportGroup = {
-      symbol: result.symbol,
-      title: result.title || "",
-      body: result.body,
-      year: result.year,
-      entity: null,
-      count: 1,
-      latestYear: result.year,
-      frequency: null,
-      subjectTerms: [],
-      suggestions: [],
-      confirmedEntities: [],
-      versions: [{
-        symbol: result.symbol,
-        year: result.year,
-        publicationDate: null,
-        recordNumber: null,
-        wordCount: null,
-      }],
-    };
-    onAdd(reportGroup);
-    setSearchQuery("");
-    setResults([]);
-    setShowResults(false);
-    setHighlightedIndex(-1);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!showResults || results.length === 0) return;
-
-    switch (e.key) {
-      case "ArrowDown":
-        e.preventDefault();
-        setHighlightedIndex((prev) => 
-          prev < results.length - 1 ? prev + 1 : 0
-        );
-        break;
-      case "ArrowUp":
-        e.preventDefault();
-        setHighlightedIndex((prev) => 
-          prev > 0 ? prev - 1 : results.length - 1
-        );
-        break;
-      case "Enter":
-        e.preventDefault();
-        if (highlightedIndex >= 0 && highlightedIndex < results.length) {
-          handleAdd(results[highlightedIndex]);
-        }
-        break;
-      case "Escape":
-        e.preventDefault();
-        setShowResults(false);
-        setHighlightedIndex(-1);
-        break;
-    }
-  };
-
-  return (
-    <div ref={searchRef} className="relative mt-3">
-      <div className="flex items-center gap-3 px-4 py-3 bg-blue-50 rounded-lg border border-blue-200 hover:border-blue-300 transition-colors">
-        <Plus className="h-4 w-4 text-un-blue flex-shrink-0" />
-        <input
-          type="text"
-          placeholder={`Add a report to ${entity}'s list — search by symbol (e.g. A/79/...) or title...`}
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onFocus={() => results.length > 0 && setShowResults(true)}
-          onKeyDown={handleKeyDown}
-          className="flex-1 bg-transparent text-sm text-gray-700 placeholder:text-gray-500 outline-none"
-        />
-        {isSearching && (
-          <Loader2 className="h-4 w-4 animate-spin text-un-blue flex-shrink-0" />
-        )}
-      </div>
-
-      {/* Search Results Dropdown */}
-      {showResults && results.length > 0 && (
-        <div ref={resultsRef} className="absolute left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-50 max-h-72 overflow-y-auto">
-          {results.map((result, index) => {
-            const isAlreadyAdded = result.title && existingTitles.has(result.title);
-            const isHighlighted = index === highlightedIndex;
-            return (
-              <div
-                key={result.symbol}
-                className={`flex items-center gap-3 px-4 py-2.5 border-b ${
-                  isAlreadyAdded 
-                    ? "bg-gray-50" 
-                    : isHighlighted 
-                    ? "bg-blue-50" 
-                    : "hover:bg-blue-50 cursor-pointer"
-                }`}
-                onClick={() => !isAlreadyAdded && handleAdd(result)}
-                onMouseEnter={() => !isAlreadyAdded && setHighlightedIndex(index)}
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <DocumentSymbolBadge 
-                      symbol={result.symbol} 
-                      size="xs"
-                    />
-                    {result.year && (
-                      <span className="text-[10px] text-gray-400">{result.year}</span>
-                    )}
-                  </div>
-                  <div className="text-xs text-gray-600 truncate mt-0.5">
-                    {result.title || <span className="italic text-gray-400">No title</span>}
-                  </div>
-                </div>
-                {isAlreadyAdded ? (
-                  <span className="inline-flex items-center gap-1 text-[10px] text-green-600">
-                    <Check className="h-3 w-3" />
-                    Added
-                  </span>
-                ) : (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        className="inline-flex items-center justify-center w-6 h-6 text-un-blue hover:bg-blue-100 rounded-full border border-un-blue transition-colors"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAdd(result);
-                        }}
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <span className="text-xs">Add to {entity}&apos;s reports</span>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-              </div>
-            );
-          })}
-          <button
-            type="button"
-            onClick={() => { setShowResults(false); setShowManualDialog(true); }}
-            className="w-full px-4 py-2 text-xs text-gray-500 hover:text-un-blue hover:bg-gray-50 text-left border-t"
-          >
-            Can&apos;t find it? Add report manually
-          </button>
-        </div>
-      )}
-
-      {showResults && searchQuery.length >= 2 && results.length === 0 && !isSearching && (
-        <div className="absolute left-4 right-4 mt-1 bg-white border rounded-lg shadow-lg z-50 p-3">
-          <p className="text-sm text-gray-500">No reports found</p>
-          <button
-            type="button"
-            onClick={() => { setShowResults(false); setShowManualDialog(true); }}
-            className="mt-2 text-sm text-un-blue hover:underline"
-          >
-            Add report manually
-          </button>
-        </div>
-      )}
-
-      <ManualReportDialog
-        open={showManualDialog}
-        onOpenChange={setShowManualDialog}
-        entity={entity}
-        onAdd={onAdd}
-      />
-    </div>
-  );
-}
-
-// =============================================================================
-// Reports Table Props
-// =============================================================================
-
-interface ReportsTableProps {
-  mode?: ReportsTableMode;
-  entity?: string;  // Required for mode=my and mode=suggested
-  userEntity?: string | null;  // The logged-in user's entity (for permissions)
-  userEmail?: string | null;  // The logged-in user's email (for feedback display)
-  userRole?: "user" | "admin";
-  showAddSearch?: boolean;  // Show inline search row at bottom (for mode=my)
-  onDataChanged?: () => void;  // Callback when data changes (report added/removed)
-  refetchTrigger?: number;  // Increment to trigger a refetch without remounting
-  className?: string;
-}
-
-// Backward compatibility alias
-export type SGReportsListProps = Omit<ReportsTableProps, "mode">;
-
-export function ReportsTable({ 
-  mode = "all", 
-  entity, 
-  userEntity, 
-  userEmail,
-  userRole = "user",
-  showAddSearch,
-  onDataChanged,
-  refetchTrigger,
-  className,
-}: ReportsTableProps) {
+export function ReportsTable() {
   const [data, setData] = useState<APIResponse | null>(null);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [selectedReport, setSelectedReport] = useState<ReportGroup | null>(null);
   const [filters, setFilters] = useState<Filters>({
     search: "",
-    symbol: "",
-    title: "",
     bodies: [],
     years: [],
     frequencies: [],
-    responses: [],
     subjects: [],
     entities: [],
     reportTypes: [],
   });
   const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-  const [surveyResponses, setSurveyResponses] = useState<Record<string, { status: string; frequency: string | null; format: string | null }>>({});
-  const isAdmin = userRole === "admin";
-  
-  // Local state for optimistic updates on entity confirmations
-  const [locallyConfirmed, setLocallyConfirmed] = useState<Set<string>>(new Set());
-  const [addingReport, setAddingReport] = useState<string | null>(null);
-  const [removingReport, setRemovingReport] = useState<string | null>(null);
-
-  // Debounced text inputs
   const [searchInput, setSearchInput] = useState("");
-  
-  // Fetch user's survey responses
-  useEffect(() => {
-    fetch("/api/survey-responses/my-responses")
-      .then((r) => r.json())
-      .then((data) => setSurveyResponses(data.responses || {}))
-      .catch(() => {});
-  }, []);
 
   const limit = 50;
-
-  // Entity filter from filters
-  const effectiveEntityFilters = useMemo(() => {
-    return filters.entities;
-  }, [filters.entities]);
 
   const fetchData = useCallback(() => {
     setLoading(true);
@@ -1565,136 +708,27 @@ export function ReportsTable({
       limit: String(limit),
     });
 
-    // Mode and entity for filtered views
-    if (mode !== "all") {
-      params.set("mode", mode);
-      if (entity) params.set("entity", entity);
-    }
     if (sortColumn) params.set("sortColumn", sortColumn);
     if (sortColumn) params.set("sortDirection", sortDirection);
 
-    // Unified search
     if (filters.search) params.set("filterSearch", filters.search);
-    // Legacy filters (kept for compatibility)
-    if (filters.symbol) params.set("filterSymbol", filters.symbol);
-    if (filters.title) params.set("filterTitle", filters.title);
-    
     filters.bodies.forEach((b) => params.append("filterBody", b));
     filters.years.forEach((y) => params.append("filterYear", String(y)));
     filters.frequencies.forEach((f) => params.append("filterFrequency", f));
-    filters.responses.forEach((r) => params.append("filterResponse", r));
     filters.subjects.forEach((s) => params.append("filterSubject", s));
-    // Entity filter (supports multiple)
-    effectiveEntityFilters.forEach((e) => params.append("filterEntity", e));
-    // Report type filter
+    filters.entities.forEach((e) => params.append("filterEntity", e));
     filters.reportTypes.forEach((t) => params.append("filterReportType", t));
 
     fetch(`/api/sg-reports?${params.toString()}`)
       .then((r) => r.json())
-      .then((data) => {
-        setData(data);
-        // Clear optimistic state when fresh data arrives
-        setLocallyConfirmed(new Set());
-      })
+      .then((d) => setData(d))
       .finally(() => setLoading(false));
-  }, [page, filters, effectiveEntityFilters, mode, entity, sortColumn, sortDirection]);
-
-  // The effective entity to use for add/remove operations
-  const effectiveEntity = entity || userEntity;
-
-  // Add report to user's confirmed reports
-  const handleAddReport = useCallback(async (report: ReportGroup) => {
-    if (!effectiveEntity) {
-      console.error("Cannot add report: no entity selected");
-      return;
-    }
-    if (addingReport) return;
-    
-    setAddingReport(report.title);
-    // Optimistic update
-    setLocallyConfirmed((prev) => new Set(prev).add(report.title));
-    
-    try {
-      const response = await fetch("/api/entity-confirmations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          properTitle: report.title,
-          entity: effectiveEntity,
-        }),
-      });
-      
-      if (response.ok) {
-        onDataChanged?.();
-        // Refetch to get updated data
-        fetchData();
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        console.error("Failed to add report:", errorData.error || response.statusText);
-        // Revert optimistic update on error
-        setLocallyConfirmed((prev) => {
-          const next = new Set(prev);
-          next.delete(report.title);
-          return next;
-        });
-      }
-    } catch (error) {
-      console.error("Failed to add report:", error);
-      // Revert optimistic update
-      setLocallyConfirmed((prev) => {
-        const next = new Set(prev);
-        next.delete(report.title);
-        return next;
-      });
-    } finally {
-      setAddingReport(null);
-    }
-  }, [effectiveEntity, addingReport, fetchData, onDataChanged]);
-
-  // Remove report from user's confirmed reports
-  const handleRemoveReport = useCallback(async (report: ReportGroup) => {
-    if (!effectiveEntity) {
-      console.error("Cannot remove report: no entity selected");
-      return;
-    }
-    if (removingReport) return;
-    
-    setRemovingReport(report.title);
-    
-    try {
-      const response = await fetch(`/api/entity-confirmations?properTitle=${encodeURIComponent(report.title)}&entity=${encodeURIComponent(effectiveEntity)}`, {
-        method: "DELETE",
-      });
-      
-      if (response.ok) {
-        onDataChanged?.();
-        // Refetch to get updated data
-        fetchData();
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        console.error("Failed to remove report:", errorData.error || response.statusText);
-      }
-    } catch (error) {
-      console.error("Failed to remove report:", error);
-    } finally {
-      setRemovingReport(null);
-    }
-  }, [effectiveEntity, removingReport, fetchData, onDataChanged]);
+  }, [page, filters, sortColumn, sortDirection]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // Refetch when external trigger changes (but not on initial mount)
-  const refetchTriggerRef = useRef(refetchTrigger);
-  useEffect(() => {
-    if (refetchTrigger !== refetchTriggerRef.current) {
-      refetchTriggerRef.current = refetchTrigger;
-      fetchData();
-    }
-  }, [refetchTrigger, fetchData]);
-
-  // Debounce text filters
   useEffect(() => {
     const timer = setTimeout(() => {
       if (searchInput !== filters.search) {
@@ -1715,22 +749,19 @@ export function ReportsTable({
       }
     } else {
       setSortColumn(column);
-      setSortDirection(column === "responseCount" ? "desc" : "asc");
+      setSortDirection("asc");
     }
     setPage(1);
   };
-  const sortedReports = data?.reports || [];
 
+  const sortedReports = data?.reports || [];
   const totalPages = data ? Math.ceil(data.total / limit) : 0;
 
   const hasActiveFilters =
     filters.search ||
-    filters.symbol ||
-    filters.title ||
     filters.bodies.length > 0 ||
     filters.years.length > 0 ||
     filters.frequencies.length > 0 ||
-    filters.responses.length > 0 ||
     filters.subjects.length > 0 ||
     filters.entities.length > 0 ||
     filters.reportTypes.length > 0;
@@ -1744,68 +775,54 @@ export function ReportsTable({
 
   return (
     <div className="space-y-4">
-      {/* Search filters - hidden for suggested mode */}
-      {mode !== "suggested" ? (
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search by symbol or title..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="h-9 text-sm pl-9 w-96"
-            />
-            {searchInput && (
-              <button
-                onClick={() => setSearchInput("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-
-          
-          {hasActiveFilters && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setSearchInput("");
-                setFilters({
-                  search: "",
-                  symbol: "",
-                  title: "",
-                  bodies: [],
-                  years: [],
-                  frequencies: [],
-                  responses: [],
-                  subjects: [],
-                  entities: [],
-                  reportTypes: [],
-                });
-                setPage(1);
-              }}
-              className="h-8 text-xs text-gray-500"
+      <div className="flex items-center gap-3">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Search by symbol or title..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="h-9 text-sm pl-9 w-96"
+          />
+          {searchInput && (
+            <button
+              onClick={() => setSearchInput("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
             >
-              Clear all filters
-            </Button>
+              <X className="h-3 w-3" />
+            </button>
           )}
-          
-          {/* Right-aligned count */}
-          <p className="text-sm text-gray-500 ml-auto">
-            {data?.total} report series
-            {hasActiveFilters && " (filtered)"}
-          </p>
         </div>
-      ) : (
-        /* Simple count for suggested mode */
-        <p className="text-sm text-gray-500">
-          {data?.total} suggested reports
-        </p>
-      )}
 
-      {/* Table */}
+        {hasActiveFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSearchInput("");
+              setFilters({
+                search: "",
+                bodies: [],
+                years: [],
+                frequencies: [],
+                subjects: [],
+                entities: [],
+                reportTypes: [],
+              });
+              setPage(1);
+            }}
+            className="h-8 text-xs text-gray-500"
+          >
+            Clear all filters
+          </Button>
+        )}
+
+        <p className="text-sm text-gray-500 ml-auto">
+          {data?.total} report series
+          {hasActiveFilters && " (filtered)"}
+        </p>
+      </div>
+
       <div className="rounded-lg border border-gray-200 overflow-hidden">
         <ColumnHeaders
           sortColumn={sortColumn}
@@ -1818,8 +835,6 @@ export function ReportsTable({
             setPage(1);
           }}
           subjectCounts={data?.subjectCounts || []}
-          mode={mode}
-          isAdmin={isAdmin}
         />
 
         <div className="divide-y divide-gray-100">
@@ -1830,39 +845,13 @@ export function ReportsTable({
               isSelected={selectedReport?.symbol === r.symbol}
               onSelect={() => setSelectedReport(r)}
               subjectCounts={data?.subjectCounts || []}
-              surveyResponse={surveyResponses[getResponseMapKey(r.title, r.body)]}
-              mode={mode}
-              isAdmin={isAdmin}
-              entity={entity || userEntity || undefined}
-              onAdd={handleAddReport}
-              onRemove={handleRemoveReport}
-              isConfirmedByEntity={
-                locallyConfirmed.has(r.title) || 
-                Boolean((entity || userEntity) && r.confirmedEntities?.includes(entity || userEntity || ''))
-              }
             />
           ))}
         </div>
 
         {sortedReports.length === 0 && (
           <div className="px-4 py-8 text-center">
-            {mode === "my" ? (
-              <div className="space-y-2">
-                <p className="text-gray-500">No reports added yet</p>
-                <p className="text-sm text-gray-400">Use the search below to add reports, or add from the suggested reports section.</p>
-              </div>
-            ) : mode === "suggested" ? (
-              <div className="space-y-2">
-                <p className="text-gray-500">No suggested reports available</p>
-                <p className="text-sm text-gray-400">
-                  Use the search above to add reports manually, or{" "}
-                  <Link href="/reports" className="text-un-blue hover:underline">
-                    browse all reports
-                  </Link>{" "}
-                  to find reports not in our suggestions.
-                </p>
-              </div>
-            ) : hasActiveFilters ? (
+            {hasActiveFilters ? (
               <p className="text-gray-400">No reports match your filters</p>
             ) : (
               <p className="text-gray-400">No reports found</p>
@@ -1871,16 +860,6 @@ export function ReportsTable({
         )}
       </div>
 
-      {/* Add Report Search - for entity reports mode */}
-      {mode === "my" && showAddSearch && effectiveEntity && (
-        <AddReportSearch 
-          entity={effectiveEntity} 
-          onAdd={handleAddReport}
-          existingTitles={new Set(sortedReports.map(r => r.title))}
-        />
-      )}
-
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between pt-2">
           <Button
@@ -1905,27 +884,11 @@ export function ReportsTable({
         </div>
       )}
 
-      {/* Sidebar */}
       <ReportSidebar
         report={selectedReport}
         onClose={() => setSelectedReport(null)}
         subjectCounts={data?.subjectCounts || []}
-        userEntity={userEntity}
-        userEmail={userEmail}
-        onDataChanged={onDataChanged}
-        onSave={() => {
-          // Refetch survey responses after save
-          fetch("/api/survey-responses/my-responses")
-            .then((r) => r.json())
-            .then((data) => setSurveyResponses(data.responses || {}))
-            .catch(() => {});
-        }}
       />
     </div>
   );
-}
-
-// Backward compatibility alias for SGReportsList
-export function SGReportsList(props: SGReportsListProps) {
-  return <ReportsTable mode="all" {...props} />;
 }

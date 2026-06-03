@@ -9,16 +9,9 @@ interface EntitySuggestion {
   confidence_score: number | null;
 }
 
-interface EntityConfirmation {
-  entity: string;
-  role?: string;
-  confirmed_by_email: string;
-  confirmed_at: string;
-}
-
 interface ReportRow {
   proper_title: string;
-  normalized_body: string | null;  // Normalized body for grouping
+  normalized_body: string | null;
   symbols: string[];
   years: (number | null)[];
   bodies: (string | null)[];
@@ -32,20 +25,13 @@ interface ReportRow {
   lead_entities: string[] | null;
   contributing_entities: string[] | null;
   suggestions: EntitySuggestion[] | null;
-  confirmations: EntityConfirmation[] | null;
   primary_entity: string | null;
   has_confirmation: boolean;
   count: number;
   latest_year: number | null;
-  // Frequency fields
   calculated_frequency: string | null;
   confirmed_frequency: string | null;
   gap_history: number[] | null;
-  response_count: number;
-  response_continue_count: number;
-  response_continue_changes_count: number;
-  response_merge_count: number;
-  response_discontinue_count: number;
 }
 
 interface SingleReportRow {
@@ -79,11 +65,6 @@ interface ResolutionInfo {
   mandates: MandateInfo[];
 }
 
-interface CountItem {
-  value: string;
-  count: number;
-}
-
 interface SubjectCount {
   subject: string;
   count: number;
@@ -94,38 +75,24 @@ export async function GET(req: NextRequest) {
   const limit = parseInt(req.nextUrl.searchParams.get("limit") || "20");
   const offset = (page - 1) * limit;
   const symbol = req.nextUrl.searchParams.get("symbol");
-  
-  // Mode: all (default), my (confirmed reports), suggested (suggestions for entity)
-  const mode = req.nextUrl.searchParams.get("mode") || "all";
-  const modeEntity = req.nextUrl.searchParams.get("entity"); // Required for mode=my and mode=suggested
 
-  // Filter parameters
+  // Filter parameters (public site supports browse filters only; no survey-response filter)
   const filterSymbol = req.nextUrl.searchParams.get("filterSymbol") || "";
   const filterTitle = req.nextUrl.searchParams.get("filterTitle") || "";
-  const filterSearch = req.nextUrl.searchParams.get("filterSearch") || ""; // Unified search for symbol OR title
+  const filterSearch = req.nextUrl.searchParams.get("filterSearch") || "";
   const filterBodies = req.nextUrl.searchParams.getAll("filterBody");
-  const filterYears = req.nextUrl.searchParams.getAll("filterYear").map(y => parseInt(y)).filter(y => !isNaN(y)); // Array of years
+  const filterYears = req.nextUrl.searchParams.getAll("filterYear").map(y => parseInt(y)).filter(y => !isNaN(y));
   const filterFrequencies = req.nextUrl.searchParams.getAll("filterFrequency");
   const filterSubjects = req.nextUrl.searchParams.getAll("filterSubject");
-  const filterEntities = req.nextUrl.searchParams.getAll("filterEntity"); // Filter by reporting entities
-  const filterReportTypes = req.nextUrl.searchParams.getAll("filterReportType"); // Filter by report type (Report/Note/Other)
-  const filterResponses = req.nextUrl.searchParams
-    .getAll("filterResponse")
-    .filter((value) =>
-      value === "continue" ||
-      value === "continue_changes" ||
-      value === "merge" ||
-      value === "discontinue"
-    );
+  const filterEntities = req.nextUrl.searchParams.getAll("filterEntity");
+  const filterReportTypes = req.nextUrl.searchParams.getAll("filterReportType");
   const sortColumn = req.nextUrl.searchParams.get("sortColumn");
   const sortDirectionParam = req.nextUrl.searchParams.get("sortDirection");
   const sortDirection = sortDirectionParam === "desc" ? "DESC" : "ASC";
-  
-  // Survey focus years (2023 to present) - base filter applied to all queries
+
   const currentYear = new Date().getFullYear();
   const SURVEY_YEARS = Array.from({ length: currentYear - 2023 + 1 }, (_, i) => 2023 + i);
 
-  // If a specific symbol is requested, return that single report
   if (symbol) {
     const reports = await query<SingleReportRow>(
       `SELECT id, symbol, proper_title, title, date_year, publication_date,
@@ -141,8 +108,7 @@ export async function GET(req: NextRequest) {
     }
 
     const report = reports[0];
-    
-    // Fetch resolution details with mandate info if report has mandating resolutions
+
     let resolutions: ResolutionInfo[] = [];
     if (report.based_on_resolution_symbols && report.based_on_resolution_symbols.length > 0) {
       const resolutionRows = await query<{
@@ -151,9 +117,9 @@ export async function GET(req: NextRequest) {
         date_year: number | null;
         mandates: MandateInfo[] | null;
       }>(
-        `SELECT 
-           d.symbol, 
-           d.proper_title as title, 
+        `SELECT
+           d.symbol,
+           d.proper_title as title,
            d.date_year,
            COALESCE(
              (SELECT json_agg(
@@ -165,7 +131,7 @@ export async function GET(req: NextRequest) {
                  'verbatim_paragraph', rm.verbatim_paragraph
                )
              )
-             FROM ${DB_SCHEMA}.resolution_mandates rm 
+             FROM ${DB_SCHEMA}.resolution_mandates rm
              WHERE rm.resolution_symbol = d.symbol),
              '[]'::json
            ) as mandates
@@ -185,29 +151,16 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // Validate mode
-  if ((mode === "my" || mode === "suggested") && !modeEntity) {
-    return NextResponse.json({ error: "entity parameter required for mode=my or mode=suggested" }, { status: 400 });
-  }
-
-  // Build WHERE clauses for filters
-  // Uses sg_reports view which already handles:
-  // - Type filtering (resource_type_level3 or title match)
-  // - proper_title IS NOT NULL
-  // - CORR/REV exclusion
-  // - Credentials exclusion
   const whereClauses: string[] = [];
   const params: (string | number)[] = [];
   let paramIndex = 1;
 
-  // Unified search: search in both symbol and title
   if (filterSearch) {
     whereClauses.push(`(r.symbol ILIKE $${paramIndex} OR r.proper_title ILIKE $${paramIndex})`);
     params.push(`%${filterSearch}%`);
     paramIndex++;
   }
 
-  // Legacy individual filters (kept for backward compatibility)
   if (filterSymbol) {
     whereClauses.push(`r.symbol ILIKE $${paramIndex}`);
     params.push(`%${filterSymbol}%`);
@@ -221,7 +174,6 @@ export async function GET(req: NextRequest) {
   }
 
   if (filterBodies.length > 0) {
-    // Handle PostgreSQL array format in un_body (e.g. '{"General Assembly"}')
     const bodyConditions = filterBodies.map((_, i) => `r.un_body LIKE '%' || $${paramIndex + i} || '%'`).join(' OR ');
     whereClauses.push(`(${bodyConditions})`);
     filterBodies.forEach((b) => params.push(b));
@@ -240,51 +192,25 @@ export async function GET(req: NextRequest) {
     paramIndex++;
   }
 
-  // Year range filter (on effective_year, filter on MAX year of the series)
-  // We'll add this as a HAVING clause for proper_title groups
   const havingClauses: string[] = [];
   const havingParams: (string | number)[] = [];
   let havingParamIndex = paramIndex;
 
-  // Mode-specific filtering
-  // mode=my: Filter to reports confirmed by the specified entity
-  // mode=suggested: Filter to reports suggested for the specified entity
-  // Note: Entity confirmations are shared across bodies (keyed by proper_title only)
-  if (mode === "my" && modeEntity) {
-    havingClauses.push(`(
-      (SELECT re.confirmed_entities FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) @> ARRAY[$${havingParamIndex}]::text[]
-    )`);
-    havingParams.push(modeEntity);
-    havingParamIndex++;
-  } else if (mode === "suggested" && modeEntity) {
-    havingClauses.push(`(
-      (SELECT re.suggested_entities FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) @> ARRAY[$${havingParamIndex}]::text[]
-    )`);
-    havingParams.push(modeEntity);
-    havingParamIndex++;
-  }
-
-  // Entity filter (supports multiple) - filter on suggested or confirmed entities
-  // This needs to be in HAVING clause since we join with report_entities after grouping
-  // Note: Entity confirmations are shared across bodies (keyed by proper_title only)
   if (filterEntities.length > 0) {
     havingClauses.push(`(
-      (SELECT re.suggested_entities FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) && $${havingParamIndex}::text[] 
-      OR (SELECT re.confirmed_entities FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) && $${havingParamIndex}::text[]
+      (SELECT re.suggested_entities FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = sub.proper_title) && $${havingParamIndex}::text[]
+      OR (SELECT re.confirmed_entities FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = sub.proper_title) && $${havingParamIndex}::text[]
     )`);
     havingParams.push(filterEntities as unknown as string);
     havingParamIndex++;
   }
 
-  // Year filter if user selected specific years (base 2023-2025 filtering done in sg_reports view)
   if (filterYears.length > 0) {
     havingClauses.push(`MAX(effective_year) = ANY($${havingParamIndex}::int[])`);
     havingParams.push(filterYears as unknown as string);
     havingParamIndex++;
   }
 
-  // Frequency filter - now uses pre-computed values from report_frequencies table
-  // Filter on confirmed frequency first, fallback to calculated
   const frequencyFilterSQL = filterFrequencies.length > 0
     ? `AND COALESCE(confirmed_frequency, calculated_frequency) = ANY($${havingParamIndex})`
     : "";
@@ -292,23 +218,6 @@ export async function GET(req: NextRequest) {
     havingParams.push(filterFrequencies as unknown as string);
     havingParamIndex++;
   }
-
-  const responsePredicates: string[] = [];
-  if (filterResponses.includes("continue")) {
-    responsePredicates.push("response_continue_count > 0");
-  }
-  if (filterResponses.includes("continue_changes")) {
-    responsePredicates.push("response_continue_changes_count > 0");
-  }
-  if (filterResponses.includes("merge")) {
-    responsePredicates.push("response_merge_count > 0");
-  }
-  if (filterResponses.includes("discontinue")) {
-    responsePredicates.push("response_discontinue_count > 0");
-  }
-  const responseFilterSQL = responsePredicates.length > 0
-    ? `AND (${responsePredicates.join(" OR ")})`
-    : "";
 
   const whereClause = whereClauses.length > 0 ? whereClauses.join(" AND ") : "TRUE";
   const havingClause = havingClauses.length > 0 ? `HAVING ${havingClauses.join(" AND ")}` : "";
@@ -320,25 +229,19 @@ export async function GET(req: NextRequest) {
     body: "normalized_body",
     year: "latest_year",
     frequency: "COALESCE(confirmed_frequency, calculated_frequency)",
-    responseCount: "response_count",
   };
   const sortExpression = sortColumn ? sortColumnSQLMap[sortColumn] : null;
   const orderByClause = sortExpression
     ? `${sortExpression} ${sortDirection} NULLS LAST, proper_title ASC, normalized_body ASC`
     : "latest_year DESC NULLS LAST, proper_title, normalized_body";
 
-  // Build the main query with CTE to calculate frequency
   const allParams = [...params, ...havingParams];
   const limitParamIndex = havingParamIndex;
 
-  // Otherwise, return paginated list grouped by title AND body
-  // Reports with the same title but different bodies (e.g., GA vs ECOSOC) are now separate groups
-  // Use COALESCE to fall back to publication_date year when date_year is null
-  // Extract year from publication_date using substring (format: YYYY-MM-DD or similar)
   const [reports, countResult, bodyCounts, yearsResult, subjectCounts, entityCounts, reportTypeCounts] = await Promise.all([
     query<ReportRow>(
       `WITH grouped AS (
-        SELECT 
+        SELECT
           sub.proper_title,
           sub.normalized_body,
           array_agg(symbol ORDER BY effective_year DESC NULLS LAST, symbol) as symbols,
@@ -349,63 +252,36 @@ export async function GET(req: NextRequest) {
           array_agg(record_number ORDER BY effective_year DESC NULLS LAST, symbol) as record_numbers,
           array_agg(word_count ORDER BY effective_year DESC NULLS LAST, symbol) as word_counts,
           array_agg(to_json(COALESCE(subject_terms, ARRAY[]::text[])) ORDER BY effective_year DESC NULLS LAST, symbol) as subject_terms_agg,
-          -- Entity fields using scalar subqueries (shared across bodies, keyed by proper_title only)
-          (SELECT re.suggested_entities FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as suggested_entities,
-          (SELECT re.confirmed_entities FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as confirmed_entities,
-          (SELECT re.lead_entities FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as lead_entities,
-          (SELECT re.contributing_entities FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as contributing_entities,
-          (SELECT re.suggestions FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as suggestions,
-          (SELECT re.confirmations FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as confirmations,
-          (SELECT re.primary_entity FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as primary_entity,
-          (SELECT COALESCE(re.has_confirmation, false) FROM ${DB_SCHEMA}.report_entities re WHERE re.proper_title = sub.proper_title) as has_confirmation,
-          -- Pre-computed frequency from report_frequencies table (per body)
-          (SELECT rf.calculated_frequency FROM ${DB_SCHEMA}.report_frequencies rf 
-           WHERE rf.proper_title = sub.proper_title 
+          (SELECT re.suggested_entities FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = sub.proper_title) as suggested_entities,
+          (SELECT re.confirmed_entities FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = sub.proper_title) as confirmed_entities,
+          (SELECT re.lead_entities FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = sub.proper_title) as lead_entities,
+          (SELECT re.contributing_entities FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = sub.proper_title) as contributing_entities,
+          (SELECT re.suggestions FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = sub.proper_title) as suggestions,
+          (SELECT re.primary_entity FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = sub.proper_title) as primary_entity,
+          (SELECT COALESCE(re.has_confirmation, false) FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = sub.proper_title) as has_confirmation,
+          (SELECT rf.calculated_frequency FROM ${DB_SCHEMA}.report_frequencies rf
+           WHERE rf.proper_title = sub.proper_title
            AND rf.normalized_body = COALESCE(sub.normalized_body, '')) as calculated_frequency,
-          (SELECT rf.gap_history FROM ${DB_SCHEMA}.report_frequencies rf 
-           WHERE rf.proper_title = sub.proper_title 
+          (SELECT rf.gap_history FROM ${DB_SCHEMA}.report_frequencies rf
+           WHERE rf.proper_title = sub.proper_title
            AND rf.normalized_body = COALESCE(sub.normalized_body, '')) as gap_history,
-          -- User-confirmed frequency (per body)
-          (SELECT rfc.frequency FROM ${DB_SCHEMA}.report_frequency_confirmations rfc 
+          (SELECT rfc.frequency FROM ${DB_SCHEMA}.report_frequency_confirmations_public rfc
            WHERE rfc.proper_title = sub.proper_title
            AND rfc.normalized_body = COALESCE(sub.normalized_body, '')) as confirmed_frequency,
-          (SELECT COUNT(*)::int FROM ${DB_SCHEMA}.survey_responses sr
-           WHERE sr.proper_title = sub.proper_title
-           AND sr.normalized_body = COALESCE(sub.normalized_body, '')) as response_count,
-          (SELECT COUNT(*)::int FROM ${DB_SCHEMA}.survey_responses sr
-           WHERE sr.proper_title = sub.proper_title
-           AND sr.normalized_body = COALESCE(sub.normalized_body, '')
-           AND sr.status = 'continue'
-           AND sr.frequency IS NULL
-           AND sr.format IS NULL) as response_continue_count,
-          (SELECT COUNT(*)::int FROM ${DB_SCHEMA}.survey_responses sr
-           WHERE sr.proper_title = sub.proper_title
-           AND sr.normalized_body = COALESCE(sub.normalized_body, '')
-           AND sr.status = 'continue'
-           AND (sr.frequency IS NOT NULL OR sr.format IS NOT NULL)) as response_continue_changes_count,
-          (SELECT COUNT(*)::int FROM ${DB_SCHEMA}.survey_responses sr
-           WHERE sr.proper_title = sub.proper_title
-           AND sr.normalized_body = COALESCE(sub.normalized_body, '')
-           AND sr.status = 'merge') as response_merge_count,
-          (SELECT COUNT(*)::int FROM ${DB_SCHEMA}.survey_responses sr
-           WHERE sr.proper_title = sub.proper_title
-           AND sr.normalized_body = COALESCE(sub.normalized_body, '')
-           AND sr.status = 'discontinue') as response_discontinue_count,
           COUNT(*)::int as count,
           MAX(effective_year) as latest_year
         FROM (
-          SELECT 
+          SELECT
             r.proper_title,
             r.symbol,
             r.un_body,
-            -- Normalize body from symbol prefix (more reliable than un_body which can contain multiple bodies)
-            CASE 
+            CASE
               WHEN r.symbol LIKE 'A/%' THEN 'General Assembly'
               WHEN r.symbol LIKE 'E/%' THEN 'Economic and Social Council'
               WHEN r.symbol LIKE 'S/%' THEN 'Security Council'
               WHEN r.symbol LIKE 'A/HRC/%' THEN 'Human Rights Council'
               ELSE COALESCE(
-                CASE 
+                CASE
                   WHEN r.un_body LIKE '{%}' THEN SUBSTRING(r.un_body FROM '^\\{"?([^",}]+)"?')
                   ELSE r.un_body
                 END,
@@ -419,9 +295,9 @@ export async function GET(req: NextRequest) {
             r.subject_terms,
             COALESCE(
               r.date_year,
-              CASE 
-                WHEN r.publication_date ~ '^\\d{4}' 
-                THEN SUBSTRING(r.publication_date FROM 1 FOR 4)::int 
+              CASE
+                WHEN r.publication_date ~ '^\\d{4}'
+                THEN SUBSTRING(r.publication_date FROM 1 FOR 4)::int
               END
             ) as effective_year
           FROM ${DB_SCHEMA}.sg_reports r
@@ -431,60 +307,34 @@ export async function GET(req: NextRequest) {
         ${havingClause}
       )
       SELECT * FROM grouped
-      WHERE 1=1 ${frequencyFilterSQL} ${responseFilterSQL}
+      WHERE 1=1 ${frequencyFilterSQL}
       ORDER BY ${orderByClause}
       LIMIT $${limitParamIndex} OFFSET $${limitParamIndex + 1}`,
       [...allParams, limit, offset]
     ),
-    // Count query with same filters (grouped by title AND body)
     query<{ total: number }>(
       `WITH grouped AS (
-        SELECT 
+        SELECT
           sub.proper_title,
           sub.normalized_body,
-          -- Pre-computed frequency from report_frequencies table (per body)
-          (SELECT rf.calculated_frequency FROM ${DB_SCHEMA}.report_frequencies rf 
-           WHERE rf.proper_title = sub.proper_title 
+          (SELECT rf.calculated_frequency FROM ${DB_SCHEMA}.report_frequencies rf
+           WHERE rf.proper_title = sub.proper_title
            AND rf.normalized_body = COALESCE(sub.normalized_body, '')) as calculated_frequency,
-          -- User-confirmed frequency (per body)
-          (SELECT rfc.frequency FROM ${DB_SCHEMA}.report_frequency_confirmations rfc 
+          (SELECT rfc.frequency FROM ${DB_SCHEMA}.report_frequency_confirmations_public rfc
            WHERE rfc.proper_title = sub.proper_title
            AND rfc.normalized_body = COALESCE(sub.normalized_body, '')) as confirmed_frequency,
-          (SELECT COUNT(*)::int FROM ${DB_SCHEMA}.survey_responses sr
-           WHERE sr.proper_title = sub.proper_title
-           AND sr.normalized_body = COALESCE(sub.normalized_body, '')) as response_count,
-          (SELECT COUNT(*)::int FROM ${DB_SCHEMA}.survey_responses sr
-           WHERE sr.proper_title = sub.proper_title
-           AND sr.normalized_body = COALESCE(sub.normalized_body, '')
-           AND sr.status = 'continue'
-           AND sr.frequency IS NULL
-           AND sr.format IS NULL) as response_continue_count,
-          (SELECT COUNT(*)::int FROM ${DB_SCHEMA}.survey_responses sr
-           WHERE sr.proper_title = sub.proper_title
-           AND sr.normalized_body = COALESCE(sub.normalized_body, '')
-           AND sr.status = 'continue'
-           AND (sr.frequency IS NOT NULL OR sr.format IS NOT NULL)) as response_continue_changes_count,
-          (SELECT COUNT(*)::int FROM ${DB_SCHEMA}.survey_responses sr
-           WHERE sr.proper_title = sub.proper_title
-           AND sr.normalized_body = COALESCE(sub.normalized_body, '')
-           AND sr.status = 'merge') as response_merge_count,
-          (SELECT COUNT(*)::int FROM ${DB_SCHEMA}.survey_responses sr
-           WHERE sr.proper_title = sub.proper_title
-           AND sr.normalized_body = COALESCE(sub.normalized_body, '')
-           AND sr.status = 'discontinue') as response_discontinue_count,
           COUNT(*)::int as count,
           MAX(effective_year) as latest_year
         FROM (
-          SELECT 
+          SELECT
             r.proper_title,
-            -- Normalize body from symbol prefix (more reliable than un_body which can contain multiple bodies)
-            CASE 
+            CASE
               WHEN r.symbol LIKE 'A/%' THEN 'General Assembly'
               WHEN r.symbol LIKE 'E/%' THEN 'Economic and Social Council'
               WHEN r.symbol LIKE 'S/%' THEN 'Security Council'
               WHEN r.symbol LIKE 'A/HRC/%' THEN 'Human Rights Council'
               ELSE COALESCE(
-                CASE 
+                CASE
                   WHEN r.un_body LIKE '{%}' THEN SUBSTRING(r.un_body FROM '^\\{"?([^",}]+)"?')
                   ELSE r.un_body
                 END,
@@ -493,33 +343,28 @@ export async function GET(req: NextRequest) {
             END as normalized_body,
             COALESCE(
               r.date_year,
-              CASE 
-                WHEN r.publication_date ~ '^\\d{4}' 
-                THEN SUBSTRING(r.publication_date FROM 1 FOR 4)::int 
+              CASE
+                WHEN r.publication_date ~ '^\\d{4}'
+                THEN SUBSTRING(r.publication_date FROM 1 FOR 4)::int
               END
             ) as effective_year
           FROM ${DB_SCHEMA}.sg_reports r
           WHERE ${whereClause}
         ) sub
-        LEFT JOIN ${DB_SCHEMA}.report_entities re ON sub.proper_title = re.proper_title
         GROUP BY sub.proper_title, sub.normalized_body
         ${havingClause}
       )
       SELECT COUNT(*)::int as total FROM grouped
-      WHERE 1=1 ${frequencyFilterSQL} ${responseFilterSQL}`,
+      WHERE 1=1 ${frequencyFilterSQL}`,
       allParams
     ),
-    // Body counts (from latest_versions view - one per series)
     query<{ body: string; count: number }>(
-      `SELECT un_body as body, COUNT(*)::int as count 
-       FROM ${DB_SCHEMA}.latest_versions 
+      `SELECT un_body as body, COUNT(*)::int as count
+       FROM ${DB_SCHEMA}.latest_versions
        WHERE un_body IS NOT NULL
        GROUP BY un_body ORDER BY count DESC`
     ),
-    // Years available for filtering (hardcoded to survey focus years)
     Promise.resolve([{ years: SURVEY_YEARS }]),
-    // Subject term counts (from latest_versions - one per series)
-    // Credentials already excluded by sg_reports view
     query<SubjectCount>(
       `SELECT subject, COUNT(*)::int as count
        FROM ${DB_SCHEMA}.latest_versions, unnest(subject_terms) as subject
@@ -527,44 +372,34 @@ export async function GET(req: NextRequest) {
        HAVING COUNT(*) > 1
        ORDER BY count DESC, subject`
     ),
-    // Entity counts (from report_entity_suggestions, filtered to 2023+ via latest_versions)
     query<{ entity: string; count: number }>(
-      `SELECT rs.entity, COUNT(DISTINCT rs.proper_title)::int as count 
+      `SELECT rs.entity, COUNT(DISTINCT rs.proper_title)::int as count
        FROM ${DB_SCHEMA}.report_entity_suggestions rs
        INNER JOIN ${DB_SCHEMA}.latest_versions lv ON rs.proper_title = lv.proper_title
-       GROUP BY rs.entity 
+       GROUP BY rs.entity
        ORDER BY count DESC`
     ),
-    // Report type counts (from latest_versions - one per series)
     query<{ report_type: string; count: number }>(
-      `SELECT report_type, COUNT(*)::int as count 
+      `SELECT report_type, COUNT(*)::int as count
        FROM ${DB_SCHEMA}.latest_versions
        WHERE report_type IS NOT NULL
-       GROUP BY report_type 
+       GROUP BY report_type
        ORDER BY count DESC`
     ),
   ]);
 
-  // Parse PostgreSQL array string like {"General Assembly","Human Rights Bodies"} to extract first element
   function parseBodyString(bodyStr: string | null): string | null {
     if (!bodyStr) return null;
-    // Check if it's a PostgreSQL array format
     if (bodyStr.startsWith('{') && bodyStr.endsWith('}')) {
-      // Remove braces and split by comma (handling quoted strings)
       const inner = bodyStr.slice(1, -1);
-      // Simple regex to match first quoted or unquoted value
       const match = inner.match(/^"([^"]+)"|^([^,]+)/);
-      if (match) {
-        return match[1] || match[2] || null;
-      }
+      if (match) return match[1] || match[2] || null;
     }
     return bodyStr;
   }
 
-  // Helper to format frequency for display (capitalize first letter)
   function formatFrequency(freq: string | null): string | null {
     if (!freq) return null;
-    // Map internal values to display values
     const displayMap: Record<string, string> = {
       'annual': 'Annual',
       'biennial': 'Biennial',
@@ -578,9 +413,7 @@ export async function GET(req: NextRequest) {
     return displayMap[freq] || freq.charAt(0).toUpperCase() + freq.slice(1);
   }
 
-  // Transform reports to response format
   const filteredReports = reports.map((r) => {
-    // Collect unique subject terms from all versions (now stored as JSON)
     const allSubjects = new Set<string>();
     r.subject_terms_agg?.forEach((terms) => {
       if (Array.isArray(terms)) {
@@ -589,24 +422,31 @@ export async function GET(req: NextRequest) {
         });
       }
     });
-    
-    // Effective frequency: confirmed takes precedence over calculated
+
     const effectiveFrequency = r.confirmed_frequency || r.calculated_frequency;
-    
+
+    // Strip AI-only suggestions: keep dgacm/dri-sourced suggestions, plus
+    // entities that are independently in the confirmed lead/contributing arrays.
+    const leadSet = new Set((r.lead_entities || []).map(e => e.toLowerCase()));
+    const contribSet = new Set((r.contributing_entities || []).map(e => e.toLowerCase()));
+    const filteredSuggestions = (r.suggestions || []).filter(s => {
+      if (s.source !== 'ai') return true;
+      const k = s.entity.toLowerCase();
+      return leadSet.has(k) || contribSet.has(k);
+    });
+
     return {
-      title: r.proper_title || null,  // Keep original proper_title for database matching
+      title: r.proper_title || null,
       symbol: r.symbols[0],
-      body: r.normalized_body || parseBodyString(r.bodies[0]),  // Use normalized body from grouping
-      reportType: r.report_types?.[0] || 'Other', // Report type (Report/Note/Other)
+      body: r.normalized_body || parseBodyString(r.bodies[0]),
+      reportType: r.report_types?.[0] || 'Other',
       year: r.years[0] || null,
-      // New entity structure
-      entity: r.primary_entity || null, // Primary entity (confirmed first, then best suggestion)
+      entity: r.primary_entity || null,
       suggestedEntities: r.suggested_entities || [],
       confirmedEntities: r.confirmed_entities || [],
       leadEntities: r.lead_entities || [],
       contributingEntities: r.contributing_entities || [],
-      suggestions: r.suggestions || [],
-      confirmations: r.confirmations || [],
+      suggestions: filteredSuggestions,
       hasConfirmation: r.has_confirmation || false,
       versions: r.symbols.map((s, i) => ({
         symbol: s,
@@ -617,26 +457,16 @@ export async function GET(req: NextRequest) {
       })),
       count: r.count,
       latestYear: r.latest_year,
-      // Frequency fields - both calculated and confirmed
-      frequency: formatFrequency(effectiveFrequency), // Display frequency (confirmed or calculated)
+      frequency: formatFrequency(effectiveFrequency),
       calculatedFrequency: formatFrequency(r.calculated_frequency),
       confirmedFrequency: formatFrequency(r.confirmed_frequency),
       gapHistory: r.gap_history || null,
-      responseCount: r.response_count || 0,
-      responseStats: {
-        continue: r.response_continue_count || 0,
-        continueWithChanges: r.response_continue_changes_count || 0,
-        merge: r.response_merge_count || 0,
-        discontinue: r.response_discontinue_count || 0,
-      },
       subjectTerms: Array.from(allSubjects),
     };
   });
 
-  // Get unique frequencies from all data
   const allFrequencies = ["One-time", "Annual", "Biennial", "Triennial", "Quadrennial", "Quinquennial"];
 
-  // Parse and dedupe body counts
   const bodyCountMap = new Map<string, number>();
   bodyCounts.forEach((b) => {
     const parsed = parseBodyString(b.body);
@@ -651,8 +481,6 @@ export async function GET(req: NextRequest) {
     total: countResult[0]?.total || 0,
     page,
     limit,
-    mode,
-    entity: modeEntity || null,
     filterOptions: {
       bodies: parsedBodyCounts,
       years: yearsResult[0]?.years || SURVEY_YEARS,

@@ -2,31 +2,17 @@ import Link from "next/link";
 import {
   ArrowRight,
   BarChart3,
-  Bot,
   Building2,
-  Calendar,
-  Check,
-  ChevronDown,
+  Database,
   FileText,
   GitMerge,
-  LayoutDashboard,
-  Mic,
-  Pencil,
-  Plus,
   Quote,
   Search,
-  Sparkles,
-  Users,
 } from "lucide-react";
-import { getCurrentUser } from "@/lib/auth";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 
 export const dynamic = "force-dynamic";
-
-// =============================================================================
-// Feature Card Component
-// =============================================================================
 
 function FeatureCard({
   icon: Icon,
@@ -59,11 +45,6 @@ function FeatureCard({
   );
 }
 
-// =============================================================================
-// Mini Mockup Components
-// =============================================================================
-
-// Mock report row for Browse All Reports
 function MockReportRow({
   symbol,
   title,
@@ -84,11 +65,9 @@ function MockReportRow({
   );
 }
 
-// Mock publication pattern visualization
 function MockPublicationPattern() {
   const years = [2020, 2021, 2022, 2023, 2024, 2025];
   const hasPublication = [true, true, true, true, true, false];
-  const quarters = ["Q2", "Q2", "Q2", "Q2", "Q2", ""];
 
   return (
     <div className="space-y-2">
@@ -115,78 +94,18 @@ function MockPublicationPattern() {
           </div>
         ))}
       </div>
-      <div className="flex gap-2 text-[8px] text-gray-400">
-        {quarters.map((q, i) => (
-          <div key={i} className="flex-1 text-center">{q}</div>
-        ))}
-      </div>
     </div>
   );
 }
 
-// Mock frequency selector
-function MockFrequencyOption({
-  label,
-  selected,
-}: {
-  label: string;
-  selected?: boolean;
-}) {
-  return (
-    <div className="flex items-center gap-2 text-xs text-gray-600">
-      <span
-        className={`h-3 w-3 rounded-full border ${
-          selected
-            ? "border-un-blue bg-un-blue"
-            : "border-gray-300"
-        }`}
-      >
-        {selected && (
-          <span className="flex h-full w-full items-center justify-center">
-            <span className="h-1.5 w-1.5 rounded-full bg-white" />
-          </span>
-        )}
-      </span>
-      {label}
-    </div>
-  );
-}
-
-// Mock format option card
-function MockFormatCard({
-  icon: Icon,
-  label,
-  selected,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  selected?: boolean;
-}) {
-  return (
-    <div
-      className={`flex flex-col items-center justify-center rounded-lg border p-2 text-center ${
-        selected
-          ? "border-un-blue bg-blue-50"
-          : "border-gray-200 bg-white"
-      }`}
-    >
-      <Icon className={`h-4 w-4 ${selected ? "text-un-blue" : "text-gray-500"}`} />
-      <span className="text-[10px] text-gray-600">{label}</span>
-    </div>
-  );
-}
-
-// Mock similar report for merge
 function MockSimilarReport({
   title,
   symbol,
   similarity,
-  merged,
 }: {
   title: string;
   symbol: string;
   similarity: number;
-  merged?: boolean;
 }) {
   return (
     <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-2">
@@ -194,31 +113,13 @@ function MockSimilarReport({
         <div className="truncate text-xs text-gray-700">{title}</div>
         <div className="text-[10px] text-gray-400">{symbol}</div>
       </div>
-      <div className="flex items-center gap-2 flex-shrink-0">
-        <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">
-          {similarity}%
-        </span>
-        <span
-          className={`rounded px-2 py-0.5 text-[10px] font-medium ${
-            merged
-              ? "bg-un-blue text-white"
-              : "bg-gray-100 text-gray-600"
-          }`}
-        >
-          {merged ? (
-            <span className="flex items-center gap-1">
-              <Check className="h-2.5 w-2.5" /> Merge
-            </span>
-          ) : (
-            "Merge"
-          )}
-        </span>
-      </div>
+      <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">
+        {similarity}%
+      </span>
     </div>
   );
 }
 
-// Mock mandating paragraph
 function MockMandateParagraph() {
   return (
     <div className="space-y-2">
@@ -233,105 +134,55 @@ function MockMandateParagraph() {
   );
 }
 
-// Mock AI chat interface
-function MockChatInterface() {
+function MockEntityBadges() {
   return (
-    <div className="space-y-2">
-      {/* User message */}
-      <div className="flex justify-end">
-        <div className="rounded-2xl rounded-br-sm bg-un-blue px-3 py-1.5 max-w-[85%]">
-          <p className="text-[11px] text-white">Compare A/78/554 with A/79/347</p>
-        </div>
-      </div>
-      {/* AI response */}
-      <div className="flex gap-2">
-        <div className="flex-shrink-0 w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center">
-          <Sparkles className="h-2.5 w-2.5 text-gray-500" />
-        </div>
-        <div className="flex-1 rounded-lg border border-gray-200 bg-white px-2.5 py-2">
-          <p className="text-[11px] text-gray-600 leading-relaxed">
-            Both reports cover SDG implementation. A/79/347 adds new climate metrics and expands the partnerships section...
-          </p>
-        </div>
-      </div>
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="inline-flex items-center rounded-full font-medium whitespace-nowrap px-2 py-0.5 text-xs bg-blue-100 text-blue-800 border border-blue-500">
+        DESA
+      </span>
+      <span className="inline-flex items-center rounded-full font-medium whitespace-nowrap px-2 py-0.5 text-xs bg-gray-100 text-gray-800 border border-gray-400">
+        UNCTAD
+      </span>
+      <span className="inline-flex items-center rounded-full font-medium whitespace-nowrap px-2 py-0.5 text-xs bg-blue-50 text-blue-800 border border-dashed border-blue-600">
+        DPPA
+      </span>
     </div>
   );
 }
 
-// Mock team collaboration - shared entity reports
-function MockTeamCollaboration() {
-  return (
-    <div className="space-y-2">
-      <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">
-        DESA Reports (shared)
-      </div>
-      <div className="space-y-1.5">
-        <div className="flex items-center gap-2 rounded-lg bg-white px-2.5 py-2 shadow-sm">
-          <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-un-blue">
-            A/79/123
-          </span>
-          <span className="flex-1 truncate text-xs text-gray-600">SDG Progress</span>
-          <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
-        </div>
-        <div className="flex items-center gap-2 rounded-lg bg-white px-2.5 py-2 shadow-sm">
-          <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-un-blue">
-            A/78/456
-          </span>
-          <span className="flex-1 truncate text-xs text-gray-600">Financing for Dev</span>
-          <Check className="h-3 w-3 text-green-500 flex-shrink-0" />
-        </div>
-      </div>
-      <p className="text-[10px] text-gray-400 leading-relaxed">
-        All colleagues from DESA see and can update these reports.
-      </p>
-    </div>
-  );
-}
-
-// =============================================================================
-// Main About Page
-// =============================================================================
-
-export default async function AboutPage() {
-  const user = await getCurrentUser();
-  const isLoggedIn = !!user;
-  const ctaHref = isLoggedIn ? "/" : "/login";
-
+export default function AboutPage() {
   return (
     <div className="flex min-h-screen flex-col">
-      <Header user={user} maxWidth="6xl" hideAbout />
+      <Header maxWidth="6xl" hideAbout />
       <main className="flex-1 bg-gradient-to-b from-gray-50 to-white">
-        {/* Hero Section */}
         <section className="mx-auto max-w-6xl px-4 py-16 text-center">
           <h2 className="mb-4 text-4xl font-bold tracking-tight text-gray-900">
-            SG Reports Survey
+            SG Reports Overview
           </h2>
           <p className="mx-auto mb-8 max-w-2xl text-lg text-gray-600">
-            Provide feedback on Secretary-General reports:
+            Data and analysis about reports of the Secretary-General:
             <br />
-            frequency, format, and consolidation opportunities.
+            catalog, publication patterns, mandates, and similar reports.
           </p>
           <Link
-            href={ctaHref}
+            href="/reports"
             className="inline-flex items-center gap-2 rounded-lg bg-un-blue px-6 py-3 font-medium text-white transition-colors hover:bg-un-blue/90"
           >
-            {isLoggedIn ? "Go to Dashboard" : "Get Started"}
+            Browse Reports
             <ArrowRight className="h-4 w-4" />
           </Link>
         </section>
 
-        {/* Feature Grid */}
         <section id="features" className="mx-auto max-w-6xl px-4 pb-20">
           <h3 className="mb-8 text-center text-sm font-semibold uppercase tracking-wider text-gray-400">
-            Survey Features
+            What you can explore
           </h3>
 
           <div className="grid gap-6 md:grid-cols-2">
-            {/* 1. Browse All Reports */}
             <FeatureCard
               icon={FileText}
               title="Browse All Reports"
-              description="View all Secretary-General reports from 2023 to present. Search by symbol or title, filter by issuing body, year, or subject, and sort by any column."
+              description="View Secretary-General reports from 2023 to present. Search by symbol or title, filter by issuing body, year, subject, entity, or reporting frequency."
             >
               <div className="space-y-2">
                 <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2">
@@ -353,100 +204,43 @@ export default async function AboutPage() {
               </div>
             </FeatureCard>
 
-            {/* 2. Find Your Reports */}
             <FeatureCard
               icon={Building2}
-              title="Find Your Reports"
-              description="Search for reports authored by your entity and confirm ownership. Once confirmed, you can provide feedback on frequency, format, and consolidation."
+              title="See Who Authors What"
+              description="Each report shows the authoring entities, drawn from official DGACM and DRI data and from authoring entities' own confirmations. Solid badges are confirmed; dashed badges are official-source attribution."
             >
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 rounded-lg border-2 border-dashed border-gray-200 px-3 py-2">
-                  <Plus className="h-3.5 w-3.5 text-gray-400" />
-                  <span className="text-xs text-gray-400">
-                    Search to add reports...
-                  </span>
-                </div>
-                <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">
-                  Your reports
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 rounded-lg bg-white px-2 py-1.5 text-xs shadow-sm">
-                    <Check className="h-3 w-3 text-green-500" />
-                    <span className="text-gray-700">Annual report on activities</span>
-                  </div>
-                  <div className="flex items-center gap-2 rounded-lg bg-white px-2 py-1.5 text-xs shadow-sm">
-                    <Check className="h-3 w-3 text-green-500" />
-                    <span className="text-gray-700">Implementation of resolution</span>
-                  </div>
-                </div>
-              </div>
+              <MockEntityBadges />
             </FeatureCard>
 
-            {/* 3. Visualize Publication History */}
             <FeatureCard
               icon={BarChart3}
               title="Visualize Publication History"
-              description="See when each report has been published over time. The visual timeline helps you identify the actual reporting frequency."
+              description="A compact quarter-by-quarter timeline shows when each report has actually been published over the past years. Compare the cadence to the mandate."
             >
               <MockPublicationPattern />
             </FeatureCard>
 
-            {/* 4. Confirm or Adjust Frequency */}
             <FeatureCard
-              icon={Calendar}
-              title="Confirm or Adjust Frequency"
-              description="Confirm the current reporting frequency or recommend a change. Options range from multiple times per year to one-time only."
+              icon={Quote}
+              title="Explore Mandating Paragraphs"
+              description="View the original operative paragraphs from the resolutions that mandate each report — verbatim — so it is clear exactly what was requested and how often."
             >
-              <div className="space-y-3">
-                <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2">
-                  <span className="text-xs text-gray-700">Annual</span>
-                  <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <MockFrequencyOption label="Multiple/year" />
-                  <MockFrequencyOption label="Annual" selected />
-                  <MockFrequencyOption label="Biennial" />
-                  <MockFrequencyOption label="Triennial" />
-                  <MockFrequencyOption label="Quadrennial" />
-                  <MockFrequencyOption label="One-time" />
-                </div>
-              </div>
+              <MockMandateParagraph />
             </FeatureCard>
 
-            {/* 5. Recommend New Formats */}
-            <FeatureCard
-              icon={Sparkles}
-              title="Recommend New Formats"
-              description="Suggest innovative reporting formats. Reports could be shorter, delivered orally, or transformed into interactive dashboards."
-            >
-              <div className="space-y-2">
-                <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">
-                  Recommended format
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <MockFormatCard icon={FileText} label="Shorter report" />
-                  <MockFormatCard icon={Mic} label="Oral update" />
-                  <MockFormatCard icon={LayoutDashboard} label="Dashboard" selected />
-                  <MockFormatCard icon={Pencil} label="Other" />
-                </div>
-              </div>
-            </FeatureCard>
-
-            {/* 6. Suggest Report Mergers */}
             <FeatureCard
               icon={GitMerge}
-              title="Suggest Report Mergers"
-              description="Identify reports with similar content that could be consolidated. Similarity search finds merge candidates automatically."
+              title="Find Similar Reports"
+              description="A semantic similarity search surfaces reports with overlapping content, which can be useful for identifying duplication or related work across entities."
             >
               <div className="space-y-2">
                 <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">
-                  Similar reports found
+                  Similar reports
                 </div>
                 <MockSimilarReport
                   title="Progress report on SDGs"
                   symbol="A/78/234 · DESA"
                   similarity={87}
-                  merged
                 />
                 <MockSimilarReport
                   title="Implementation update"
@@ -456,77 +250,21 @@ export default async function AboutPage() {
               </div>
             </FeatureCard>
 
-            {/* 7. Explore Mandating Paragraphs */}
             <FeatureCard
-              icon={Quote}
-              title="Explore Mandating Paragraphs"
-              description="View the original operative paragraphs from resolutions that mandate each report. Understand exactly what was requested and when."
+              icon={Database}
+              title="Open Data Source"
+              description="All report metadata comes from the UN Digital Library, refreshed regularly. The catalog includes computed reporting frequency, gap history between versions, and AI-extracted mandate text."
             >
-              <MockMandateParagraph />
+              <a
+                href="https://digitallibrary.un.org"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-xs text-un-blue font-medium hover:underline"
+              >
+                digitallibrary.un.org
+                <ArrowRight className="h-3 w-3" />
+              </a>
             </FeatureCard>
-
-            {/* 8. AI Chatbot Assistant */}
-            <FeatureCard
-              icon={Bot}
-              title="AI Chatbot Assistant"
-              description="Ask questions about any report. The AI can summarize documents, compare versions, query the database, and find related reports instantly."
-            >
-              <MockChatInterface />
-            </FeatureCard>
-
-            {/* 9. Team Collaboration */}
-            <FeatureCard
-              icon={Users}
-              title="Team Collaboration"
-              description="Multiple colleagues from the same entity can work together on the survey. All team members see the same reports and can contribute feedback."
-            >
-              <MockTeamCollaboration />
-            </FeatureCard>
-          </div>
-        </section>
-
-        {/* Getting Started Section */}
-        <section className="border-t border-gray-200 bg-gray-50 py-16">
-          <div className="mx-auto max-w-4xl px-4 text-center">
-            <h3 className="mb-8 text-2xl font-bold text-gray-900">
-              Get Started in 3 Steps
-            </h3>
-            <div className="grid gap-8 md:grid-cols-3">
-              <div>
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-un-blue text-lg font-bold text-white">
-                  1
-                </div>
-                <h4 className="mb-2 font-semibold text-gray-900">Sign In &amp; Select Entity</h4>
-                <p className="text-sm text-gray-600">
-                  Enter your UN email, click the magic link, and select your organisational entity.
-                </p>
-              </div>
-              <div>
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-un-blue text-lg font-bold text-white">
-                  2
-                </div>
-                <h4 className="mb-2 font-semibold text-gray-900">Find Your Reports</h4>
-                <p className="text-sm text-gray-600">
-                  Search for and confirm the Secretary-General reports your entity is responsible for.
-                </p>
-              </div>
-              <div>
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-un-blue text-lg font-bold text-white">
-                  3
-                </div>
-                <h4 className="mb-2 font-semibold text-gray-900">Provide Feedback</h4>
-                <p className="text-sm text-gray-600">
-                  Share your perspective on frequency, format, and consolidation opportunities.
-                </p>
-              </div>
-            </div>
-            <Link
-              href={ctaHref}
-              className="mt-10 inline-flex items-center gap-2 rounded-lg bg-un-blue px-6 py-3 font-medium text-white transition-colors hover:bg-un-blue/90"
-            >
-              {isLoggedIn ? "Go to Dashboard" : "Get Started"}
-              <ArrowRight className="h-4 w-4" />
-            </Link>
           </div>
         </section>
       </main>

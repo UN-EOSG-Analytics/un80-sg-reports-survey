@@ -2,23 +2,20 @@ import { GoogleAnalytics } from "@next/third-parties/google";
 import type { Metadata, Viewport } from "next";
 import { Roboto } from "next/font/google";
 import "./globals.css";
-import { ChatProvider, ChatWidget } from "@/components/chat";
 
-// https://fonts.google.com/specimen/Roboto
-// 100 (Thin), 300 (Light), 400 (Regular), 500 (Medium), 700 (Bold), 800 (ExtraBold), 900 (Black)
 const roboto = Roboto({
   weight: ["100", "300", "400", "500", "700", "800", "900"],
   subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "SG Reports Survey",
+  title: "SG Reports Overview",
   description:
-    "Survey platform for UN entities to provide recommendations on Secretary-General reports.",
+    "Data and analysis about reports of the Secretary-General: catalog, publication patterns, mandates, and similar reports.",
   openGraph: {
-    title: "SG Reports Survey",
+    title: "SG Reports Overview",
     description:
-      "Survey platform for UN entities to provide recommendations on Secretary-General reports.",
+      "Data and analysis about reports of the Secretary-General: catalog, publication patterns, mandates, and similar reports.",
     type: "website",
     locale: "en_US",
   },
@@ -38,10 +35,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${roboto.className} antialiased`}>
       <body>
-        <ChatProvider>
-          {children}
-          <ChatWidget />
-        </ChatProvider>
+        {children}
         <GoogleAnalytics gaId="G-XYZ" />
       </body>
     </html>

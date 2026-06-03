@@ -138,7 +138,7 @@ export default function HomePage() {
       <main className="flex-1 bg-background py-8">
         <div className="mx-auto max-w-7xl space-y-8 px-4 sm:px-8">
           <section className="space-y-4">
-            <p className="max-w-3xl text-sm leading-relaxed text-gray-600">
+            <p className="max-w-3xl text-base leading-relaxed text-gray-600">
               Developed as part of the{" "}
               <a
                 href="https://www.un.org/un80-initiative/en"

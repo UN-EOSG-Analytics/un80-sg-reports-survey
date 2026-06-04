@@ -575,7 +575,7 @@ function SimilarReportsGrid({
                 </span>
               </TooltipTrigger>
               <TooltipContent className="max-w-xs">
-                <p className="text-xs">Similarity score (0–100%). Typical matches fall between 70% and 85%. Scores above 85% usually indicate the same recurring report series; below 70% suggests only loose thematic overlap.</p>
+                <p className="text-xs">Similarity score (0–100%). Typical matches fall between 70% and 85%. Scores below 70% suggests only loose thematic overlap.</p>
               </TooltipContent>
             </Tooltip>
             <span className="text-[11px] font-medium text-un-blue">{r.symbol}</span>

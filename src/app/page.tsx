@@ -208,8 +208,7 @@ export default function HomePage() {
                 </dt>
                 <dd>
                   Total downloads refer to downloads of the report in all six
-                  official languages, as displayed on the United Nations
-                  Official Document System webpage.
+                  official languages from the United Nations Digital Library; this does not include downloads via the United Nations Official Document System.
                 </dd>
               </dl>
             </div>

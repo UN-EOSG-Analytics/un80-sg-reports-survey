@@ -278,9 +278,9 @@ export async function GET(req: NextRequest) {
           (SELECT rfc.frequency FROM ${DB_SCHEMA}.report_frequency_confirmations_public rfc
            WHERE rfc.proper_title = sub.proper_title
            AND rfc.normalized_body = COALESCE(sub.normalized_body, '')) as confirmed_frequency,
-          (SELECT COALESCE(SUM(rds.total_downloads), 0)::int
+          (SELECT COALESCE(rds.total_downloads, 0)::int
              FROM ${DB_SCHEMA}.report_download_summary rds
-             WHERE rds.symbol = ANY(array_agg(sub.symbol))) as download_count,
+             WHERE rds.symbol = (array_agg(sub.symbol ORDER BY effective_year DESC NULLS LAST, sub.symbol))[1]) as download_count,
           COUNT(*)::int as count,
           MAX(effective_year) as latest_year
         FROM (

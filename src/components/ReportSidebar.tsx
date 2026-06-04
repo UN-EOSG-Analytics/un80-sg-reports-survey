@@ -658,9 +658,9 @@ export function ReportSidebar({
     setDownloadStats(null);
     if ((report.downloadCount ?? 0) > 0) {
       setDownloadStatsLoading(true);
-      const params = new URLSearchParams();
-      report.versions.forEach((v) => params.append("symbol", v.symbol));
-      fetch(`/api/report-downloads?${params.toString()}`)
+      fetch(
+        `/api/report-downloads?symbol=${encodeURIComponent(report.symbol)}`
+      )
         .then((r) => r.json())
         .then((data) => {
           if (!data.error) setDownloadStats(data);
@@ -890,6 +890,11 @@ export function ReportSidebar({
                     monthly, by language
                   </span>
                 </div>
+                <p className="text-xs leading-relaxed text-gray-600">
+                  Downloads of this report in all six official languages from
+                  the United Nations Digital Library; this does not include
+                  downloads via the United Nations Official Document System.
+                </p>
                 {downloadStatsLoading && !downloadStats ? (
                   <div className="flex items-center gap-2 text-xs text-gray-400 h-20">
                     <Loader2 className="h-3 w-3 animate-spin" />

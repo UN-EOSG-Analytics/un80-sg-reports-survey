@@ -240,6 +240,186 @@ function VersionRow({ v }: { v: Version }) {
   );
 }
 
+// Per-language colors from the UN visual identity palette (UN Blue + accents).
+// EN takes UN Blue; remaining accent hues are assigned in palette order.
+const LANG_COLORS: Record<string, string> = {
+  EN: "#009EDB", // UN Blue
+  FR: "#A05FB4", // Purple
+  ES: "#F58220", // Orange
+  AR: "#72BF44", // Green
+  ZH: "#ED1847", // Red
+  RU: "#FFC800", // Yellow
+  DE: "#AEA29A", // Gray
+};
+const LANG_FALLBACK = "#AEA29A";
+
+const MONTH_NAMES = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+function formatMonth(month: string): string {
+  // month is "YYYY-MM"
+  const [y, m] = month.split("-");
+  const idx = parseInt(m, 10) - 1;
+  if (idx < 0 || idx > 11) return month;
+  return `${MONTH_NAMES[idx]} ${y}`;
+}
+
+interface DownloadStats {
+  languages: string[];
+  totals: Record<string, number>;
+  total: number;
+  series: { month: string; langs: Record<string, number>; total: number }[];
+}
+
+function DownloadChart({ stats }: { stats: DownloadStats }) {
+  const { series, languages, totals, total } = stats;
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+
+  if (series.length === 0 || total === 0) {
+    return (
+      <p className="text-xs text-gray-400">No download data available.</p>
+    );
+  }
+
+  const maxTotal = Math.max(...series.map((s) => s.total), 1);
+
+  const yearTicks: { year: string; index: number }[] = [];
+  let lastYear = "";
+  series.forEach((s, i) => {
+    const y = s.month.slice(0, 4);
+    if (y !== lastYear) {
+      yearTicks.push({ year: y, index: i });
+      lastYear = y;
+    }
+  });
+
+  const hovered = hoverIdx !== null ? series[hoverIdx] : null;
+  // Tooltip horizontal anchor: center over the hovered bar, clamped so it
+  // never overflows the chart edges.
+  const tooltipLeftPct =
+    hoverIdx !== null
+      ? Math.min(
+          Math.max(((hoverIdx + 0.5) / series.length) * 100, 18),
+          82
+        )
+      : 50;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1.5">
+        {languages.map((lang) => (
+          <span
+            key={lang}
+            className="inline-flex items-center gap-1 text-[10px] text-gray-600"
+          >
+            <span
+              className="inline-block h-2 w-2 rounded-sm"
+              style={{ backgroundColor: LANG_COLORS[lang] || LANG_FALLBACK }}
+            />
+            <span className="font-medium">{lang}</span>
+            <span className="tabular-nums text-gray-400">
+              {totals[lang].toLocaleString()}
+            </span>
+          </span>
+        ))}
+      </div>
+      <div
+        className="relative h-20 w-full"
+        onMouseLeave={() => setHoverIdx(null)}
+      >
+        <div className="absolute inset-0 flex items-end gap-px">
+          {series.map((m, i) => {
+            const heightPct = (m.total / maxTotal) * 100;
+            const isHovered = hoverIdx === i;
+            return (
+              <div
+                key={m.month}
+                className="group relative flex h-full flex-1 min-w-0 flex-col justify-end cursor-default"
+                onMouseEnter={() => setHoverIdx(i)}
+              >
+                {/* Hover highlight column behind the bar */}
+                <div
+                  className={`absolute inset-0 transition-colors ${
+                    isHovered ? "bg-gray-200/60" : "bg-transparent"
+                  }`}
+                />
+                <div
+                  className="relative flex flex-col-reverse w-full"
+                  style={{ height: `${heightPct}%` }}
+                >
+                  {languages.map((lang) => {
+                    const v = m.langs[lang] || 0;
+                    if (v === 0) return null;
+                    const segPct = (v / m.total) * 100;
+                    return (
+                      <div
+                        key={lang}
+                        style={{
+                          height: `${segPct}%`,
+                          backgroundColor: LANG_COLORS[lang] || LANG_FALLBACK,
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {hovered && (
+          <div
+            className="pointer-events-none absolute -top-1 z-10 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[10px] shadow-md"
+            style={{ left: `${tooltipLeftPct}%` }}
+          >
+            <div className="mb-1 flex items-baseline gap-3">
+              <span className="font-medium text-gray-700">
+                {formatMonth(hovered.month)}
+              </span>
+              <span className="ml-auto tabular-nums font-semibold text-gray-900">
+                {hovered.total.toLocaleString()}
+              </span>
+            </div>
+            <div className="space-y-0.5">
+              {languages
+                .filter((lang) => (hovered.langs[lang] || 0) > 0)
+                .map((lang) => (
+                  <div
+                    key={lang}
+                    className="flex items-center gap-1.5 text-gray-600"
+                  >
+                    <span
+                      className="inline-block h-1.5 w-1.5 rounded-sm"
+                      style={{
+                        backgroundColor: LANG_COLORS[lang] || LANG_FALLBACK,
+                      }}
+                    />
+                    <span className="font-medium">{lang}</span>
+                    <span className="ml-auto tabular-nums">
+                      {hovered.langs[lang].toLocaleString()}
+                    </span>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="relative h-3 w-full text-[9px] text-gray-400">
+        {yearTicks.map((t) => (
+          <span
+            key={t.year}
+            className="absolute"
+            style={{ left: `${(t.index / series.length) * 100}%` }}
+          >
+            {t.year}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function PublicationPattern({
   versions,
   frequencyBadge,
@@ -444,6 +624,8 @@ export function ReportSidebar({
   const [similarError, setSimilarError] = useState<string | null>(null);
   const [resolutions, setResolutions] = useState<ResolutionInfo[]>([]);
   const [mandatingParagraphsExpanded, setMandatingParagraphsExpanded] = useState(false);
+  const [downloadStats, setDownloadStats] = useState<DownloadStats | null>(null);
+  const [downloadStatsLoading, setDownloadStatsLoading] = useState(false);
 
   const prevReportRef = useRef<ReportGroup | null>(null);
   useEffect(() => {
@@ -472,6 +654,20 @@ export function ReportSidebar({
         if (data.resolutions) setResolutions(data.resolutions);
       })
       .catch(() => {});
+
+    setDownloadStats(null);
+    if ((report.downloadCount ?? 0) > 0) {
+      setDownloadStatsLoading(true);
+      const params = new URLSearchParams();
+      report.versions.forEach((v) => params.append("symbol", v.symbol));
+      fetch(`/api/report-downloads?${params.toString()}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (!data.error) setDownloadStats(data);
+        })
+        .catch(() => {})
+        .finally(() => setDownloadStatsLoading(false));
+    }
   }, [report?.symbol]);
 
   if (!report) return null;
@@ -662,23 +858,6 @@ export function ReportSidebar({
               </div>
             )}
 
-            {/* Downloads */}
-            {report.downloadCount !== undefined && report.downloadCount > 0 && (
-              <div className="bg-gray-50 rounded-lg p-3 border border-gray-100 space-y-2">
-                <div className="flex items-baseline justify-between">
-                  <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Downloads
-                  </h3>
-                  <span className="text-[10px] text-gray-400">
-                    all official languages
-                  </span>
-                </div>
-                <p className="text-2xl font-semibold tabular-nums text-gray-900">
-                  {report.downloadCount.toLocaleString()}
-                </p>
-              </div>
-            )}
-
             {/* Reporting pattern */}
             <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
               <PublicationPattern
@@ -694,6 +873,35 @@ export function ReportSidebar({
                 }
               />
             </div>
+
+            {/* Downloads */}
+            {report.downloadCount !== undefined && report.downloadCount > 0 && (
+              <div className="bg-gray-50 rounded-lg p-3 border border-gray-100 space-y-3">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="flex items-baseline gap-2">
+                    <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Downloads
+                    </h3>
+                    <span className="text-sm font-semibold tabular-nums text-gray-900">
+                      {report.downloadCount.toLocaleString()}
+                    </span>
+                  </span>
+                  <span className="text-[10px] text-gray-400">
+                    monthly, by language
+                  </span>
+                </div>
+                {downloadStatsLoading && !downloadStats ? (
+                  <div className="flex items-center gap-2 text-xs text-gray-400 h-20">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Loading download history...
+                  </div>
+                ) : downloadStats ? (
+                  <DownloadChart stats={downloadStats} />
+                ) : (
+                  <p className="text-xs text-gray-400">No download history available.</p>
+                )}
+              </div>
+            )}
 
             {/* Similar reports */}
             <div className="bg-gray-50 rounded-lg p-3 border border-gray-100 space-y-2">

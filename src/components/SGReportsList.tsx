@@ -605,9 +605,7 @@ function ColumnHeaders({
         )}
         <SortArrow column="frequency" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
       </div>
-      <div className="flex items-center justify-end">
-        <span>Details</span>
-      </div>
+      <div className="flex items-center justify-end" />
     </div>
   );
 }

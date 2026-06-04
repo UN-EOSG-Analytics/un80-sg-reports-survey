@@ -257,7 +257,7 @@ export default function HomePage() {
               <FeatureCard
                 icon={Quote}
                 title="Mandating Paragraphs"
-                description="The original operative paragraphs from the resolutions that mandate each report."
+                description="The operative paragraphs of the mandating resolutions, where recorded in Digital Library metadata."
               >
                 <MockMandateParagraph />
               </FeatureCard>
@@ -265,7 +265,7 @@ export default function HomePage() {
               <FeatureCard
                 icon={GitMerge}
                 title="Similar Reports"
-                description="Semantic similarity surfaces reports with overlapping content across entities."
+                description="Find reports on related topics, even when they use different wording or come from different bodies."
               >
                 <div className="space-y-1.5">
                   <MockSimilarReport

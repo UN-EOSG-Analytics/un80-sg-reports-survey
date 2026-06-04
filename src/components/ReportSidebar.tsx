@@ -394,7 +394,7 @@ function SimilarReportsGrid({
                 </span>
               </TooltipTrigger>
               <TooltipContent className="max-w-xs">
-                <p className="text-xs">Semantic similarity based on meaning, not word-by-word matching</p>
+                <p className="text-xs">Similarity score (0–100%). Typical matches fall between 70% and 85%. Scores above 85% usually indicate the same recurring report series; below 70% suggests only loose thematic overlap.</p>
               </TooltipContent>
             </Tooltip>
             <span className="text-[11px] font-medium text-un-blue">{r.symbol}</span>
@@ -542,7 +542,7 @@ export function ReportSidebar({
 
         <div className="flex-1 overflow-y-auto">
           <div className="p-4 space-y-5">
-            {/* Mandating paragraphs (its own section) */}
+            {/* Mandating paragraphs (always shown, with empty states) */}
             {(() => {
               const allMandates: Array<{ mandate: MandateInfo; resSymbol: string; idx: number }> = [];
               resolutions.forEach((res) => {
@@ -553,7 +553,8 @@ export function ReportSidebar({
                 });
               });
 
-              if (allMandates.length === 0) return null;
+              const hasResolutions = resolutions.length > 0;
+              const hasMandates = allMandates.length > 0;
 
               const INITIAL_VISIBLE = 2;
               const hasMore = allMandates.length > INITIAL_VISIBLE;
@@ -561,9 +562,9 @@ export function ReportSidebar({
                 ? allMandates
                 : allMandates.slice(0, INITIAL_VISIBLE);
 
-              const uniqueSources = Array.from(
-                new Set(allMandates.map((m) => m.resSymbol))
-              );
+              const uniqueSources = hasMandates
+                ? Array.from(new Set(allMandates.map((m) => m.resSymbol)))
+                : resolutions.map((r) => r.symbol);
               const showMultiSource = uniqueSources.length > 1;
 
               return (
@@ -572,61 +573,80 @@ export function ReportSidebar({
                     Mandating Paragraphs
                   </h3>
 
-                  <p className="text-xs leading-relaxed text-gray-600">
-                    Mandate source{uniqueSources.length > 1 ? "s" : ""}{" "}
-                    according to Digital Library metadata:{" "}
-                    {uniqueSources.map((sym, i) => (
-                      <span key={sym}>
-                        {i > 0 && ", "}
+                  {!hasResolutions ? (
+                    <p className="text-xs leading-relaxed text-gray-500 italic">
+                      No mandating resolution is recorded for this report in
+                      the Digital Library metadata.
+                    </p>
+                  ) : (
+                    <p className="text-xs leading-relaxed text-gray-600">
+                      Mandate source{uniqueSources.length > 1 ? "s" : ""}{" "}
+                      according to Digital Library metadata:{" "}
+                      {uniqueSources.map((sym, i) => (
+                        <span key={sym}>
+                          {i > 0 && ", "}
+                          <a
+                            href={buildDLLink(sym)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-block rounded bg-blue-50 px-1.5 py-0.5 text-[11px] font-medium text-un-blue hover:bg-blue-100 transition-colors"
+                          >
+                            {sym}
+                          </a>
+                        </span>
+                      ))}
+                    </p>
+                  )}
+
+                  {hasResolutions && !hasMandates && (
+                    <p className="mt-3 text-xs leading-relaxed text-gray-500 italic">
+                      No operative paragraph could be extracted from{" "}
+                      {uniqueSources.length > 1 ? "these resolutions" : "this resolution"}.
+                    </p>
+                  )}
+
+                  {hasMandates && (
+                    <div className="mt-4 space-y-2">
+                      <p className="text-xs leading-relaxed text-gray-600">
+                        Potentially matching paragraphs according to AI analysis
+                        (unverified):
+                      </p>
+                      {visibleMandates.map(({ mandate, resSymbol, idx }) => (
                         <a
-                          href={buildDLLink(sym)}
+                          key={`${resSymbol}-${idx}`}
+                          href={`https://docs.un.org/en/${encodeURI(resSymbol)}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-block rounded bg-blue-50 px-1.5 py-0.5 text-[11px] font-medium text-un-blue hover:bg-blue-100 transition-colors"
+                          className="block rounded-md border border-gray-200 bg-white p-2.5 space-y-1.5 hover:border-un-blue hover:bg-blue-50/40 transition-colors"
                         >
-                          {sym}
-                        </a>
-                      </span>
-                    ))}
-                  </p>
-
-                  <div className="mt-4 space-y-2">
-                    <p className="text-xs leading-relaxed text-gray-600">
-                      Potentially matching paragraphs according to AI analysis
-                      (unverified):
-                    </p>
-                    {visibleMandates.map(({ mandate, resSymbol, idx }) => (
-                      <div
-                        key={`${resSymbol}-${idx}`}
-                        className="rounded-md border border-gray-200 bg-white p-2.5 space-y-1.5"
-                      >
-                        <p className="text-xs text-gray-700 italic">
-                          {mandate.verbatim_paragraph ? (
-                            <>&quot;{mandate.verbatim_paragraph}&quot;</>
-                          ) : mandate.summary ? (
-                            <>{mandate.summary}</>
-                          ) : null}
-                        </p>
-                        {showMultiSource && (
-                          <p className="text-[10px] text-gray-400">
-                            from {resSymbol}
+                          <p className="text-xs text-gray-700 italic">
+                            {mandate.verbatim_paragraph ? (
+                              <>&quot;{mandate.verbatim_paragraph}&quot;</>
+                            ) : mandate.summary ? (
+                              <>{mandate.summary}</>
+                            ) : null}
                           </p>
-                        )}
-                      </div>
-                    ))}
-                    {hasMore && (
-                      <button
-                        onClick={() => setMandatingParagraphsExpanded(!mandatingParagraphsExpanded)}
-                        className="w-full text-xs text-gray-500 hover:text-gray-700 py-1 flex items-center justify-center gap-1 mt-1"
-                      >
-                        {mandatingParagraphsExpanded ? (
-                          <>Show less <ChevronUp className="h-3 w-3" /></>
-                        ) : (
-                          <>Show {allMandates.length - INITIAL_VISIBLE} more <ChevronDown className="h-3 w-3" /></>
-                        )}
-                      </button>
-                    )}
-                  </div>
+                          {showMultiSource && (
+                            <p className="text-[10px] text-gray-400">
+                              from {resSymbol}
+                            </p>
+                          )}
+                        </a>
+                      ))}
+                      {hasMore && (
+                        <button
+                          onClick={() => setMandatingParagraphsExpanded(!mandatingParagraphsExpanded)}
+                          className="w-full text-xs text-gray-500 hover:text-gray-700 py-1 flex items-center justify-center gap-1 mt-1"
+                        >
+                          {mandatingParagraphsExpanded ? (
+                            <>Show less <ChevronUp className="h-3 w-3" /></>
+                          ) : (
+                            <>Show {allMandates.length - INITIAL_VISIBLE} more <ChevronDown className="h-3 w-3" /></>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -662,6 +682,12 @@ export function ReportSidebar({
               <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Similar Reports {!similarLoading && similar.length > 0 && `(${similar.length})`}
               </h3>
+              <p className="text-xs leading-relaxed text-gray-600">
+                Reports are ranked by topical similarity to this one, using
+                vector embeddings of each report&apos;s title, subjects, and
+                opening text. Higher scores reflect closer subject matter and
+                framing, not verbatim content overlap.
+              </p>
               <SimilarReportsGrid
                 similar={similar}
                 loading={similarLoading}

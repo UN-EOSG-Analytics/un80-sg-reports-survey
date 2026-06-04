@@ -77,8 +77,8 @@ function abbreviateBody(body: string | null): string | null {
 type SortColumn = "symbol" | "title" | "entity" | "body" | "year" | "frequency";
 type SortDirection = "asc" | "desc";
 
-// Columns: Symbol, Title, Entity, Body, Year, Subjects, Frequency, Details
-const GRID_COLS = "grid-cols-[120px_1fr_100px_75px_65px_120px_90px_90px]";
+// Columns: Symbol, Title, Body, Year, Entity, Subjects, Frequency, Details
+const GRID_COLS = "grid-cols-[120px_1fr_75px_65px_100px_120px_90px_90px]";
 
 function toTitleCase(str: string): string {
   return str
@@ -545,18 +545,6 @@ function ColumnHeaders({
         <SortArrow column="title" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
       </div>
       <div className="flex items-center gap-1">
-        <span>Entity</span>
-        {filterOptions?.entities && filterOptions.entities.length > 0 && (
-          <CountFilterPopover
-            options={filterOptions.entities}
-            selected={filters.entities}
-            onChange={(v) => onFilterChange({ ...filters, entities: v })}
-            label="entities"
-          />
-        )}
-        <SortArrow column="entity" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
-      </div>
-      <div className="flex items-center gap-1">
         <span>Body</span>
         {filterOptions?.bodies && filterOptions.bodies.length > 0 && (
           <CountFilterPopover
@@ -578,6 +566,18 @@ function ColumnHeaders({
           />
         )}
         <SortArrow column="year" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
+      </div>
+      <div className="flex items-center gap-1">
+        <span>Entity</span>
+        {filterOptions?.entities && filterOptions.entities.length > 0 && (
+          <CountFilterPopover
+            options={filterOptions.entities}
+            selected={filters.entities}
+            onChange={(v) => onFilterChange({ ...filters, entities: v })}
+            label="entities"
+          />
+        )}
+        <SortArrow column="entity" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
       </div>
       <div className="flex items-center gap-1">
         <span>Subjects</span>
@@ -643,6 +643,14 @@ function ReportRow({
         {displayTitle || <span className="text-gray-400 italic">No title</span>}
       </div>
 
+      <div className="text-xs text-gray-500" title={report.body ?? undefined}>
+        {abbreviateBody(report.body) ?? "—"}
+      </div>
+
+      <div className="text-xs text-gray-600">
+        {report.year ?? <span className="text-gray-300">—</span>}
+      </div>
+
       <div className="overflow-hidden">
         <EntityBadges
           suggestions={report.suggestions}
@@ -652,14 +660,6 @@ function ReportRow({
           maxVisible={2}
           size="xs"
         />
-      </div>
-
-      <div className="text-xs text-gray-500" title={report.body ?? undefined}>
-        {abbreviateBody(report.body) ?? "—"}
-      </div>
-
-      <div className="text-xs text-gray-600">
-        {report.year ?? <span className="text-gray-300">—</span>}
       </div>
 
       <SortedSubjectPills

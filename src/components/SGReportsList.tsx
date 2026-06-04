@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Loader2, ChevronUp, ChevronDown, Filter, X, Search, ChevronRight, ArrowRight } from "lucide-react";
+import { Loader2, ChevronUp, ChevronDown, Filter, X, Search, ChevronRight, ArrowRight, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -9,6 +9,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -74,11 +80,11 @@ function abbreviateBody(body: string | null): string | null {
     .join("");
 }
 
-type SortColumn = "symbol" | "title" | "entity" | "body" | "year" | "frequency";
+type SortColumn = "symbol" | "title" | "entity" | "body" | "year" | "frequency" | "downloads";
 type SortDirection = "asc" | "desc";
 
-// Columns: Symbol, Title, Body, Year, Entity, Subjects, Frequency, Details
-const GRID_COLS = "grid-cols-[120px_1fr_75px_65px_100px_120px_90px_90px]";
+// Columns: Symbol, Title, Body, Year, Entity, Subjects, Frequency, Downloads, Details
+const GRID_COLS = "grid-cols-[120px_1fr_75px_65px_100px_120px_90px_80px_90px]";
 
 function toTitleCase(str: string): string {
   return str
@@ -523,6 +529,7 @@ function ColumnHeaders({
   filters,
   onFilterChange,
   subjectCounts,
+  onExport,
 }: {
   sortColumn: SortColumn | null;
   sortDirection: SortDirection;
@@ -531,6 +538,7 @@ function ColumnHeaders({
   filters: Filters;
   onFilterChange: (filters: Filters) => void;
   subjectCounts: SubjectCount[];
+  onExport: (format: "csv" | "xlsx") => void;
 }) {
   return (
     <div
@@ -605,7 +613,31 @@ function ColumnHeaders({
         )}
         <SortArrow column="frequency" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
       </div>
-      <div className="flex items-center justify-end" />
+      <div className="flex items-center justify-end gap-1">
+        <span>Downloads</span>
+        <SortArrow column="downloads" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
+      </div>
+      <div className="flex items-center justify-end">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              title="Export filtered data"
+              className="inline-flex h-5 items-center gap-0.5 rounded px-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors"
+            >
+              <Download className="h-3 w-3" />
+              <ChevronDown className="h-2.5 w-2.5 opacity-60" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem onClick={() => onExport("xlsx")}>
+              Excel (.xlsx)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onExport("csv")}>
+              CSV (.csv)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </div>
   );
 }
@@ -679,6 +711,12 @@ function ReportRow({
         />
       </div>
 
+      <div className="text-right text-xs tabular-nums text-gray-600">
+        {report.downloadCount
+          ? report.downloadCount.toLocaleString()
+          : <span className="text-gray-300">—</span>}
+      </div>
+
       <div className="flex items-center justify-end">
         <button
           onClick={(e) => {
@@ -715,16 +753,12 @@ export function ReportsTable() {
 
   const limit = 50;
 
-  const fetchData = useCallback(() => {
-    setLoading(true);
-    const params = new URLSearchParams({
-      page: String(page),
-      limit: String(limit),
-    });
-
-    if (sortColumn) params.set("sortColumn", sortColumn);
-    if (sortColumn) params.set("sortDirection", sortDirection);
-
+  const buildFilterParams = useCallback(() => {
+    const params = new URLSearchParams();
+    if (sortColumn) {
+      params.set("sortColumn", sortColumn);
+      params.set("sortDirection", sortDirection);
+    }
     if (filters.search) params.set("filterSearch", filters.search);
     filters.bodies.forEach((b) => params.append("filterBody", b));
     filters.years.forEach((y) => params.append("filterYear", String(y)));
@@ -732,12 +766,26 @@ export function ReportsTable() {
     filters.subjects.forEach((s) => params.append("filterSubject", s));
     filters.entities.forEach((e) => params.append("filterEntity", e));
     filters.reportTypes.forEach((t) => params.append("filterReportType", t));
+    return params;
+  }, [filters, sortColumn, sortDirection]);
+
+  const fetchData = useCallback(() => {
+    setLoading(true);
+    const params = buildFilterParams();
+    params.set("page", String(page));
+    params.set("limit", String(limit));
 
     fetch(`/api/sg-reports?${params.toString()}`)
       .then((r) => r.json())
       .then((d) => setData(d))
       .finally(() => setLoading(false));
-  }, [page, filters, sortColumn, sortDirection]);
+  }, [page, buildFilterParams]);
+
+  const handleExport = (format: "csv" | "xlsx") => {
+    const params = buildFilterParams();
+    params.set("format", format);
+    window.location.href = `/api/sg-reports?${params.toString()}`;
+  };
 
   useEffect(() => {
     fetchData();
@@ -849,6 +897,7 @@ export function ReportsTable() {
             setPage(1);
           }}
           subjectCounts={data?.subjectCounts || []}
+          onExport={handleExport}
         />
 
         <div className="divide-y divide-gray-100">

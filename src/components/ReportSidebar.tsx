@@ -87,6 +87,7 @@ export interface ReportGroup {
   calculatedFrequency?: string | null;
   confirmedFrequency?: string | null;
   gapHistory?: number[] | null;
+  downloadCount?: number;
   subjectTerms: string[];
 }
 
@@ -658,6 +659,23 @@ export function ReportSidebar({
                   Subjects
                 </h3>
                 <SortedSubjectPills subjects={report.subjectTerms} subjectCounts={subjectCounts} />
+              </div>
+            )}
+
+            {/* Downloads */}
+            {report.downloadCount !== undefined && report.downloadCount > 0 && (
+              <div className="bg-gray-50 rounded-lg p-3 border border-gray-100 space-y-2">
+                <div className="flex items-baseline justify-between">
+                  <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Downloads
+                  </h3>
+                  <span className="text-[10px] text-gray-400">
+                    all official languages
+                  </span>
+                </div>
+                <p className="text-2xl font-semibold tabular-nums text-gray-900">
+                  {report.downloadCount.toLocaleString()}
+                </p>
               </div>
             )}
 

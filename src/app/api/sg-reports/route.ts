@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import ExcelJS from "exceljs";
 import { query } from "@/lib/db";
 
 const DB_SCHEMA = process.env.DB_SCHEMA || "sg_reports_survey";
+
+const EXPORT_MAX_ROWS = 100000;
 
 interface EntitySuggestion {
   entity: string;
@@ -32,6 +35,7 @@ interface ReportRow {
   calculated_frequency: string | null;
   confirmed_frequency: string | null;
   gap_history: number[] | null;
+  download_count: number | null;
 }
 
 interface SingleReportRow {
@@ -71,9 +75,14 @@ interface SubjectCount {
 }
 
 export async function GET(req: NextRequest) {
+  const exportFormat = (req.nextUrl.searchParams.get("format") || "").toLowerCase();
+  const isExport = exportFormat === "csv" || exportFormat === "xlsx";
+
   const page = parseInt(req.nextUrl.searchParams.get("page") || "1");
-  const limit = parseInt(req.nextUrl.searchParams.get("limit") || "20");
-  const offset = (page - 1) * limit;
+  const limit = isExport
+    ? EXPORT_MAX_ROWS
+    : parseInt(req.nextUrl.searchParams.get("limit") || "20");
+  const offset = isExport ? 0 : (page - 1) * limit;
   const symbol = req.nextUrl.searchParams.get("symbol");
 
   // Filter parameters (public site supports browse filters only; no survey-response filter)
@@ -229,6 +238,7 @@ export async function GET(req: NextRequest) {
     body: "normalized_body",
     year: "latest_year",
     frequency: "COALESCE(confirmed_frequency, calculated_frequency)",
+    downloads: "download_count",
   };
   const sortExpression = sortColumn ? sortColumnSQLMap[sortColumn] : null;
   const orderByClause = sortExpression
@@ -268,6 +278,9 @@ export async function GET(req: NextRequest) {
           (SELECT rfc.frequency FROM ${DB_SCHEMA}.report_frequency_confirmations_public rfc
            WHERE rfc.proper_title = sub.proper_title
            AND rfc.normalized_body = COALESCE(sub.normalized_body, '')) as confirmed_frequency,
+          (SELECT COALESCE(SUM(rds.total_downloads), 0)::int
+             FROM ${DB_SCHEMA}.report_download_summary rds
+             WHERE rds.symbol = ANY(array_agg(sub.symbol))) as download_count,
           COUNT(*)::int as count,
           MAX(effective_year) as latest_year
         FROM (
@@ -461,6 +474,7 @@ export async function GET(req: NextRequest) {
       calculatedFrequency: formatFrequency(r.calculated_frequency),
       confirmedFrequency: formatFrequency(r.confirmed_frequency),
       gapHistory: r.gap_history || null,
+      downloadCount: r.download_count || 0,
       subjectTerms: Array.from(allSubjects),
     };
   });
@@ -476,6 +490,10 @@ export async function GET(req: NextRequest) {
     .map(([value, count]) => ({ value, count }))
     .sort((a, b) => b.count - a.count);
 
+  if (isExport) {
+    return buildExportResponse(filteredReports, exportFormat as "csv" | "xlsx");
+  }
+
   return NextResponse.json({
     reports: filteredReports,
     total: countResult[0]?.total || 0,
@@ -489,5 +507,161 @@ export async function GET(req: NextRequest) {
       reportTypes: reportTypeCounts.map((t) => ({ value: t.report_type, count: t.count })),
     },
     subjectCounts: subjectCounts.map((s) => ({ subject: s.subject, count: s.count })),
+  });
+}
+
+type ExportReport = {
+  title: string | null;
+  symbol: string;
+  body: string | null;
+  reportType: string;
+  year: number | null;
+  entity: string | null;
+  leadEntities: string[];
+  contributingEntities: string[];
+  frequency: string | null;
+  calculatedFrequency: string | null;
+  confirmedFrequency: string | null;
+  downloadCount: number;
+  subjectTerms: string[];
+  count: number;
+  versions: {
+    symbol: string;
+    year: number | null;
+    publicationDate: string | null;
+    recordNumber: string | null;
+    wordCount: number | null;
+  }[];
+};
+
+const EXPORT_COLUMNS: {
+  key: string;
+  header: string;
+  width: number;
+  get: (r: ExportReport) => string | number | null;
+}[] = [
+  { key: "symbol", header: "Symbol", width: 18, get: r => r.symbol },
+  { key: "title", header: "Title", width: 60, get: r => r.title },
+  { key: "body", header: "Body", width: 28, get: r => r.body },
+  { key: "reportType", header: "Report type", width: 22, get: r => r.reportType },
+  { key: "year", header: "Latest year", width: 12, get: r => r.year },
+  { key: "frequency", header: "Frequency", width: 14, get: r => r.frequency },
+  { key: "calculatedFrequency", header: "Calculated frequency", width: 18, get: r => r.calculatedFrequency },
+  { key: "confirmedFrequency", header: "Confirmed frequency", width: 18, get: r => r.confirmedFrequency },
+  { key: "primaryEntity", header: "Primary entity", width: 28, get: r => r.entity },
+  { key: "leadEntities", header: "Lead entities", width: 32, get: r => r.leadEntities.join("; ") },
+  { key: "contributingEntities", header: "Contributing entities", width: 36, get: r => r.contributingEntities.join("; ") },
+  { key: "subjects", header: "Subjects", width: 40, get: r => r.subjectTerms.join("; ") },
+  { key: "downloadCount", header: "Downloads", width: 12, get: r => r.downloadCount },
+  { key: "versionCount", header: "Series length", width: 12, get: r => r.count },
+  { key: "allSymbols", header: "All symbols", width: 50, get: r => r.versions.map(v => v.symbol).join("; ") },
+  { key: "allYears", header: "All years", width: 24, get: r => r.versions.map(v => v.year ?? "").join("; ") },
+  { key: "publicationDates", header: "Publication dates", width: 28, get: r => r.versions.map(v => v.publicationDate ?? "").join("; ") },
+  { key: "recordNumbers", header: "ODS record numbers", width: 28, get: r => r.versions.map(v => v.recordNumber ?? "").join("; ") },
+  { key: "wordCounts", header: "Word counts", width: 24, get: r => r.versions.map(v => v.wordCount ?? "").join("; ") },
+];
+
+function csvEscape(value: string | number | null): string {
+  if (value === null || value === undefined) return "";
+  const s = String(value);
+  if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function buildCsv(reports: ExportReport[]): string {
+  const header = EXPORT_COLUMNS.map(c => csvEscape(c.header)).join(",");
+  const rows = reports.map(r =>
+    EXPORT_COLUMNS.map(c => csvEscape(c.get(r))).join(",")
+  );
+  // BOM so Excel detects UTF-8 correctly when opening CSVs directly.
+  return "﻿" + [header, ...rows].join("\r\n") + "\r\n";
+}
+
+async function buildXlsx(reports: ExportReport[]): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "UN-80 SG Reports Survey";
+  wb.created = new Date();
+
+  const ws = wb.addWorksheet("SG Reports", {
+    views: [{ state: "frozen", xSplit: 1, ySplit: 1 }],
+  });
+
+  ws.columns = EXPORT_COLUMNS.map(c => ({
+    header: c.header,
+    key: c.key,
+    width: c.width,
+  }));
+
+  reports.forEach(r => {
+    const row: Record<string, string | number | null> = {};
+    EXPORT_COLUMNS.forEach(c => {
+      row[c.key] = c.get(r);
+    });
+    ws.addRow(row);
+  });
+
+  const headerRow = ws.getRow(1);
+  headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  headerRow.fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FF009EDB" },
+  };
+  headerRow.alignment = { vertical: "middle", horizontal: "left" };
+  headerRow.height = 22;
+
+  ws.autoFilter = {
+    from: { row: 1, column: 1 },
+    to: { row: 1, column: EXPORT_COLUMNS.length },
+  };
+
+  // Right-align numeric columns and apply thousands separator to downloads/word counts.
+  const numericKeys = new Set(["year", "downloadCount", "versionCount"]);
+  EXPORT_COLUMNS.forEach((c, i) => {
+    const col = ws.getColumn(i + 1);
+    if (numericKeys.has(c.key)) {
+      col.alignment = { horizontal: "right" };
+      if (c.key !== "year") col.numFmt = "#,##0";
+    }
+  });
+
+  // Tighten column widths against actual content so very long strings don't blow up the sheet.
+  EXPORT_COLUMNS.forEach((c, i) => {
+    const col = ws.getColumn(i + 1);
+    let max = c.header.length;
+    reports.forEach(r => {
+      const v = c.get(r);
+      if (v === null || v === undefined) return;
+      const len = String(v).length;
+      if (len > max) max = len;
+    });
+    col.width = Math.min(Math.max(max + 2, 8), 60);
+  });
+
+  const buf = await wb.xlsx.writeBuffer();
+  return Buffer.from(buf);
+}
+
+async function buildExportResponse(
+  reports: ExportReport[],
+  format: "csv" | "xlsx"
+): Promise<NextResponse> {
+  const stamp = new Date().toISOString().slice(0, 10);
+  if (format === "csv") {
+    const body = buildCsv(reports);
+    return new NextResponse(body, {
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="sg-reports-${stamp}.csv"`,
+      },
+    });
+  }
+  const buf = await buildXlsx(reports);
+  return new NextResponse(new Uint8Array(buf), {
+    headers: {
+      "Content-Type":
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="sg-reports-${stamp}.xlsx"`,
+    },
   });
 }

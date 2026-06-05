@@ -206,8 +206,8 @@ export default function HomePage() {
 
               <FeatureCard
                 icon={Quote}
-                title="Mandating Paragraphs"
-                description="Read the operative paragraphs from the resolutions that mandate each report."
+                title="Mandate Source"
+                description="Find the official resolution that mandates each report, when available from UN Digital Library."
               >
                 <MockMandateParagraph />
               </FeatureCard>

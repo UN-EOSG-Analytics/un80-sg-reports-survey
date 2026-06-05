@@ -221,10 +221,10 @@ export async function GET(req: NextRequest) {
   }
 
   const frequencyFilterSQL = filterFrequencies.length > 0
-    ? `AND COALESCE(confirmed_frequency, calculated_frequency) = ANY($${havingParamIndex})`
+    ? `AND LOWER(COALESCE(confirmed_frequency, calculated_frequency)) = ANY($${havingParamIndex})`
     : "";
   if (filterFrequencies.length > 0) {
-    havingParams.push(filterFrequencies as unknown as string);
+    havingParams.push(filterFrequencies.map((f) => f.toLowerCase()) as unknown as string);
     havingParamIndex++;
   }
 

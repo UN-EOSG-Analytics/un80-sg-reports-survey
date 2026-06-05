@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Loader2, ChevronUp, ChevronDown, Filter, X, Search, ChevronRight, ArrowRight, Download } from "lucide-react";
+import { Loader2, ChevronUp, ChevronDown, Filter, X, Search, ChevronRight, ArrowRight, Download, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -84,7 +84,7 @@ type SortColumn = "symbol" | "title" | "entity" | "body" | "year" | "frequency" 
 type SortDirection = "asc" | "desc";
 
 // Columns: Symbol, Title, Body, Year, Entity, Subjects, Frequency, Downloads, Details
-const GRID_COLS = "grid-cols-[120px_1fr_75px_65px_100px_120px_90px_80px_90px]";
+const GRID_COLS = "grid-cols-[95px_1fr_65px_65px_100px_115px_105px_125px_70px]";
 
 function toTitleCase(str: string): string {
   return str
@@ -118,9 +118,28 @@ function SortArrow({
           <ChevronDown className="h-3.5 w-3.5 text-un-blue" />
         )
       ) : (
-        <ChevronDown className="h-3.5 w-3.5 opacity-40" />
+        <ChevronDown className="h-3.5 w-3.5 text-gray-700" />
       )}
     </button>
+  );
+}
+
+function ColumnInfo({ label, text }: { label: string; text: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 cursor-help hover:text-black transition-colors"
+        >
+          <span>{label}</span>
+          <Info className="h-3 w-3" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="normal-case tracking-normal font-normal">
+        {text}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -154,7 +173,7 @@ function CountFilterPopover({
           className={`inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
             selected.length > 0
               ? "bg-un-blue text-white"
-              : "text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+              : "text-gray-700 hover:bg-gray-200 hover:text-black"
           }`}
         >
           <Filter className="h-3 w-3" />
@@ -228,7 +247,7 @@ function FrequencyFilterPopover({
           className={`inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
             selected.length > 0
               ? "bg-un-blue text-white"
-              : "text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+              : "text-gray-700 hover:bg-gray-200 hover:text-black"
           }`}
         >
           <Filter className="h-3 w-3" />
@@ -282,7 +301,7 @@ function YearFilterPopover({
           className={`inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
             selected.length > 0
               ? "bg-un-blue text-white"
-              : "text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+              : "text-gray-700 hover:bg-gray-200 hover:text-black"
           }`}
         >
           <Filter className="h-3 w-3" />
@@ -458,7 +477,7 @@ function SubjectFilterPopover({
           className={`inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
             selectedSubjects.length > 0
               ? "bg-un-blue text-white"
-              : "text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+              : "text-gray-700 hover:bg-gray-200 hover:text-black"
           }`}
         >
           <Filter className="h-3 w-3" />
@@ -542,82 +561,98 @@ function ColumnHeaders({
 }) {
   return (
     <div
-      className={`grid ${GRID_COLS} items-center gap-x-4 px-4 py-2 text-[10px] font-medium tracking-wider text-gray-400 uppercase bg-gray-50 border-b`}
+      className={`grid ${GRID_COLS} items-start gap-x-4 px-4 py-2 text-[11px] font-semibold tracking-wider text-gray-700 uppercase bg-gray-50 border-b`}
     >
-      <div className="flex items-center gap-1">
-        <span>Symbol</span>
-        <SortArrow column="symbol" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
+      <div className="flex flex-col items-start gap-0.5">
+        <ColumnInfo label="Symbol" text="Taken directly from United Nations Digital Library metadata." />
+        <div className="flex items-center gap-1 -ml-0.5">
+          <SortArrow column="symbol" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
+        </div>
       </div>
-      <div className="flex items-center gap-1">
-        <span>Title</span>
-        <SortArrow column="title" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
+      <div className="flex flex-col items-start gap-0.5">
+        <ColumnInfo label="Title" text="Taken directly from United Nations Digital Library metadata." />
+        <div className="flex items-center gap-1 -ml-0.5">
+          <SortArrow column="title" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
+        </div>
       </div>
-      <div className="flex items-center gap-1">
-        <span>Body</span>
-        {filterOptions?.bodies && filterOptions.bodies.length > 0 && (
-          <CountFilterPopover
-            options={filterOptions.bodies}
-            selected={filters.bodies}
-            onChange={(v) => onFilterChange({ ...filters, bodies: v })}
-            label="bodies"
-          />
-        )}
-        <SortArrow column="body" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
+      <div className="flex flex-col items-start gap-0.5">
+        <ColumnInfo label="Body" text="Taken directly from United Nations Digital Library metadata." />
+        <div className="flex items-center gap-1 -ml-0.5">
+          {filterOptions?.bodies && filterOptions.bodies.length > 0 && (
+            <CountFilterPopover
+              options={filterOptions.bodies}
+              selected={filters.bodies}
+              onChange={(v) => onFilterChange({ ...filters, bodies: v })}
+              label="bodies"
+            />
+          )}
+          <SortArrow column="body" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
+        </div>
       </div>
-      <div className="flex items-center gap-1">
-        <span>Year</span>
-        {filterOptions?.years && filterOptions.years.length > 0 && (
-          <YearFilterPopover
-            options={filterOptions.years}
-            selected={filters.years}
-            onChange={(v) => onFilterChange({ ...filters, years: v })}
-          />
-        )}
-        <SortArrow column="year" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
+      <div className="flex flex-col items-start gap-0.5">
+        <ColumnInfo label="Year" text="Taken directly from United Nations Digital Library metadata." />
+        <div className="flex items-center gap-1 -ml-0.5">
+          {filterOptions?.years && filterOptions.years.length > 0 && (
+            <YearFilterPopover
+              options={filterOptions.years}
+              selected={filters.years}
+              onChange={(v) => onFilterChange({ ...filters, years: v })}
+            />
+          )}
+          <SortArrow column="year" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
+        </div>
       </div>
-      <div className="flex items-center gap-1">
+      <div className="flex flex-col items-start gap-0.5">
         <span>Entity</span>
-        {filterOptions?.entities && filterOptions.entities.length > 0 && (
-          <CountFilterPopover
-            options={filterOptions.entities}
-            selected={filters.entities}
-            onChange={(v) => onFilterChange({ ...filters, entities: v })}
-            label="entities"
-          />
-        )}
-        <SortArrow column="entity" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
+        <div className="flex items-center gap-1 -ml-0.5">
+          {filterOptions?.entities && filterOptions.entities.length > 0 && (
+            <CountFilterPopover
+              options={filterOptions.entities}
+              selected={filters.entities}
+              onChange={(v) => onFilterChange({ ...filters, entities: v })}
+              label="entities"
+            />
+          )}
+          <SortArrow column="entity" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
+        </div>
       </div>
-      <div className="flex items-center gap-1">
-        <span>Subjects</span>
-        {subjectCounts.length > 0 && (
-          <SubjectFilterPopover
-            subjects={subjectCounts}
-            selectedSubjects={filters.subjects}
-            onToggle={(subject) => {
-              const newSubjects = filters.subjects.includes(subject)
-                ? filters.subjects.filter((s) => s !== subject)
-                : [...filters.subjects, subject];
-              onFilterChange({ ...filters, subjects: newSubjects });
-            }}
-          />
-        )}
+      <div className="flex flex-col items-start gap-0.5">
+        <ColumnInfo label="Subjects" text="Extracted directly from United Nations Digital Library metadata." />
+        <div className="flex items-center gap-1 -ml-0.5">
+          {subjectCounts.length > 0 && (
+            <SubjectFilterPopover
+              subjects={subjectCounts}
+              selectedSubjects={filters.subjects}
+              onToggle={(subject) => {
+                const newSubjects = filters.subjects.includes(subject)
+                  ? filters.subjects.filter((s) => s !== subject)
+                  : [...filters.subjects, subject];
+                onFilterChange({ ...filters, subjects: newSubjects });
+              }}
+            />
+          )}
+        </div>
       </div>
-      <div className="flex items-center gap-1">
-        <span>Frequency</span>
-        {filterOptions?.frequencies && filterOptions.frequencies.length > 0 && (
-          <FrequencyFilterPopover
-            options={filterOptions.frequencies}
-            selected={filters.frequencies}
-            onChange={(v) => onFilterChange({ ...filters, frequencies: v })}
-          />
-        )}
-        <SortArrow column="frequency" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
+      <div className="flex flex-col items-start gap-0.5">
+        <ColumnInfo label="Frequency" text="Frequency reflects either an express recurring reporting request or a report requested for a specific session that has, in practice, been requested recurrently at regular intervals. References to annual, biennial or triennial reporting do not prejudge future decisions by the relevant intergovernmental organ." />
+        <div className="flex items-center gap-1 -ml-0.5">
+          {filterOptions?.frequencies && filterOptions.frequencies.length > 0 && (
+            <FrequencyFilterPopover
+              options={filterOptions.frequencies}
+              selected={filters.frequencies}
+              onChange={(v) => onFilterChange({ ...filters, frequencies: v })}
+            />
+          )}
+          <SortArrow column="frequency" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
+        </div>
       </div>
-      <div className="flex items-center justify-end gap-1">
-        <span>Downloads</span>
-        <SortArrow column="downloads" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
+      <div className="flex flex-col items-end gap-0.5">
+        <ColumnInfo label="DL Downloads" text="Total downloads of the report in all six official languages from the United Nations Digital Library; does not include downloads via the United Nations Official Document System." />
+        <div className="flex items-center gap-1 -mr-0.5">
+          <SortArrow column="downloads" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
+        </div>
       </div>
-      <div className="flex items-center justify-end">
+      <div className="flex items-start justify-end">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -878,6 +913,11 @@ export function ReportsTable() {
             Clear all filters
           </Button>
         )}
+
+        <p className="text-xs text-gray-400 hidden md:flex items-center gap-1">
+          <Info className="h-3 w-3" />
+          Hover column headers for details
+        </p>
 
         <p className="text-sm text-gray-500 ml-auto">
           {data?.total} report series

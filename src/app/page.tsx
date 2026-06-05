@@ -173,45 +173,6 @@ export default function HomePage() {
               </a>
               , where official reports are stored.
             </p>
-            <div className="space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-                About the columns
-              </h3>
-              <dl className="grid max-w-3xl gap-x-6 gap-y-3 text-sm leading-relaxed text-gray-600 sm:grid-cols-[10rem_1fr]">
-                <dt className="font-semibold text-gray-800">
-                  Symbol, Title, Body, Year
-                </dt>
-                <dd>
-                  The document symbol, full title, the UN body to which the
-                  report is submitted, and the publication year — taken
-                  directly from the United Nations Digital Library metadata.
-                </dd>
-
-                <dt className="font-semibold text-gray-800">Subject</dt>
-                <dd>
-                  Subjects are extracted directly from United Nations Digital
-                  Library metadata.
-                </dd>
-
-                <dt className="font-semibold text-gray-800">Frequency</dt>
-                <dd>
-                  Frequency reflects either an express recurring reporting
-                  request or a report requested for a specific session that
-                  has, in practice, been requested recurrently at regular
-                  intervals. References to annual, biennial or triennial
-                  reporting do not prejudge future decisions by the relevant
-                  intergovernmental organ.
-                </dd>
-
-                <dt className="font-semibold text-gray-800">
-                  Total download counts
-                </dt>
-                <dd>
-                  Total downloads refer to downloads of the report in all six
-                  official languages from the United Nations Digital Library; this does not include downloads via the United Nations Official Document System.
-                </dd>
-              </dl>
-            </div>
           </section>
 
           <section className="space-y-3">

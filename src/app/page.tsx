@@ -199,7 +199,7 @@ export default function HomePage() {
               <FeatureCard
                 icon={BarChart3}
                 title="Publication History"
-                description="A quarter-by-quarter timeline of when each report has actually been published."
+                description="See when each version in a report series was actually published."
               >
                 <MockPublicationPattern />
               </FeatureCard>
@@ -207,7 +207,7 @@ export default function HomePage() {
               <FeatureCard
                 icon={Quote}
                 title="Mandating Paragraphs"
-                description="The operative paragraphs of the mandating resolutions, where recorded in Digital Library metadata."
+                description="Read the operative paragraphs from the resolutions that mandate each report."
               >
                 <MockMandateParagraph />
               </FeatureCard>

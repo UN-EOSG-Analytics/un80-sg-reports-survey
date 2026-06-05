@@ -844,7 +844,7 @@ Guidelines:
                       {visibleMandates.map(({ mandate, resSymbol, idx }) => (
                         <a
                           key={`${resSymbol}-${idx}`}
-                          href={`https://docs.un.org/en/${encodeURI(resSymbol)}`}
+                          href={`https://docs.un.org/${encodeURI(resSymbol)}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="block rounded-md border border-gray-200 bg-white p-2.5 space-y-1.5 hover:border-un-blue hover:bg-blue-50/40 transition-colors"

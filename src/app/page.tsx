@@ -154,7 +154,7 @@ export default function HomePage() {
               provide context for the analysis of the reporting landscape
               pursuant to the{" "}
               <a
-                href="https://docs.un.org/en/A/RES/80/251#page=4"
+                href="https://docs.un.org/A/RES/80/251#page=4"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-un-blue hover:underline"

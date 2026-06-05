@@ -9,7 +9,7 @@ import { FileText } from "lucide-react";
 // Build ODS link from document symbol
 // Uses undocs.org which is the official UN shortlink service
 function buildODSLink(symbol: string): string {
-  return `https://undocs.org/en/${encodeURIComponent(symbol)}`;
+  return `https://undocs.org/${encodeURIComponent(symbol)}`;
 }
 
 // =============================================================================

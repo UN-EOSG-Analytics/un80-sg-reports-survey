@@ -806,6 +806,29 @@ export function ReportSidebar({
                         Potentially matching paragraphs according to AI analysis
                         (unverified):
                       </p>
+                      <details className="group text-xs text-gray-500">
+                        <summary className="cursor-pointer select-none hover:text-gray-700 list-none flex items-center gap-1">
+                          <ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" />
+                          How were these extracted?
+                        </summary>
+                        <div className="mt-2 rounded-md border border-gray-200 bg-white p-2.5 space-y-1.5 text-[11px] leading-relaxed text-gray-600">
+                          <p>
+                            Each resolution&apos;s full text was passed to a language
+                            model with the following instructions:
+                          </p>
+                          <blockquote className="border-l-2 border-gray-200 pl-2 whitespace-pre-line text-gray-500 italic">
+{`You are an expert at analyzing UN resolutions to extract information about mandated reports.
+
+Given a UN resolution text, extract information about any reports that are mandated/requested from the Secretary-General.
+
+Guidelines:
+- Look for operative paragraphs that "request", "invite", or "decide", etc. that the Secretary-General submit a report
+- If multiple reports are mandated, include each as a separate mandate
+- If no report is mandated, return an empty mandates list
+- Include the FULL verbatim paragraph, not just a snippet`}
+                          </blockquote>
+                        </div>
+                      </details>
                       {visibleMandates.map(({ mandate, resSymbol, idx }) => (
                         <a
                           key={`${resSymbol}-${idx}`}

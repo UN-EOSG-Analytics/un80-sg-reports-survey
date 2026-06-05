@@ -7,7 +7,7 @@ interface Props {
   maxWidth?: "6xl" | "7xl";
 }
 
-export const SITE_TITLE = "Secretary-General's Reports";
+export const SITE_TITLE = "Secretary-General's Report Portfolio";
 
 export function Header({ children, maxWidth = "7xl" }: Props) {
   const wide = maxWidth === "7xl";
@@ -37,7 +37,7 @@ export function Header({ children, maxWidth = "7xl" }: Props) {
             original UN horizontal logo's emblem-wordmark proportion. */}
         <Link
           href="/"
-          aria-label="Secretary-General's Reports"
+          aria-label="Secretary-General's Report Portfolio"
           className={cn(
             "absolute top-1/2 end-[calc(100%-24.74px)] h-10 w-[47.9px] -translate-y-1/2 transition-opacity hover:opacity-75",
             outboardOnly,
@@ -54,7 +54,7 @@ export function Header({ children, maxWidth = "7xl" }: Props) {
         </Link>
         <Link
           href="/"
-          aria-label="Secretary-General's Reports"
+          aria-label="Secretary-General's Report Portfolio"
           className="inline-flex items-center gap-2.5 transition-opacity hover:opacity-75"
         >
           <Image

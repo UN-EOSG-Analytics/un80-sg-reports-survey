@@ -33,7 +33,7 @@ function FeatureCard({
         </div>
         <p className="text-xs leading-relaxed text-gray-600">{description}</p>
       </div>
-      {children && (
+      {false && children && (
         <div className="flex flex-1 items-center border-t border-gray-100 p-3">
           <div className="w-full">{children}</div>
         </div>
@@ -176,9 +176,6 @@ export default function HomePage() {
           </section>
 
           <section className="space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-              What you can explore
-            </h3>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <FeatureCard
                 icon={FileText}

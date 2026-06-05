@@ -915,7 +915,7 @@ export function ReportsTable() {
         )}
 
         <p className="text-sm text-gray-500 hidden md:block">
-          Hover column headers for details
+          Hover column headers for explanations.
         </p>
 
         <p className="text-sm text-gray-500 ml-auto">

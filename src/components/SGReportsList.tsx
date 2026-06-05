@@ -130,7 +130,7 @@ function ColumnInfo({ label, text }: { label: string; text: string }) {
       <TooltipTrigger asChild>
         <button
           type="button"
-          className="inline-flex items-center gap-1 cursor-help hover:text-black transition-colors"
+          className="inline-flex items-center gap-1 uppercase cursor-help hover:text-black transition-colors"
         >
           <span>{label}</span>
           <Info className="h-3 w-3" />
@@ -914,8 +914,7 @@ export function ReportsTable() {
           </Button>
         )}
 
-        <p className="text-xs text-gray-400 hidden md:flex items-center gap-1">
-          <Info className="h-3 w-3" />
+        <p className="text-sm text-gray-500 hidden md:block">
           Hover column headers for details
         </p>
 

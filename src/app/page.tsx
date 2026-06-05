@@ -148,9 +148,9 @@ export default function HomePage() {
               >
                 UN80 Initiative
               </a>
-              , this list provides a
-              consolidated view of Secretary-General&apos;s reports published
-              from 2023 to 2025. It is intended to support transparency and
+              , this list provides a consolidated view of
+              Secretary-General&rsquo;s reports published as official documents
+              of the United Nations from 2023 to 2025. It is intended to
               provide context for the analysis of the reporting landscape
               pursuant to the{" "}
               <a
@@ -161,8 +161,7 @@ export default function HomePage() {
               >
                 General Assembly resolution 80/251 paragraph 16
               </a>
-              .
-              The list is drawn from the{" "}
+              . The list is drawn from the{" "}
               <a
                 href="https://digitallibrary.un.org"
                 target="_blank"
@@ -171,7 +170,7 @@ export default function HomePage() {
               >
                 United Nations Digital Library
               </a>
-              , where official reports are stored.
+              , where such Secretary-General&rsquo;s reports are stored.
             </p>
           </section>
 

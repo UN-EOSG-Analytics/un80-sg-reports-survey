@@ -118,13 +118,21 @@ function SortArrow({
           <ChevronDown className="h-3.5 w-3.5 text-un-blue" />
         )
       ) : (
-        <ChevronDown className="h-3.5 w-3.5 text-gray-700" />
+        <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
       )}
     </button>
   );
 }
 
-function ColumnInfo({ label, text }: { label: string; text: string }) {
+function ColumnInfo({
+  label,
+  text,
+  contentClassName,
+}: {
+  label: string;
+  text: React.ReactNode;
+  contentClassName?: string;
+}) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -136,7 +144,9 @@ function ColumnInfo({ label, text }: { label: string; text: string }) {
           <Info className="h-3 w-3" />
         </button>
       </TooltipTrigger>
-      <TooltipContent className="normal-case tracking-normal font-normal">
+      <TooltipContent
+        className={`normal-case tracking-normal font-normal ${contentClassName ?? ""}`}
+      >
         {text}
       </TooltipContent>
     </Tooltip>
@@ -173,7 +183,7 @@ function CountFilterPopover({
           className={`inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
             selected.length > 0
               ? "bg-un-blue text-white"
-              : "text-gray-700 hover:bg-gray-200 hover:text-black"
+              : "text-gray-400 hover:bg-gray-200 hover:text-gray-700"
           }`}
         >
           <Filter className="h-3 w-3" />
@@ -247,7 +257,7 @@ function FrequencyFilterPopover({
           className={`inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
             selected.length > 0
               ? "bg-un-blue text-white"
-              : "text-gray-700 hover:bg-gray-200 hover:text-black"
+              : "text-gray-400 hover:bg-gray-200 hover:text-gray-700"
           }`}
         >
           <Filter className="h-3 w-3" />
@@ -301,7 +311,7 @@ function YearFilterPopover({
           className={`inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
             selected.length > 0
               ? "bg-un-blue text-white"
-              : "text-gray-700 hover:bg-gray-200 hover:text-black"
+              : "text-gray-400 hover:bg-gray-200 hover:text-gray-700"
           }`}
         >
           <Filter className="h-3 w-3" />
@@ -477,7 +487,7 @@ function SubjectFilterPopover({
           className={`inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
             selectedSubjects.length > 0
               ? "bg-un-blue text-white"
-              : "text-gray-700 hover:bg-gray-200 hover:text-black"
+              : "text-gray-400 hover:bg-gray-200 hover:text-gray-700"
           }`}
         >
           <Filter className="h-3 w-3" />
@@ -590,7 +600,7 @@ function ColumnHeaders({
         </div>
       </div>
       <div className="flex flex-col items-start gap-0.5">
-        <ColumnInfo label="Year" text="Taken directly from United Nations Digital Library metadata." />
+        <ColumnInfo label="Year" text="The year shown reflects the publication date recorded in the United Nations Digital Library metadata." />
         <div className="flex items-center gap-1 -ml-0.5">
           {filterOptions?.years && filterOptions.years.length > 0 && (
             <YearFilterPopover
@@ -617,7 +627,7 @@ function ColumnHeaders({
         </div>
       </div>
       <div className="flex flex-col items-start gap-0.5">
-        <ColumnInfo label="Subjects" text="Extracted directly from United Nations Digital Library metadata." />
+        <ColumnInfo label="Subjects" text="Subjects are extracted directly from United Nations Digital Library metadata." />
         <div className="flex items-center gap-1 -ml-0.5">
           {subjectCounts.length > 0 && (
             <SubjectFilterPopover
@@ -634,7 +644,40 @@ function ColumnHeaders({
         </div>
       </div>
       <div className="flex flex-col items-start gap-0.5">
-        <ColumnInfo label="Frequency" text="Frequency reflects either an express recurring reporting request or a report requested for a specific session that has, in practice, been requested recurrently at regular intervals. References to annual, biennial or triennial reporting do not prejudge future decisions by the relevant intergovernmental organ." />
+        <ColumnInfo
+          label="Frequency"
+          contentClassName="max-w-[min(60ch,calc(100vw-2rem))] max-h-[calc(100vh-4rem)] overflow-y-auto"
+          text={
+            <div className="space-y-2">
+              <p>
+                This reference to frequency of reporting includes
+                Secretary-General&rsquo;s reports submitted pursuant to the
+                following types of decisions of intergovernmental organs:
+              </p>
+              <ul className="list-disc space-y-1 pl-5">
+                <li>
+                  a decision which contains a standing request for a
+                  Secretary-General&rsquo;s report on an annual (or biennial,
+                  triennial, etc.) basis, and
+                </li>
+                <li>
+                  a decision which requests the Secretary-General to submit a
+                  report at a specific session (e.g. 80th session) but, as a
+                  matter of practice, the intergovernmental organ concerned
+                  has, in the past, requested a Secretary-General&rsquo;s
+                  report on the same subject recurrently at specific intervals.
+                </li>
+              </ul>
+              <p>
+                The reference to &ldquo;annual&rdquo;, &ldquo;biennial&rdquo;
+                or &ldquo;triennial&rdquo; in this table is not intended to
+                prejudge that the intergovernmental organ concerned would, in
+                the future, request the relevant reports on an annual,
+                biennial, or triennial basis.
+              </p>
+            </div>
+          }
+        />
         <div className="flex items-center gap-1 -ml-0.5">
           {filterOptions?.frequencies && filterOptions.frequencies.length > 0 && (
             <FrequencyFilterPopover

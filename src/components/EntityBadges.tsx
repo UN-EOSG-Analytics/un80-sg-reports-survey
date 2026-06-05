@@ -31,33 +31,11 @@ export interface EntityBadgesProps {
 // Helper Functions
 // =============================================================================
 
-// Get styling based on source reliability and role
-// Lead: solid blue border with blue background
-// Contributing: solid gray border with light gray background
-// Suggested: dotted blue border with blue tinted backgrounds (dark/mid/light based on reliability)
-function getEntityStyle(source: string, isConfirmed: boolean, role?: EntityRole): string {
-  if (isConfirmed) {
-    if (role === "lead") {
-      // Lead entities - blue accent
-      return "bg-blue-100 text-blue-800 border border-blue-500";
-    }
-    // Contributing entities - gray styling
+function getEntityStyle(_source: string, _isConfirmed: boolean, role?: EntityRole): string {
+  if (role === "contributing") {
     return "bg-gray-100 text-gray-800 border border-gray-400";
   }
-  
-  switch (source.toLowerCase()) {
-    case "dgacm":
-      // Most reliable - dark blue dotted border with blue background
-      return "bg-blue-50 text-blue-800 border border-dashed border-blue-600";
-    case "dri":
-      // Medium reliability - medium blue dotted border
-      return "bg-blue-50/70 text-blue-600 border border-dashed border-blue-400";
-    case "ai":
-      // Least reliable - light blue dotted border
-      return "bg-blue-50/50 text-blue-500 border border-dashed border-blue-300";
-    default:
-      return "bg-gray-50 text-gray-600 border border-dashed border-gray-300";
-  }
+  return "bg-blue-100 text-blue-800 border border-blue-500";
 }
 
 
@@ -164,21 +142,17 @@ function deduplicateEntities(
     }
   }
   
-  // Sort by reliability: lead first, then contributing, then dgacm, dri, ai
   result.sort((a, b) => {
-    // Lead always comes first
+    const aContrib = a.role === "contributing" ? 1 : 0;
+    const bContrib = b.role === "contributing" ? 1 : 0;
+    if (aContrib !== bContrib) return aContrib - bContrib;
+
     if (a.role === "lead" && b.role !== "lead") return -1;
     if (a.role !== "lead" && b.role === "lead") return 1;
-    
-    // Then contributing
-    if (a.role === "contributing" && !b.isConfirmed) return -1;
-    if (!a.isConfirmed && b.role === "contributing") return 1;
-    
-    // Then other confirmed
+
     if (a.isConfirmed && !b.isConfirmed) return -1;
     if (!a.isConfirmed && b.isConfirmed) return 1;
-    
-    // Then sort by source priority
+
     const priorityA = SOURCE_PRIORITY[a.source.toLowerCase()] ?? 99;
     const priorityB = SOURCE_PRIORITY[b.source.toLowerCase()] ?? 99;
     return priorityA - priorityB;

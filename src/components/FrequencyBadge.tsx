@@ -31,23 +31,11 @@ function formatFrequency(frequency: string): string {
   return frequency.replace(/-/g, " ");
 }
 
-// Get styling based on confirmation status
-// Confirmed: solid gray border with light gray background (same as confirmed entities)
-// Calculated: dotted blue border with blue tinted background (auto-derived, might be flawed)
-function getFrequencyStyle(isConfirmed: boolean, isOneTime: boolean): string {
+function getFrequencyStyle(isConfirmed: boolean): string {
   if (isConfirmed) {
-    // Confirmed frequency - solid border
-    if (isOneTime) {
-      return "bg-gray-100 text-gray-500 border border-gray-300";
-    }
     return "bg-gray-100 text-gray-800 border border-gray-400";
   }
-  
-  // Calculated/auto-derived - dotted border (might be flawed)
-  if (isOneTime) {
-    return "bg-gray-50 text-gray-400 border border-dashed border-gray-300";
-  }
-  return "bg-blue-50 text-blue-700 border border-dashed border-blue-400";
+  return "bg-gray-100 text-gray-800 border border-dashed border-gray-400";
 }
 
 // =============================================================================
@@ -67,8 +55,7 @@ export function FrequencyBadge({
   }
   
   const isConfirmed = !!confirmedFrequency;
-  const isOneTime = frequency.toLowerCase() === "one-time";
-  const style = getFrequencyStyle(isConfirmed, isOneTime);
+  const style = getFrequencyStyle(isConfirmed);
   
   const sizeClasses = size === "xs" 
     ? "px-1.5 py-0.5 text-[10px]" 

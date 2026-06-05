@@ -179,7 +179,7 @@ export default function HomePage() {
               <FeatureCard
                 icon={FileText}
                 title="Browse All Reports"
-                description="Search by symbol or title; filter by body, year, subject, entity, or frequency."
+                description="Search by symbol or title; filter by body, year, entity, subjects or frequency."
               >
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-2 py-1">
@@ -199,7 +199,7 @@ export default function HomePage() {
               <FeatureCard
                 icon={BarChart3}
                 title="Publication History"
-                description="See when each version in a report series was actually published."
+                description="View the publication pattern for this report title, based on when the current and previous versions were published each quarter."
               >
                 <MockPublicationPattern />
               </FeatureCard>
@@ -207,7 +207,7 @@ export default function HomePage() {
               <FeatureCard
                 icon={Quote}
                 title="Mandate Source"
-                description="Find the official resolution that mandates each report, when available from UN Digital Library."
+                description="Find the resolution or decision identified as the source of the reporting mandate, based on United Nations Digital Library metadata where available."
               >
                 <MockMandateParagraph />
               </FeatureCard>
@@ -215,7 +215,7 @@ export default function HomePage() {
               <FeatureCard
                 icon={GitMerge}
                 title="Similar Reports"
-                description="Find reports on related topics, even when they use different wording or come from different bodies."
+                description="Find reports with similar or related topics, including reports from different sessions or intergovernmental bodies."
               >
                 <div className="space-y-1.5">
                   <MockSimilarReport

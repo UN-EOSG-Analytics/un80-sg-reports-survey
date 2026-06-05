@@ -451,7 +451,7 @@ function PublicationPattern({
       <div className="flex items-center justify-between mb-2">
         <span className="flex items-center gap-2">
           <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-            Reporting Pattern
+            Publication History
           </span>
           {frequencyBadge}
         </span>
@@ -459,6 +459,10 @@ function PublicationPattern({
           {versions.length} versions
         </span>
       </div>
+      <p className="text-sm leading-relaxed text-gray-600">
+        Publication pattern for this report title, based on when the current
+        and previous versions were published each quarter.
+      </p>
       <div className="flex gap-2">
         {displayYears.map((year) => {
           const quarters = versionMap.get(year);
@@ -765,8 +769,21 @@ export function ReportSidebar({
               return (
                 <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
                   <h3 className="mb-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Mandating Paragraphs
+                    Mandate Source &amp; Operative Paragraphs
                   </h3>
+
+                  {hasMandates && (
+                    <p className="mb-3 text-sm leading-relaxed text-gray-600">
+                      The mandate source and the relevant paragraph identified
+                      as requesting the Secretary-General&rsquo;s report. The
+                      mandating paragraphs are extracted using AI and have not
+                      been manually verified, to identify operative paragraphs
+                      that request, invite or decide that the Secretary-General
+                      submit a report. The extraction is provided as a
+                      reference aid and should be checked against the official
+                      document for authoritative use.
+                    </p>
+                  )}
 
                   {!hasResolutions ? (
                     <p className="text-sm leading-relaxed text-gray-500 italic">
@@ -775,8 +792,7 @@ export function ReportSidebar({
                     </p>
                   ) : (
                     <p className="text-sm leading-relaxed text-gray-600">
-                      Mandate source{uniqueSources.length > 1 ? "s" : ""}{" "}
-                      according to Digital Library metadata:{" "}
+                      Source{uniqueSources.length > 1 ? "s" : ""}:{" "}
                       {uniqueSources.map((sym, i) => (
                         <span key={sym}>
                           {i > 0 && ", "}
@@ -802,10 +818,6 @@ export function ReportSidebar({
 
                   {hasMandates && (
                     <div className="mt-4 space-y-2">
-                      <p className="text-sm leading-relaxed text-gray-600">
-                        Potentially matching paragraphs according to AI analysis
-                        (unverified):
-                      </p>
                       <details className="group text-xs text-gray-500">
                         <summary className="cursor-pointer select-none hover:text-gray-700 list-none flex items-center gap-1">
                           <ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" />
@@ -912,9 +924,11 @@ Guidelines:
                   </span>
                 </div>
                 <p className="text-sm leading-relaxed text-gray-600">
-                  Downloads of this report in all six official languages from
-                  the UN Digital Library; this does not include
-                  downloads via the UN Official Document System.
+                  Downloads refer to total download counts after adding up
+                  those counts of a report in each official language, as
+                  displayed on the United Nations Digital Library webpage; do
+                  not include those from the United Nations Official Document
+                  System.
                 </p>
                 {downloadStatsLoading && !downloadStats ? (
                   <div className="flex items-center gap-2 text-sm text-gray-400 h-20">
@@ -935,10 +949,18 @@ Guidelines:
                 Similar Reports {!similarLoading && similar.length > 0 && `(${similar.length})`}
               </h3>
               <p className="text-sm leading-relaxed text-gray-600">
-                Reports are ranked by topical similarity to this one, using
-                vector embeddings of each report&apos;s title, subjects, and
-                opening text. Higher scores reflect closer subject matter and
-                framing, not verbatim content overlap.
+                Similar reports are identified using an automated similarity
+                analysis supported by a large language model. Values reflect
+                the relationship between the reports&rsquo; topics and framing
+                rather than verbatim text overlap; higher values indicate a
+                closer topical relationship.
+              </p>
+              <p className="text-sm leading-relaxed text-gray-600">
+                These results are generated without human verification and are
+                provided only as a reference aid. They do not constitute an
+                official assessment or endorsement by the United Nations.
+                Please consult the official documents for authoritative
+                reference.
               </p>
               <SimilarReportsGrid
                 similar={similar}

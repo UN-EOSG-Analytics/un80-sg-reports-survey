@@ -613,7 +613,7 @@ function ColumnHeaders({
         </div>
       </div>
       <div className="flex flex-col items-start gap-0.5">
-        <span>Entity</span>
+        <ColumnInfo label="Entity" text="Entity identifies the entity recorded as the lead authoring entity for the report, based on internal UN Secretariat information, when available." />
         <div className="flex items-center gap-1 -ml-0.5">
           {filterOptions?.entities && filterOptions.entities.length > 0 && (
             <CountFilterPopover
@@ -690,7 +690,7 @@ function ColumnHeaders({
         </div>
       </div>
       <div className="flex flex-col items-end gap-0.5">
-        <ColumnInfo label="DL Downloads" text="Total downloads of the report in all six official languages from the UN Digital Library; does not include downloads via the UN Official Document System." />
+        <ColumnInfo label="Downloads" text="Downloads refer to total download counts after adding up those counts of a report in each official language, as displayed on the United Nations Digital Library webpage; do not include those from the United Nations Official Document System." />
         <div className="flex items-center gap-1 -mr-0.5">
           <SortArrow column="downloads" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
         </div>
@@ -766,7 +766,6 @@ function ReportRow({
           suggestions={report.suggestions}
           confirmedEntities={report.confirmedEntities}
           leadEntities={report.leadEntities}
-          contributingEntities={report.contributingEntities}
           maxVisible={2}
           size="xs"
         />

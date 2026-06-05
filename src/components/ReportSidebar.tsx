@@ -435,9 +435,7 @@ function PublicationPattern({
   const years = versions.map((v) => v.year).filter((y): y is number => y !== null);
   if (years.length === 0) return null;
 
-  const maxYear = Math.max(...years);
-  const minDisplayYear = maxYear - 5;
-  const displayYears = Array.from({ length: 6 }, (_, i) => minDisplayYear + i);
+  const displayYears = [2023, 2024, 2025];
 
   const versionMap = new Map<number, Set<number>>();
   versions.forEach((v) => {

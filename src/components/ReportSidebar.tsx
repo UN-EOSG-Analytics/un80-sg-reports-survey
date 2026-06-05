@@ -160,8 +160,8 @@ function sortSubjectsByFrequency(
 
 function SubjectPill({ subject, size = "xs" }: { subject: string; size?: "xs" | "sm" }) {
   const sizeClasses = size === "xs"
-    ? "px-1.5 py-0.5 text-[10px]"
-    : "px-2 py-0.5 text-xs";
+    ? "px-2 py-0.5 text-xs"
+    : "px-2.5 py-0.5 text-sm";
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full font-medium whitespace-nowrap border border-gray-200 bg-white text-gray-700 ${sizeClasses}`}
@@ -205,7 +205,7 @@ function VersionRow({ v }: { v: Version }) {
 
   return (
     <div className="flex items-center gap-2 py-1.5">
-      <span className="text-[11px] text-gray-500 w-20 flex-shrink-0">
+      <span className="text-xs text-gray-500 w-20 flex-shrink-0">
         {formattedDate}
       </span>
       <span className="text-xs font-medium text-gray-900 min-w-0 truncate flex-1">
@@ -213,7 +213,7 @@ function VersionRow({ v }: { v: Version }) {
       </span>
       <div className="flex items-center gap-1.5 flex-shrink-0">
         {formattedWordCount && (
-          <span className="text-[10px] text-gray-400" title="Word count">
+          <span className="text-xs text-gray-400" title="Word count">
             {formattedWordCount} words
           </span>
         )}
@@ -221,18 +221,18 @@ function VersionRow({ v }: { v: Version }) {
           href={buildODSLink(v.symbol)}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium text-un-blue bg-blue-50 rounded hover:bg-blue-100 transition-colors"
+          className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium text-un-blue bg-blue-50 rounded hover:bg-blue-100 transition-colors"
         >
-          <FileText className="h-2.5 w-2.5" />
+          <FileText className="h-3 w-3" />
           PDF
         </a>
         <a
           href={buildDLLink(v.symbol)}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 transition-colors"
+          className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 transition-colors"
         >
-          <Search className="h-2.5 w-2.5" />
+          <Search className="h-3 w-3" />
           Digital Library
         </a>
       </div>
@@ -312,7 +312,7 @@ function DownloadChart({ stats }: { stats: DownloadStats }) {
         {languages.map((lang) => (
           <span
             key={lang}
-            className="inline-flex items-center gap-1 text-[10px] text-gray-600"
+            className="inline-flex items-center gap-1 text-[11px] text-gray-600"
           >
             <span
               className="inline-block h-2 w-2 rounded-sm"
@@ -370,7 +370,7 @@ function DownloadChart({ stats }: { stats: DownloadStats }) {
         </div>
         {hovered && (
           <div
-            className="pointer-events-none absolute -top-1 z-10 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[10px] shadow-md"
+            className="pointer-events-none absolute -top-1 z-10 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md border border-gray-200 bg-white px-2 py-1.5 text-[11px] shadow-md"
             style={{ left: `${tooltipLeftPct}%` }}
           >
             <div className="mb-1 flex items-baseline gap-3">
@@ -405,7 +405,7 @@ function DownloadChart({ stats }: { stats: DownloadStats }) {
           </div>
         )}
       </div>
-      <div className="relative h-3 w-full text-[9px] text-gray-400">
+      <div className="relative h-4 w-full text-[11px] text-gray-400">
         {yearTicks.map((t) => (
           <span
             key={t.year}
@@ -531,8 +531,8 @@ function SimilarReportsGrid({
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-xs text-gray-400 h-10">
-        <Loader2 className="h-3 w-3 animate-spin" />
+      <div className="flex items-center gap-2 text-sm text-gray-400 h-10">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
         Finding similar...
       </div>
     );
@@ -540,7 +540,7 @@ function SimilarReportsGrid({
 
   if (error || similar.length === 0) {
     return (
-      <p className="text-xs text-gray-400 h-10 flex items-center">
+      <p className="text-sm text-gray-400 h-10 flex items-center">
         {error || "No similar reports found"}
       </p>
     );
@@ -565,7 +565,7 @@ function SimilarReportsGrid({
             <Tooltip>
               <TooltipTrigger asChild>
                 <span
-                  className="text-[10px] font-medium px-1.5 py-0.5 rounded cursor-help"
+                  className="text-[11px] font-medium px-1.5 py-0.5 rounded cursor-help"
                   style={{
                     backgroundColor: `rgba(0, 0, 0, ${0.05 + Math.max(0, (r.similarity - 0.7) / 0.3) * 0.25})`,
                     color: `rgba(0, 0, 0, ${0.4 + Math.max(0, (r.similarity - 0.7) / 0.3) * 0.5})`,
@@ -578,10 +578,10 @@ function SimilarReportsGrid({
                 <p className="text-xs">Similarity score (0–100%). Typical matches fall between 70% and 85%. Scores below 70% suggests only loose thematic overlap.</p>
               </TooltipContent>
             </Tooltip>
-            <span className="text-[11px] font-medium text-un-blue">{r.symbol}</span>
-            <span className="text-[11px] text-gray-400">{r.year ?? "—"}</span>
+            <span className="text-xs font-medium text-un-blue">{r.symbol}</span>
+            <span className="text-xs text-gray-400">{r.year ?? "—"}</span>
             {r.entity && (
-              <span className="text-[10px] text-gray-400 truncate">{r.entity}</span>
+              <span className="text-xs text-gray-400 truncate min-w-0">{r.entity}</span>
             )}
           </div>
         </button>
@@ -702,7 +702,7 @@ export function ReportSidebar({
                 />
               </div>
               <h2
-                className="text-sm font-medium text-gray-900 leading-snug line-clamp-2"
+                className="text-base font-medium text-gray-900 leading-snug line-clamp-2"
                 title={displayTitle}
               >
                 {displayTitle}
@@ -771,12 +771,12 @@ export function ReportSidebar({
                   </h3>
 
                   {!hasResolutions ? (
-                    <p className="text-xs leading-relaxed text-gray-500 italic">
+                    <p className="text-sm leading-relaxed text-gray-500 italic">
                       No mandating resolution is recorded for this report in
                       the Digital Library metadata.
                     </p>
                   ) : (
-                    <p className="text-xs leading-relaxed text-gray-600">
+                    <p className="text-sm leading-relaxed text-gray-600">
                       Mandate source{uniqueSources.length > 1 ? "s" : ""}{" "}
                       according to Digital Library metadata:{" "}
                       {uniqueSources.map((sym, i) => (
@@ -786,7 +786,7 @@ export function ReportSidebar({
                             href={buildDLLink(sym)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-block rounded bg-blue-50 px-1.5 py-0.5 text-[11px] font-medium text-un-blue hover:bg-blue-100 transition-colors"
+                            className="inline-block rounded bg-blue-50 px-1.5 py-0.5 text-xs font-medium text-un-blue hover:bg-blue-100 transition-colors"
                           >
                             {sym}
                           </a>
@@ -796,15 +796,15 @@ export function ReportSidebar({
                   )}
 
                   {hasResolutions && !hasMandates && (
-                    <p className="mt-3 text-xs leading-relaxed text-gray-500 italic">
-                      No operative paragraph could be extracted from{" "}
+                    <p className="mt-3 text-sm leading-relaxed text-gray-500 italic">
+                      No relevant operative paragraph could be extracted from{" "}
                       {uniqueSources.length > 1 ? "these resolutions" : "this resolution"}.
                     </p>
                   )}
 
                   {hasMandates && (
                     <div className="mt-4 space-y-2">
-                      <p className="text-xs leading-relaxed text-gray-600">
+                      <p className="text-sm leading-relaxed text-gray-600">
                         Potentially matching paragraphs according to AI analysis
                         (unverified):
                       </p>
@@ -816,7 +816,7 @@ export function ReportSidebar({
                           rel="noopener noreferrer"
                           className="block rounded-md border border-gray-200 bg-white p-2.5 space-y-1.5 hover:border-un-blue hover:bg-blue-50/40 transition-colors"
                         >
-                          <p className="text-xs text-gray-700 italic">
+                          <p className="text-sm leading-relaxed text-gray-700 italic">
                             {mandate.verbatim_paragraph ? (
                               <>&quot;{mandate.verbatim_paragraph}&quot;</>
                             ) : mandate.summary ? (
@@ -824,7 +824,7 @@ export function ReportSidebar({
                             ) : null}
                           </p>
                           {showMultiSource && (
-                            <p className="text-[10px] text-gray-400">
+                            <p className="text-[11px] text-gray-400">
                               from {resSymbol}
                             </p>
                           )}
@@ -886,24 +886,24 @@ export function ReportSidebar({
                       {report.downloadCount.toLocaleString()}
                     </span>
                   </span>
-                  <span className="text-[10px] text-gray-400">
+                  <span className="text-xs text-gray-400">
                     monthly, by language
                   </span>
                 </div>
-                <p className="text-xs leading-relaxed text-gray-600">
+                <p className="text-sm leading-relaxed text-gray-600">
                   Downloads of this report in all six official languages from
-                  the United Nations Digital Library; this does not include
-                  downloads via the United Nations Official Document System.
+                  the UN Digital Library; this does not include
+                  downloads via the UN Official Document System.
                 </p>
                 {downloadStatsLoading && !downloadStats ? (
-                  <div className="flex items-center gap-2 text-xs text-gray-400 h-20">
-                    <Loader2 className="h-3 w-3 animate-spin" />
+                  <div className="flex items-center gap-2 text-sm text-gray-400 h-20">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     Loading download history...
                   </div>
                 ) : downloadStats ? (
                   <DownloadChart stats={downloadStats} />
                 ) : (
-                  <p className="text-xs text-gray-400">No download history available.</p>
+                  <p className="text-sm text-gray-400">No download history available.</p>
                 )}
               </div>
             )}
@@ -913,7 +913,7 @@ export function ReportSidebar({
               <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Similar Reports {!similarLoading && similar.length > 0 && `(${similar.length})`}
               </h3>
-              <p className="text-xs leading-relaxed text-gray-600">
+              <p className="text-sm leading-relaxed text-gray-600">
                 Reports are ranked by topical similarity to this one, using
                 vector embeddings of each report&apos;s title, subjects, and
                 opening text. Higher scores reflect closer subject matter and

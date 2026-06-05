@@ -29,9 +29,9 @@ function FeatureCard({
           <div className="flex h-7 w-7 items-center justify-center rounded-md bg-un-blue/10">
             <Icon className="h-3.5 w-3.5 text-un-blue" />
           </div>
-          <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+          <h3 className="text-base font-semibold text-gray-900">{title}</h3>
         </div>
-        <p className="text-xs leading-relaxed text-gray-600">{description}</p>
+        <p className="text-sm leading-relaxed text-gray-600">{description}</p>
       </div>
       {false && children && (
         <div className="flex flex-1 items-center border-t border-gray-100 p-3">

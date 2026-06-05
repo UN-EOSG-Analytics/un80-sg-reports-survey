@@ -690,7 +690,7 @@ function ColumnHeaders({
         </div>
       </div>
       <div className="flex flex-col items-end gap-0.5">
-        <ColumnInfo label="DL Downloads" text="Total downloads of the report in all six official languages from the United Nations Digital Library; does not include downloads via the United Nations Official Document System." />
+        <ColumnInfo label="DL Downloads" text="Total downloads of the report in all six official languages from the UN Digital Library; does not include downloads via the UN Official Document System." />
         <div className="flex items-center gap-1 -mr-0.5">
           <SortArrow column="downloads" sortColumn={sortColumn} sortDirection={sortDirection} onSort={onSort} />
         </div>

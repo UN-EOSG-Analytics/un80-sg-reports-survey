@@ -99,8 +99,8 @@ export async function GET(req: NextRequest) {
   const sortDirectionParam = req.nextUrl.searchParams.get("sortDirection");
   const sortDirection = sortDirectionParam === "desc" ? "DESC" : "ASC";
 
-  const currentYear = new Date().getFullYear();
-  const SURVEY_YEARS = Array.from({ length: currentYear - 2023 + 1 }, (_, i) => 2023 + i);
+  const MAX_YEAR = 2025;
+  const SURVEY_YEARS = Array.from({ length: MAX_YEAR - 2023 + 1 }, (_, i) => 2023 + i);
 
   if (symbol) {
     const reports = await query<SingleReportRow>(
@@ -316,6 +316,7 @@ export async function GET(req: NextRequest) {
           FROM ${DB_SCHEMA}.sg_reports r
           WHERE ${whereClause}
         ) sub
+        WHERE sub.effective_year IS NULL OR sub.effective_year < ${MAX_YEAR + 1}
         GROUP BY sub.proper_title, sub.normalized_body
         ${havingClause}
       )
@@ -364,6 +365,7 @@ export async function GET(req: NextRequest) {
           FROM ${DB_SCHEMA}.sg_reports r
           WHERE ${whereClause}
         ) sub
+        WHERE sub.effective_year IS NULL OR sub.effective_year < ${MAX_YEAR + 1}
         GROUP BY sub.proper_title, sub.normalized_body
         ${havingClause}
       )

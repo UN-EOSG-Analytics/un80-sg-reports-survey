@@ -1,5 +1,5 @@
 // App namespace/schema for database tables
-export const DB_SCHEMA = process.env.DB_SCHEMA || "app";
+export const DB_SCHEMA = process.env.DB_SCHEMA || "sg_reports_survey";
 
 // Table names with schema prefix
 export const tables = {

@@ -1,5 +1,6 @@
 import { query } from "./db";
 import { chatQuery } from "./db-chat";
+import { DB_SCHEMA } from "./config";
 
 // Tool definitions for the AI
 export const tools = [
@@ -69,9 +70,10 @@ export async function readDocument(symbol: string): Promise<ToolResult> {
       subject_terms: string[] | null;
       based_on_resolution_symbols: string[] | null;
     }>(
-      `SELECT symbol, proper_title, title, text, date_year, publication_date, 
+      // Use schema-qualified table name to avoid search_path dependency
+      `SELECT symbol, proper_title, title, text, date_year, publication_date,
               un_body, word_count, subject_terms, based_on_resolution_symbols
-       FROM documents 
+       FROM ${DB_SCHEMA}.documents
        WHERE symbol = $1
        LIMIT 1`,
       [symbol]
@@ -114,6 +116,7 @@ const FORBIDDEN_TABLES = [
   "sessions",
   "ai_chat_logs",        // Contains all users' chat history
   "ai_chat_sessions",    // Aggregated chat data from all users
+  "information_schema",  // Leaks table/column metadata for entire database
 ];
 
 // SQL query safety check
@@ -163,9 +166,6 @@ function isQuerySafe(sql: string): { safe: boolean; error?: string } {
     }
   }
 
-  // That's it! The database's grant system will handle everything else.
-  // No need to parse table aliases, CTEs, or check allowed tables -
-  // the chat_readonly user simply won't have access to unauthorized tables.
   return { safe: true };
 }
 

@@ -1,14 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { DB_SCHEMA } from "@/lib/config";
 
-const DB_SCHEMA = process.env.DB_SCHEMA || "sg_reports_survey";
+const VALID_STATUSES = ["continue", "merge", "discontinue"] as const;
+const VALID_FREQUENCIES = [
+  "multiple-per-year",
+  "annual",
+  "biennial",
+  "triennial",
+  "quadrennial",
+  "one-time",
+] as const;
+const VALID_FORMATS = [
+  "shorter",
+  "oral",
+  "dashboard",
+  "other",
+  "no-change",
+] as const;
+const COMMENTS_MAX_LENGTH = 5000;
+
+type SurveyStatus = (typeof VALID_STATUSES)[number];
 
 interface SurveyResponseInput {
   properTitle: string;
   normalizedBody?: string | null;
   latestSymbol: string;
-  status: "continue" | "merge" | "discontinue";
+  status: SurveyStatus;
   frequency?: string | null;
   format?: string | null;
   formatOther?: string | null;
@@ -189,9 +208,39 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!["continue", "merge", "discontinue"].includes(body.status)) {
+    if (!(VALID_STATUSES as readonly string[]).includes(body.status)) {
       return NextResponse.json(
-        { error: "Invalid status value" },
+        { error: `Invalid status value. Must be one of: ${VALID_STATUSES.join(", ")}` },
+        { status: 400 }
+      );
+    }
+
+    // Validate frequency if provided
+    if (
+      body.frequency != null &&
+      !(VALID_FREQUENCIES as readonly string[]).includes(body.frequency)
+    ) {
+      return NextResponse.json(
+        { error: `Invalid frequency value. Must be one of: ${VALID_FREQUENCIES.join(", ")}` },
+        { status: 400 }
+      );
+    }
+
+    // Validate format if provided
+    if (
+      body.format != null &&
+      !(VALID_FORMATS as readonly string[]).includes(body.format)
+    ) {
+      return NextResponse.json(
+        { error: `Invalid format value. Must be one of: ${VALID_FORMATS.join(", ")}` },
+        { status: 400 }
+      );
+    }
+
+    // Validate comments length
+    if (body.comments && body.comments.length > COMMENTS_MAX_LENGTH) {
+      return NextResponse.json(
+        { error: `Comments must not exceed ${COMMENTS_MAX_LENGTH} characters` },
         { status: 400 }
       );
     }

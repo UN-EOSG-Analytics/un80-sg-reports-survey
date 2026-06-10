@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { ReportsTable } from "./SGReportsList";
+import { ProgressBar } from "./ProgressBar";
 import { Info } from "lucide-react";
 import Link from "next/link";
 
@@ -33,6 +34,9 @@ export function EntityDashboard({ entity, userName, userRole = "user" }: Props) 
           Manage your entity&apos;s SG reports and provide feedback
         </p>
       </div>
+
+      {/* Survey Progress Bar */}
+      <ProgressBar />
 
       {/* Instructions Banner */}
       <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">

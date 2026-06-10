@@ -1032,11 +1032,31 @@ function ReportRow({
                 </TooltipContent>
               </Tooltip>
             </div>
-          ) : isConfirmedByEntity ? (
+          ) : isConfirmedByEntity && report.confirmedFrequency?.toLowerCase() !== "one-time" ? (
+            // Bug fix (docs/TODO.md #2): hide "Go to survey" when the report
+            // frequency has been confirmed as one-time. Such reports are
+            // considered fully resolved by the frequency confirmation step
+            // alone and do not require a survey form submission.
             <span className="inline-flex items-center justify-center gap-1.5 h-7 w-[148px] rounded border border-blue-200 bg-blue-50 px-3 text-xs font-medium text-un-blue whitespace-nowrap hover:bg-blue-100 transition-colors">
               Go to survey
               <ArrowRight className="h-3 w-3 flex-shrink-0" />
             </span>
+          ) : isConfirmedByEntity && report.confirmedFrequency?.toLowerCase() === "one-time" ? (
+            // One-time confirmed — no survey form needed; show as complete
+            <div className="inline-flex h-7 w-[148px]">
+              <span className="inline-flex items-center gap-1.5 rounded-l border border-r-0 border-gray-200 bg-gray-50 px-2.5 text-xs font-medium text-gray-500 flex-1">
+                <Check className="h-3 w-3 flex-shrink-0" />
+                <span className="truncate">One-time</span>
+              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-r border border-gray-200 bg-gray-50 text-gray-400 flex-shrink-0">
+                    <Minus className="h-3.5 w-3.5" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>Confirmed as one-time — no survey required</TooltipContent>
+              </Tooltip>
+            </div>
           ) : (
             <span className="inline-flex items-center justify-center h-7 w-[148px] rounded border border-gray-200 bg-gray-50 px-3 text-xs text-gray-400 whitespace-nowrap">
               Not completed
@@ -1543,13 +1563,25 @@ export function ReportsTable({
   // Debounced text inputs
   const [searchInput, setSearchInput] = useState("");
   
-  // Fetch user's survey responses
+  // Fetch survey responses for the "Survey" column.
+  //
+  // Bug fix (docs/TODO.md #1): in entity mode ("my"), the column should reflect
+  // whether *anyone* in the entity has responded — not just the logged-in user.
+  // Using /entity-responses here ensures a colleague's submission is also shown
+  // as "Completed" rather than "Go to survey".
+  //
+  // For global mode ("all") we keep per-user responses so the status icon
+  // correctly shows this user's own recommendation.
   useEffect(() => {
-    fetch("/api/survey-responses/my-responses")
+    const endpoint =
+      mode === "my"
+        ? "/api/survey-responses/entity-responses"
+        : "/api/survey-responses/my-responses";
+    fetch(endpoint)
       .then((r) => r.json())
       .then((data) => setSurveyResponses(data.responses || {}))
       .catch(() => {});
-  }, []);
+  }, [mode]);
 
   const limit = 50;
 
@@ -1914,8 +1946,12 @@ export function ReportsTable({
         userEmail={userEmail}
         onDataChanged={onDataChanged}
         onSave={() => {
-          // Refetch survey responses after save
-          fetch("/api/survey-responses/my-responses")
+          // Refetch survey responses after save (same source as initial load)
+          const endpoint =
+            mode === "my"
+              ? "/api/survey-responses/entity-responses"
+              : "/api/survey-responses/my-responses";
+          fetch(endpoint)
             .then((r) => r.json())
             .then((data) => setSurveyResponses(data.responses || {}))
             .catch(() => {});

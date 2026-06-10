@@ -2,6 +2,18 @@
 -- Stores user-confirmed frequencies for reports
 -- Note: Confirmations are now keyed by (proper_title, normalized_body) to separate
 -- different UN bodies (GA, ECOSOC, etc.) that may have the same report title
+--
+-- KNOWN LIMITATION (docs/TODO.md #3 — Multi-entity edge case):
+-- This table does NOT have a per-entity column in the unique constraint.
+-- The unique constraint is UNIQUE (proper_title, normalized_body), meaning only
+-- one frequency confirmation can exist per report+body combination across all entities.
+-- When two different entities both confirm the same report as "one-time", the second
+-- write overwrites the first's `confirmed_by_user_id` and `confirmed_at` metadata —
+-- effectively stealing credit from the first entity.
+-- To fix properly, add an `entity TEXT` column and change the constraint to
+-- UNIQUE (proper_title, normalized_body, entity). This requires a schema migration
+-- and changes to the query in src/app/api/sg-reports/route.ts that reads confirmed_frequency.
+-- Do NOT apply this migration without first reviewing all queries that join on this table.
 
 -- Migration: Drop and recreate to add normalized_body column
 DROP TABLE IF EXISTS sg_reports_survey.report_frequency_confirmations;

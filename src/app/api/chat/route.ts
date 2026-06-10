@@ -239,7 +239,18 @@ export async function POST(request: Request) {
     let { messages } = body;
     const { initialPrompt, sessionId, interactionIndex } = body;
 
-    // Get userId from session cookie (server-side auth)
+    // SECURITY NOTE: The middleware (src/proxy.ts) allows all /api/ routes through
+    // without session verification. This chat endpoint therefore relies entirely on
+    // the `query_database` tool's safeguards (keyword blocklist + chat_readonly DB
+    // role) to prevent abuse. If stricter access control is needed, add a session
+    // check here and return 401 when getSession() returns null.
+    //
+    // The query_database tool uses a dedicated restricted database connection
+    // (CHAT_READONLY_DATABASE_URL / chat_readonly role) — see sql/create_chat_user.sql.
+    // That role's GRANTs are the primary security boundary. Ensure it has SELECT
+    // only on the tables listed in the system prompt and nothing else.
+
+    // Get userId from session cookie for logging (not auth enforcement)
     const session = await getSession();
     const userId = session?.userId || undefined;
 

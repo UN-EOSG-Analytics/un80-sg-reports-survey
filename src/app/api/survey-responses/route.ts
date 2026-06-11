@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-
-const DB_SCHEMA = process.env.DB_SCHEMA || "sg_reports_survey";
+import { DB_SCHEMA } from "@/lib/config";
 
 interface SurveyResponseInput {
   properTitle: string;

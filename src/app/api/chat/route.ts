@@ -1,6 +1,6 @@
 import { tools, executeTool } from "@/lib/chat-tools";
 import { logChatInteraction } from "@/lib/chat-logger";
-import { getSession } from "@/lib/auth";
+import { getSession, getCurrentUser } from "@/lib/auth";
 
 // Azure AI Foundry configuration
 function getEndpoint() {
@@ -93,50 +93,14 @@ WHERE lv.embedding IS NOT NULL
   AND lv.symbol != 'A/78/123'
 ORDER BY lv.embedding <=> s.embedding
 LIMIT 5;
-
--- Find resolutions that mandate a specific report
-SELECT rm.resolution_symbol, rm.resolution_title, rm.resolution_year
-FROM sg_report_mandates rm
-WHERE rm.report_symbol = 'A/78/123';
-
--- Or use the array directly
-SELECT symbol, proper_title, based_on_resolution_symbols
-FROM documents
-WHERE symbol = 'A/78/123' AND based_on_resolution_symbols IS NOT NULL;
-
--- Find all reports mandated by a resolution
-SELECT rm.report_symbol, rm.report_title, rm.report_year
-FROM sg_report_mandates rm
-WHERE rm.resolution_symbol = 'A/RES/78/1';
-
--- Get AI-extracted mandate details (supplementary - prefer read_document for accuracy)
-SELECT resolution_symbol, summary, explicit_frequency, verbatim_paragraph
-FROM resolution_mandates
-WHERE resolution_symbol = 'A/RES/78/1';
 \`\`\`
 
 ## Common Tasks
 - **Summarize a report**: Use read_document to get full text, then summarize key points
-- **Compare reports/versions**: ALWAYS use read_document on BOTH documents to compare actual content, not just SQL metadata. Present differences in a table.
-- **Find similar reports**: Use vector search query with \`<=>\` operator to find semantically similar reports based on content embeddings (not just metadata)
-- **Find mandating resolutions**: 
-  1. Query sg_report_mandates view OR documents.based_on_resolution_symbols array
-  2. Optionally join with resolution_mandates for extracted mandate paragraphs and frequency analysis
-  3. Use read_document on resolution symbols to read the full resolution text (often more reliable than resolution_mandates table)
-  4. Note: Database only contains resolutions that are referenced by reports, not all UN resolutions
-- **Find reports by topic**: Query with subject_terms or title ILIKE
-
-## Important: Content vs Metadata
-- SQL queries only return metadata (title, date, symbol, subject_terms)
-- To analyze or compare actual report CONTENT, you MUST use read_document
-- When user asks to "compare", "summarize", "what does it say", or "differences" → read the document(s)
-
-## Multi-Step Workflows
-You can chain multiple tool calls in sequence. Examples:
-- Query SQL to find relevant reports → read_document on top results → summarize findings
-- Read a report → query SQL to find related reports → read those too → compare
-- Query for reports by topic → read several → synthesize insights across them
-Don't hesitate to make multiple tool calls to fully answer the user's question.`;
+- **Compare reports/versions**: ALWAYS use read_document on BOTH documents to compare actual content, not just SQL metadata.
+- **Find similar reports**: Use vector search query with \`<=>\` operator
+- **Find mandating resolutions**: Query sg_report_mandates view OR documents.based_on_resolution_symbols array
+- **Find reports by topic**: Query with subject_terms or title ILIKE`;
 
 // Message types
 interface ChatMessage {
@@ -156,7 +120,6 @@ interface ChatRequest {
   initialPrompt?: string;
   sessionId?: string;
   interactionIndex?: number;
-  // Note: userId is extracted server-side from session cookie, not from request body
 }
 
 // SSE event types
@@ -234,14 +197,24 @@ async function* streamChatCompletion(messages: ChatMessage[]) {
 }
 
 export async function POST(request: Request) {
+  // Auth guard: the chat endpoint accesses document content and survey data.
+  // Require an authenticated session before processing any request.
+  const session = await getSession();
+  if (!session) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // Retrieve full user record for logging (userId already confirmed by session check above)
+  const user = await getCurrentUser();
+  const userId = user?.id;
+
   try {
     const body: ChatRequest = await request.json();
     let { messages } = body;
     const { initialPrompt, sessionId, interactionIndex } = body;
-
-    // Get userId from session cookie (server-side auth)
-    const session = await getSession();
-    const userId = session?.userId || undefined;
 
     // If there's an initial prompt (from URL params), add it as first user message
     if (initialPrompt && messages.length === 0) {
@@ -259,8 +232,8 @@ export async function POST(request: Request) {
         const userMessageTimestamp = new Date();
         let fullAiResponse = "";
         let aiResponseTimestamp: Date | undefined;
-        const toolsCalledLog: Array<{ name: string; args: any; timestamp: Date }> = [];
-        const toolResultsLog: Array<{ name: string; result: any; success: boolean; timestamp: Date }> = [];
+        const toolsCalledLog: Array<{ name: string; args: unknown; timestamp: Date }> = [];
+        const toolResultsLog: Array<{ name: string; result: unknown; success: boolean; timestamp: Date }> = [];
         let llmCallCount = 0;
         let errorOccurred = false;
         let errorMessage: string | undefined;

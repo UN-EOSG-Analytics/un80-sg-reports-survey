@@ -108,6 +108,9 @@ export async function readDocument(symbol: string): Promise<ToolResult> {
 }
 
 // Forbidden tables (auth/sensitive/private)
+// NOTE: The real security boundary is the chat_readonly DB role which has no
+// SELECT grant on these tables. This list is a defence-in-depth layer only.
+// The DB role is authoritative; this list is not exhaustive.
 const FORBIDDEN_TABLES = [
   "users",
   "magic_tokens",
@@ -116,9 +119,15 @@ const FORBIDDEN_TABLES = [
   "ai_chat_sessions",    // Aggregated chat data from all users
 ];
 
-// SQL query safety check
-// Simplified approach: block dangerous operations, check for forbidden tables,
-// and let the database handle all table-level access control
+// SQL query safety check.
+// Blocks dangerous DML/DDL keywords at the application layer as defence-in-depth.
+// The chat_readonly Postgres role is the authoritative security boundary —
+// it has no INSERT/UPDATE/DELETE/DDL grants on any table.
+//
+// NOTE: the "into" keyword was intentionally removed from the dangerous list
+// because `\binto\b` produces false positives on SELECT queries that contain
+// the English word "into" in ILIKE patterns or comments. The DB role prevents
+// INSERT INTO at the database level.
 function isQuerySafe(sql: string): { safe: boolean; error?: string } {
   const normalized = sql.trim().toLowerCase();
 
@@ -127,7 +136,7 @@ function isQuerySafe(sql: string): { safe: boolean; error?: string } {
     return { safe: false, error: "Only SELECT queries are allowed" };
   }
 
-  // Check for dangerous keywords
+  // Check for dangerous keywords (DML/DDL/privilege commands)
   const dangerous = [
     "insert",
     "update",
@@ -140,22 +149,30 @@ function isQuerySafe(sql: string): { safe: boolean; error?: string } {
     "revoke",
     "exec",
     "execute",
-    "into",
+    // "into" removed: causes false positives on valid SELECT queries that
+    // contain the English word "into". The DB role blocks INSERT INTO.
     "copy",
-    "pg_",
+    "pg_read_file",
+    "pg_write_file",
+    "pg_execute_server_program",
+    "lo_export",
+    "lo_import",
   ];
 
   for (const keyword of dangerous) {
-    // Check for keyword as whole word (with word boundaries)
-    const regex = new RegExp(`\\b${keyword}\\b`, "i");
+    // Use word-boundary regex for single-word keywords
+    const pattern = keyword.includes("_")
+      ? keyword // function names with underscores — match literally
+      : `\\b${keyword}\\b`;
+    const regex = new RegExp(pattern, "i");
     if (regex.test(sql)) {
       return { safe: false, error: `Query contains forbidden keyword: ${keyword}` };
     }
   }
 
-  // Check for explicitly forbidden tables (sensitive data)
-  // The database will enforce allowed tables via grants, but we block
-  // sensitive tables here for an extra safety layer
+  // Check for explicitly forbidden tables (sensitive data).
+  // The database will enforce access via grants, but we block
+  // sensitive tables here as an extra safety layer.
   for (const table of FORBIDDEN_TABLES) {
     const regex = new RegExp(`\\b${table}\\b`, "i");
     if (regex.test(sql)) {
@@ -163,9 +180,6 @@ function isQuerySafe(sql: string): { safe: boolean; error?: string } {
     }
   }
 
-  // That's it! The database's grant system will handle everything else.
-  // No need to parse table aliases, CTEs, or check allowed tables -
-  // the chat_readonly user simply won't have access to unauthorized tables.
   return { safe: true };
 }
 

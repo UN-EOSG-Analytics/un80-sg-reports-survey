@@ -1,5 +1,9 @@
-// App namespace/schema for database tables
-export const DB_SCHEMA = process.env.DB_SCHEMA || "app";
+// App namespace/schema for database tables.
+// All application code should import DB_SCHEMA from here rather than
+// re-declaring `process.env.DB_SCHEMA || "sg_reports_survey"` inline.
+// That pattern caused drift: one file defaulted to "app" while others
+// defaulted to "sg_reports_survey".
+export const DB_SCHEMA = process.env.DB_SCHEMA || "sg_reports_survey";
 
 // Table names with schema prefix
 export const tables = {

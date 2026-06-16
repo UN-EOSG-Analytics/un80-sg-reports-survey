@@ -6,6 +6,31 @@ const DB_SCHEMA = process.env.DB_SCHEMA || "sg_reports_survey";
 
 const EXPORT_MAX_ROWS = 100000;
 
+// Series body derived from symbol prefix. Single source of truth — used by
+// filters, grouping, and JOINs to the per-series frequency/entity tables.
+// HRC is checked before the broader A/ pattern.
+const NORMALIZED_BODY_SQL = `CASE
+  WHEN r.symbol LIKE 'A/HRC/%' THEN 'Human Rights Council'
+  WHEN r.symbol LIKE 'A/%' THEN 'General Assembly'
+  WHEN r.symbol LIKE 'E/%' THEN 'Economic and Social Council'
+  WHEN r.symbol LIKE 'S/%' THEN 'Security Council'
+  ELSE COALESCE(
+    CASE
+      WHEN r.un_body LIKE '{%}' THEN SUBSTRING(r.un_body FROM '^\\{"?([^",}]+)"?')
+      ELSE r.un_body
+    END,
+    'Other'
+  )
+END`;
+
+const EFFECTIVE_YEAR_SQL = `COALESCE(
+  r.date_year,
+  CASE
+    WHEN r.publication_date ~ '^\\d{4}'
+    THEN SUBSTRING(r.publication_date FROM 1 FOR 4)::int
+  END
+)`;
+
 interface EntitySuggestion {
   entity: string;
   source: string;
@@ -72,6 +97,145 @@ interface ResolutionInfo {
 interface SubjectCount {
   subject: string;
   count: number;
+}
+
+
+// --------------------------------------------------------------------------
+// Filter helpers
+// --------------------------------------------------------------------------
+
+type SgReportFilters = {
+  filterSearch: string;
+  filterSymbol: string;
+  filterTitle: string;
+  filterBodies: string[];
+  filterYears: number[];
+  filterFrequencies: string[];
+  filterSubjects: string[];
+  filterEntities: string[];
+  filterReportTypes: string[];
+};
+
+// Build the CTE chain used by the list, count, and export queries.
+// A series qualifies iff some single document in it satisfies the doc-level
+// filters (filterSearch/Symbol/Title/Bodies/Subjects/ReportTypes) AND the
+// series as a whole satisfies the series-level filters (Years/Entities/Frequencies).
+// This guarantees the on-screen list and the download share identical semantics.
+function buildSeriesFilters(filters: SgReportFilters, maxYear: number) {
+  const docClauses: string[] = [];
+  const params: (string | number)[] = [];
+  let idx = 1;
+
+  if (filters.filterSearch) {
+    docClauses.push(`(d.symbol ILIKE $${idx} OR d.proper_title ILIKE $${idx})`);
+    params.push(`%${filters.filterSearch}%`);
+    idx++;
+  }
+  if (filters.filterSymbol) {
+    docClauses.push(`d.symbol ILIKE $${idx}`);
+    params.push(`%${filters.filterSymbol}%`);
+    idx++;
+  }
+  if (filters.filterTitle) {
+    docClauses.push(`d.proper_title ILIKE $${idx}`);
+    params.push(`%${filters.filterTitle}%`);
+    idx++;
+  }
+  if (filters.filterBodies.length > 0) {
+    docClauses.push(`d.normalized_body = ANY($${idx}::text[])`);
+    params.push(filters.filterBodies as unknown as string);
+    idx++;
+  }
+  if (filters.filterSubjects.length > 0) {
+    docClauses.push(`d.subject_terms && $${idx}::text[]`);
+    params.push(filters.filterSubjects as unknown as string);
+    idx++;
+  }
+  if (filters.filterReportTypes.length > 0) {
+    docClauses.push(`d.report_type = ANY($${idx}::text[])`);
+    params.push(filters.filterReportTypes as unknown as string);
+    idx++;
+  }
+  const docWhereSQL = docClauses.length > 0 ? docClauses.join(" AND ") : "TRUE";
+
+  const havingClauses: string[] = [];
+
+  if (filters.filterYears.length > 0) {
+    havingClauses.push(`MAX(d.effective_year) = ANY($${idx}::int[])`);
+    params.push(filters.filterYears as unknown as string);
+    idx++;
+  }
+  if (filters.filterEntities.length > 0) {
+    havingClauses.push(`(
+      (SELECT re.suggested_entities FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = d.proper_title) && $${idx}::text[]
+      OR (SELECT re.confirmed_entities FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = d.proper_title) && $${idx}::text[]
+    )`);
+    params.push(filters.filterEntities as unknown as string);
+    idx++;
+  }
+  if (filters.filterFrequencies.length > 0) {
+    havingClauses.push(`LOWER(COALESCE(
+      (SELECT rfc.frequency FROM ${DB_SCHEMA}.report_frequency_confirmations_public rfc
+        WHERE rfc.proper_title = d.proper_title AND rfc.normalized_body = COALESCE(d.normalized_body, '')),
+      (SELECT rf.calculated_frequency FROM ${DB_SCHEMA}.report_frequencies rf
+        WHERE rf.proper_title = d.proper_title AND rf.normalized_body = COALESCE(d.normalized_body, ''))
+    )) = ANY($${idx}::text[])`);
+    params.push(filters.filterFrequencies.map((f) => f.toLowerCase()) as unknown as string);
+    idx++;
+  }
+  const havingSQL = havingClauses.length > 0 ? `HAVING ${havingClauses.join(" AND ")}` : "";
+
+  const cteSQL = `WITH all_docs AS (
+    SELECT
+      r.id, r.symbol, r.proper_title, r.un_body, r.report_type,
+      r.publication_date, r.record_number, r.word_count, r.subject_terms,
+      ${NORMALIZED_BODY_SQL} AS normalized_body,
+      ${EFFECTIVE_YEAR_SQL} AS effective_year
+    FROM ${DB_SCHEMA}.sg_reports r
+  ),
+  matching_series AS (
+    SELECT DISTINCT d.proper_title, d.normalized_body
+    FROM all_docs d
+    WHERE ${docWhereSQL}
+  ),
+  series_docs AS (
+    SELECT d.*
+    FROM all_docs d
+    JOIN matching_series ms USING (proper_title, normalized_body)
+    WHERE d.effective_year IS NULL OR d.effective_year < ${maxYear + 1}
+  ),
+  qualifying_series AS (
+    SELECT d.proper_title, d.normalized_body
+    FROM series_docs d
+    GROUP BY d.proper_title, d.normalized_body
+    ${havingSQL}
+  )`;
+
+  return { cteSQL, params, nextIdx: idx };
+}
+
+// Mirror the visible-badge rule from EntityBadges: AI-only suggestions are not
+// shown unless they're independently confirmed via lead/contributing arrays.
+function computeVisiblePrimaryEntity(
+  primaryEntity: string | null,
+  leadEntities: string[] | null,
+  contributingEntities: string[] | null,
+  confirmedEntities: string[] | null,
+  suggestions: EntitySuggestion[] | null
+): string | null {
+  if (!primaryEntity) return null;
+  const lead = new Set((leadEntities || []).map((e) => e.toLowerCase()));
+  const contrib = new Set((contributingEntities || []).map((e) => e.toLowerCase()));
+  const visible = new Set<string>([
+    ...lead,
+    ...contrib,
+    ...(confirmedEntities || []).map((e) => e.toLowerCase()),
+  ]);
+  for (const s of suggestions || []) {
+    const k = s.entity.toLowerCase();
+    if (s.source !== "ai" || lead.has(k) || contrib.has(k)) visible.add(k);
+  }
+  return visible.has(primaryEntity.toLowerCase()) ? primaryEntity : null;
 }
 
 export async function GET(req: NextRequest) {
@@ -160,76 +324,34 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const whereClauses: string[] = [];
-  const params: (string | number)[] = [];
-  let paramIndex = 1;
-
-  if (filterSearch) {
-    whereClauses.push(`(r.symbol ILIKE $${paramIndex} OR r.proper_title ILIKE $${paramIndex})`);
-    params.push(`%${filterSearch}%`);
-    paramIndex++;
+  function formatFrequency(freq: string | null): string | null {
+    if (!freq) return null;
+    const displayMap: Record<string, string> = {
+      'annual': 'Annual',
+      'biennial': 'Biennial',
+      'triennial': 'Triennial',
+      'quadrennial': 'Quadrennial',
+      'quinquennial': 'Quinquennial',
+      'one-time': 'One-time',
+      'other': 'Other',
+      'irregular': 'Irregular',
+    };
+    return displayMap[freq] || freq.charAt(0).toUpperCase() + freq.slice(1);
   }
 
-  if (filterSymbol) {
-    whereClauses.push(`r.symbol ILIKE $${paramIndex}`);
-    params.push(`%${filterSymbol}%`);
-    paramIndex++;
-  }
+  const filters: SgReportFilters = {
+    filterSearch,
+    filterSymbol,
+    filterTitle,
+    filterBodies,
+    filterYears,
+    filterFrequencies,
+    filterSubjects,
+    filterEntities,
+    filterReportTypes,
+  };
 
-  if (filterTitle) {
-    whereClauses.push(`r.proper_title ILIKE $${paramIndex}`);
-    params.push(`%${filterTitle}%`);
-    paramIndex++;
-  }
-
-  if (filterBodies.length > 0) {
-    const bodyConditions = filterBodies.map((_, i) => `r.un_body LIKE '%' || $${paramIndex + i} || '%'`).join(' OR ');
-    whereClauses.push(`(${bodyConditions})`);
-    filterBodies.forEach((b) => params.push(b));
-    paramIndex += filterBodies.length;
-  }
-
-  if (filterSubjects.length > 0) {
-    whereClauses.push(`r.subject_terms && $${paramIndex}`);
-    params.push(filterSubjects as unknown as string);
-    paramIndex++;
-  }
-
-  if (filterReportTypes.length > 0) {
-    whereClauses.push(`r.report_type = ANY($${paramIndex})`);
-    params.push(filterReportTypes as unknown as string);
-    paramIndex++;
-  }
-
-  const havingClauses: string[] = [];
-  const havingParams: (string | number)[] = [];
-  let havingParamIndex = paramIndex;
-
-  if (filterEntities.length > 0) {
-    havingClauses.push(`(
-      (SELECT re.suggested_entities FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = sub.proper_title) && $${havingParamIndex}::text[]
-      OR (SELECT re.confirmed_entities FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = sub.proper_title) && $${havingParamIndex}::text[]
-    )`);
-    havingParams.push(filterEntities as unknown as string);
-    havingParamIndex++;
-  }
-
-  if (filterYears.length > 0) {
-    havingClauses.push(`MAX(effective_year) = ANY($${havingParamIndex}::int[])`);
-    havingParams.push(filterYears as unknown as string);
-    havingParamIndex++;
-  }
-
-  const frequencyFilterSQL = filterFrequencies.length > 0
-    ? `AND LOWER(COALESCE(confirmed_frequency, calculated_frequency)) = ANY($${havingParamIndex})`
-    : "";
-  if (filterFrequencies.length > 0) {
-    havingParams.push(filterFrequencies.map((f) => f.toLowerCase()) as unknown as string);
-    havingParamIndex++;
-  }
-
-  const whereClause = whereClauses.length > 0 ? whereClauses.join(" AND ") : "TRUE";
-  const havingClause = havingClauses.length > 0 ? `HAVING ${havingClauses.join(" AND ")}` : "";
+  const { cteSQL, params: filterParams, nextIdx } = buildSeriesFilters(filters, MAX_YEAR);
 
   const sortColumnSQLMap: Record<string, string> = {
     symbol: "symbols[1]",
@@ -245,133 +367,119 @@ export async function GET(req: NextRequest) {
     ? `${sortExpression} ${sortDirection} NULLS LAST, proper_title ASC, normalized_body ASC`
     : "latest_year DESC NULLS LAST, proper_title, normalized_body";
 
-  const allParams = [...params, ...havingParams];
-  const limitParamIndex = havingParamIndex;
+  // ---- Export path: raw rows, one per document, with Series ID ----
+  if (isExport) {
+    const exportRows = await query<ExportRawRow>(
+      `${cteSQL}
+        SELECT
+          DENSE_RANK() OVER (ORDER BY d.proper_title, d.normalized_body)::int AS series_id,
+          d.symbol,
+          d.proper_title,
+          d.normalized_body AS body,
+          d.report_type,
+          d.effective_year AS year,
+          d.publication_date,
+          d.record_number,
+          d.word_count,
+          rf.calculated_frequency,
+          rfc.frequency AS confirmed_frequency,
+          re.primary_entity,
+          COALESCE(re.lead_entities, ARRAY[]::text[]) AS lead_entities,
+          COALESCE(re.contributing_entities, ARRAY[]::text[]) AS contributing_entities,
+          COALESCE(re.confirmed_entities, ARRAY[]::text[]) AS confirmed_entities,
+          re.suggestions,
+          COALESCE(d.subject_terms, ARRAY[]::text[]) AS subject_terms,
+          COALESCE(rds.total_downloads, 0)::int AS download_count
+        FROM series_docs d
+        JOIN qualifying_series qs USING (proper_title, normalized_body)
+        LEFT JOIN ${DB_SCHEMA}.report_frequencies rf
+          ON rf.proper_title = d.proper_title
+          AND rf.normalized_body = COALESCE(d.normalized_body, '')
+        LEFT JOIN ${DB_SCHEMA}.report_frequency_confirmations_public rfc
+          ON rfc.proper_title = d.proper_title
+          AND rfc.normalized_body = COALESCE(d.normalized_body, '')
+        LEFT JOIN ${DB_SCHEMA}.report_entities_public re ON re.proper_title = d.proper_title
+        LEFT JOIN ${DB_SCHEMA}.report_download_summary rds ON rds.symbol = d.symbol
+        ORDER BY d.proper_title, d.normalized_body, d.effective_year DESC NULLS LAST, d.symbol
+        LIMIT $${nextIdx}`,
+      [...filterParams, EXPORT_MAX_ROWS]
+    );
+    const mapped: ExportReport[] = exportRows.map((row) => ({
+      seriesId: row.series_id,
+      symbol: row.symbol,
+      title: (row.proper_title || "").replace(/\s*:\s*$/, "").trim() || null,
+      body: row.body,
+      reportType: row.report_type || "Other",
+      year: row.year,
+      publicationDate: row.publication_date,
+      recordNumber: row.record_number,
+      wordCount: row.word_count,
+      frequency: formatFrequency(row.confirmed_frequency || row.calculated_frequency),
+      calculatedFrequency: formatFrequency(row.calculated_frequency),
+      confirmedFrequency: formatFrequency(row.confirmed_frequency),
+      primaryEntity: computeVisiblePrimaryEntity(
+        row.primary_entity,
+        row.lead_entities,
+        row.contributing_entities,
+        row.confirmed_entities,
+        row.suggestions
+      ),
+      leadEntities: row.lead_entities || [],
+      contributingEntities: row.contributing_entities || [],
+      subjects: row.subject_terms || [],
+      downloadCount: row.download_count || 0,
+    }));
+    return buildExportResponse(mapped, exportFormat as "csv" | "xlsx");
+  }
+
+  const limitParamIndex = nextIdx;
 
   const [reports, countResult, bodyCounts, yearsResult, subjectCounts, entityCounts, reportTypeCounts] = await Promise.all([
     query<ReportRow>(
-      `WITH grouped AS (
-        SELECT
-          sub.proper_title,
-          sub.normalized_body,
-          array_agg(symbol ORDER BY effective_year DESC NULLS LAST, symbol) as symbols,
-          array_agg(effective_year ORDER BY effective_year DESC NULLS LAST, symbol) as years,
-          array_agg(un_body ORDER BY effective_year DESC NULLS LAST, symbol) as bodies,
-          array_agg(report_type ORDER BY effective_year DESC NULLS LAST, symbol) as report_types,
-          array_agg(publication_date ORDER BY effective_year DESC NULLS LAST, symbol) as publication_dates,
-          array_agg(record_number ORDER BY effective_year DESC NULLS LAST, symbol) as record_numbers,
-          array_agg(word_count ORDER BY effective_year DESC NULLS LAST, symbol) as word_counts,
-          array_agg(to_json(COALESCE(subject_terms, ARRAY[]::text[])) ORDER BY effective_year DESC NULLS LAST, symbol) as subject_terms_agg,
-          (SELECT re.suggested_entities FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = sub.proper_title) as suggested_entities,
-          (SELECT re.confirmed_entities FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = sub.proper_title) as confirmed_entities,
-          (SELECT re.lead_entities FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = sub.proper_title) as lead_entities,
-          (SELECT re.contributing_entities FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = sub.proper_title) as contributing_entities,
-          (SELECT re.suggestions FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = sub.proper_title) as suggestions,
-          (SELECT re.primary_entity FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = sub.proper_title) as primary_entity,
-          (SELECT COALESCE(re.has_confirmation, false) FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = sub.proper_title) as has_confirmation,
-          (SELECT rf.calculated_frequency FROM ${DB_SCHEMA}.report_frequencies rf
-           WHERE rf.proper_title = sub.proper_title
-           AND rf.normalized_body = COALESCE(sub.normalized_body, '')) as calculated_frequency,
-          (SELECT rf.gap_history FROM ${DB_SCHEMA}.report_frequencies rf
-           WHERE rf.proper_title = sub.proper_title
-           AND rf.normalized_body = COALESCE(sub.normalized_body, '')) as gap_history,
-          (SELECT rfc.frequency FROM ${DB_SCHEMA}.report_frequency_confirmations_public rfc
-           WHERE rfc.proper_title = sub.proper_title
-           AND rfc.normalized_body = COALESCE(sub.normalized_body, '')) as confirmed_frequency,
-          (SELECT COALESCE(rds.total_downloads, 0)::int
-             FROM ${DB_SCHEMA}.report_download_summary rds
-             WHERE rds.symbol = (array_agg(sub.symbol ORDER BY effective_year DESC NULLS LAST, sub.symbol))[1]) as download_count,
-          COUNT(*)::int as count,
-          MAX(effective_year) as latest_year
-        FROM (
-          SELECT
-            r.proper_title,
-            r.symbol,
-            r.un_body,
-            CASE
-              WHEN r.symbol LIKE 'A/%' THEN 'General Assembly'
-              WHEN r.symbol LIKE 'E/%' THEN 'Economic and Social Council'
-              WHEN r.symbol LIKE 'S/%' THEN 'Security Council'
-              WHEN r.symbol LIKE 'A/HRC/%' THEN 'Human Rights Council'
-              ELSE COALESCE(
-                CASE
-                  WHEN r.un_body LIKE '{%}' THEN SUBSTRING(r.un_body FROM '^\\{"?([^",}]+)"?')
-                  ELSE r.un_body
-                END,
-                'Other'
-              )
-            END as normalized_body,
-            r.report_type,
-            r.publication_date,
-            r.record_number,
-            r.word_count,
-            r.subject_terms,
-            COALESCE(
-              r.date_year,
-              CASE
-                WHEN r.publication_date ~ '^\\d{4}'
-                THEN SUBSTRING(r.publication_date FROM 1 FOR 4)::int
-              END
-            ) as effective_year
-          FROM ${DB_SCHEMA}.sg_reports r
-          WHERE ${whereClause}
-        ) sub
-        WHERE sub.effective_year IS NULL OR sub.effective_year < ${MAX_YEAR + 1}
-        GROUP BY sub.proper_title, sub.normalized_body
-        ${havingClause}
-      )
-      SELECT * FROM grouped
-      WHERE 1=1 ${frequencyFilterSQL}
+      `${cteSQL}
+      SELECT
+        d.proper_title,
+        d.normalized_body,
+        array_agg(d.symbol ORDER BY d.effective_year DESC NULLS LAST, d.symbol) as symbols,
+        array_agg(d.effective_year ORDER BY d.effective_year DESC NULLS LAST, d.symbol) as years,
+        array_agg(d.un_body ORDER BY d.effective_year DESC NULLS LAST, d.symbol) as bodies,
+        array_agg(d.report_type ORDER BY d.effective_year DESC NULLS LAST, d.symbol) as report_types,
+        array_agg(d.publication_date ORDER BY d.effective_year DESC NULLS LAST, d.symbol) as publication_dates,
+        array_agg(d.record_number ORDER BY d.effective_year DESC NULLS LAST, d.symbol) as record_numbers,
+        array_agg(d.word_count ORDER BY d.effective_year DESC NULLS LAST, d.symbol) as word_counts,
+        array_agg(to_json(COALESCE(d.subject_terms, ARRAY[]::text[])) ORDER BY d.effective_year DESC NULLS LAST, d.symbol) as subject_terms_agg,
+        (SELECT re.suggested_entities FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = d.proper_title) as suggested_entities,
+        (SELECT re.confirmed_entities FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = d.proper_title) as confirmed_entities,
+        (SELECT re.lead_entities FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = d.proper_title) as lead_entities,
+        (SELECT re.contributing_entities FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = d.proper_title) as contributing_entities,
+        (SELECT re.suggestions FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = d.proper_title) as suggestions,
+        (SELECT re.primary_entity FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = d.proper_title) as primary_entity,
+        (SELECT COALESCE(re.has_confirmation, false) FROM ${DB_SCHEMA}.report_entities_public re WHERE re.proper_title = d.proper_title) as has_confirmation,
+        (SELECT rf.calculated_frequency FROM ${DB_SCHEMA}.report_frequencies rf
+         WHERE rf.proper_title = d.proper_title
+         AND rf.normalized_body = COALESCE(d.normalized_body, '')) as calculated_frequency,
+        (SELECT rf.gap_history FROM ${DB_SCHEMA}.report_frequencies rf
+         WHERE rf.proper_title = d.proper_title
+         AND rf.normalized_body = COALESCE(d.normalized_body, '')) as gap_history,
+        (SELECT rfc.frequency FROM ${DB_SCHEMA}.report_frequency_confirmations_public rfc
+         WHERE rfc.proper_title = d.proper_title
+         AND rfc.normalized_body = COALESCE(d.normalized_body, '')) as confirmed_frequency,
+        (SELECT COALESCE(rds.total_downloads, 0)::int
+           FROM ${DB_SCHEMA}.report_download_summary rds
+           WHERE rds.symbol = (array_agg(d.symbol ORDER BY d.effective_year DESC NULLS LAST, d.symbol))[1]) as download_count,
+        COUNT(*)::int as count,
+        MAX(d.effective_year) as latest_year
+      FROM series_docs d
+      JOIN qualifying_series qs USING (proper_title, normalized_body)
+      GROUP BY d.proper_title, d.normalized_body
       ORDER BY ${orderByClause}
       LIMIT $${limitParamIndex} OFFSET $${limitParamIndex + 1}`,
-      [...allParams, limit, offset]
+      [...filterParams, limit, offset]
     ),
     query<{ total: number }>(
-      `WITH grouped AS (
-        SELECT
-          sub.proper_title,
-          sub.normalized_body,
-          (SELECT rf.calculated_frequency FROM ${DB_SCHEMA}.report_frequencies rf
-           WHERE rf.proper_title = sub.proper_title
-           AND rf.normalized_body = COALESCE(sub.normalized_body, '')) as calculated_frequency,
-          (SELECT rfc.frequency FROM ${DB_SCHEMA}.report_frequency_confirmations_public rfc
-           WHERE rfc.proper_title = sub.proper_title
-           AND rfc.normalized_body = COALESCE(sub.normalized_body, '')) as confirmed_frequency,
-          COUNT(*)::int as count,
-          MAX(effective_year) as latest_year
-        FROM (
-          SELECT
-            r.proper_title,
-            CASE
-              WHEN r.symbol LIKE 'A/%' THEN 'General Assembly'
-              WHEN r.symbol LIKE 'E/%' THEN 'Economic and Social Council'
-              WHEN r.symbol LIKE 'S/%' THEN 'Security Council'
-              WHEN r.symbol LIKE 'A/HRC/%' THEN 'Human Rights Council'
-              ELSE COALESCE(
-                CASE
-                  WHEN r.un_body LIKE '{%}' THEN SUBSTRING(r.un_body FROM '^\\{"?([^",}]+)"?')
-                  ELSE r.un_body
-                END,
-                'Other'
-              )
-            END as normalized_body,
-            COALESCE(
-              r.date_year,
-              CASE
-                WHEN r.publication_date ~ '^\\d{4}'
-                THEN SUBSTRING(r.publication_date FROM 1 FOR 4)::int
-              END
-            ) as effective_year
-          FROM ${DB_SCHEMA}.sg_reports r
-          WHERE ${whereClause}
-        ) sub
-        WHERE sub.effective_year IS NULL OR sub.effective_year < ${MAX_YEAR + 1}
-        GROUP BY sub.proper_title, sub.normalized_body
-        ${havingClause}
-      )
-      SELECT COUNT(*)::int as total FROM grouped
-      WHERE 1=1 ${frequencyFilterSQL}`,
-      allParams
+      `${cteSQL}
+      SELECT COUNT(*)::int as total FROM qualifying_series`,
+      filterParams
     ),
     query<{ body: string; count: number }>(
       `SELECT un_body as body, COUNT(*)::int as count
@@ -413,21 +521,6 @@ export async function GET(req: NextRequest) {
     return bodyStr;
   }
 
-  function formatFrequency(freq: string | null): string | null {
-    if (!freq) return null;
-    const displayMap: Record<string, string> = {
-      'annual': 'Annual',
-      'biennial': 'Biennial',
-      'triennial': 'Triennial',
-      'quadrennial': 'Quadrennial',
-      'quinquennial': 'Quinquennial',
-      'one-time': 'One-time',
-      'other': 'Other',
-      'irregular': 'Irregular',
-    };
-    return displayMap[freq] || freq.charAt(0).toUpperCase() + freq.slice(1);
-  }
-
   const filteredReports = reports.map((r) => {
     const allSubjects = new Set<string>();
     r.subject_terms_agg?.forEach((terms) => {
@@ -450,13 +543,21 @@ export async function GET(req: NextRequest) {
       return leadSet.has(k) || contribSet.has(k);
     });
 
+    const visiblePrimaryEntity = computeVisiblePrimaryEntity(
+      r.primary_entity,
+      r.lead_entities,
+      r.contributing_entities,
+      r.confirmed_entities,
+      r.suggestions
+    );
+
     return {
       title: r.proper_title || null,
       symbol: r.symbols[0],
       body: r.normalized_body || parseBodyString(r.bodies[0]),
       reportType: r.report_types?.[0] || 'Other',
       year: r.years[0] || null,
-      entity: r.primary_entity || null,
+      entity: visiblePrimaryEntity,
       suggestedEntities: r.suggested_entities || [],
       confirmedEntities: r.confirmed_entities || [],
       leadEntities: r.lead_entities || [],
@@ -492,10 +593,6 @@ export async function GET(req: NextRequest) {
     .map(([value, count]) => ({ value, count }))
     .sort((a, b) => b.count - a.count);
 
-  if (isExport) {
-    return buildExportResponse(filteredReports, exportFormat as "csv" | "xlsx");
-  }
-
   return NextResponse.json({
     reports: filteredReports,
     total: countResult[0]?.total || 0,
@@ -512,28 +609,45 @@ export async function GET(req: NextRequest) {
   });
 }
 
-type ExportReport = {
-  title: string | null;
+interface ExportRawRow {
+  series_id: number;
   symbol: string;
+  proper_title: string | null;
+  body: string | null;
+  report_type: string | null;
+  year: number | null;
+  publication_date: string | null;
+  record_number: string | null;
+  word_count: number | null;
+  calculated_frequency: string | null;
+  confirmed_frequency: string | null;
+  primary_entity: string | null;
+  lead_entities: string[] | null;
+  contributing_entities: string[] | null;
+  confirmed_entities: string[] | null;
+  suggestions: EntitySuggestion[] | null;
+  subject_terms: string[] | null;
+  download_count: number | null;
+}
+
+type ExportReport = {
+  seriesId: number;
+  symbol: string;
+  title: string | null;
   body: string | null;
   reportType: string;
   year: number | null;
-  entity: string | null;
-  leadEntities: string[];
-  contributingEntities: string[];
+  publicationDate: string | null;
+  recordNumber: string | null;
+  wordCount: number | null;
   frequency: string | null;
   calculatedFrequency: string | null;
   confirmedFrequency: string | null;
+  primaryEntity: string | null;
+  leadEntities: string[];
+  contributingEntities: string[];
+  subjects: string[];
   downloadCount: number;
-  subjectTerms: string[];
-  count: number;
-  versions: {
-    symbol: string;
-    year: number | null;
-    publicationDate: string | null;
-    recordNumber: string | null;
-    wordCount: number | null;
-  }[];
 };
 
 const EXPORT_COLUMNS: {
@@ -542,25 +656,25 @@ const EXPORT_COLUMNS: {
   width: number;
   get: (r: ExportReport) => string | number | null;
 }[] = [
+  // Pivot on Series ID to reproduce the app's on-screen grouping
+  // (proper_title, normalized_body).
+  { key: "seriesId", header: "Series ID", width: 10, get: r => r.seriesId },
   { key: "symbol", header: "Symbol", width: 18, get: r => r.symbol },
   { key: "title", header: "Title", width: 60, get: r => r.title },
   { key: "body", header: "Body", width: 28, get: r => r.body },
-  { key: "reportType", header: "Report type", width: 22, get: r => r.reportType },
-  { key: "year", header: "Latest year", width: 12, get: r => r.year },
+  { key: "reportType", header: "Report type", width: 20, get: r => r.reportType },
+  { key: "year", header: "Year", width: 10, get: r => r.year },
+  { key: "publicationDate", header: "Publication date", width: 16, get: r => r.publicationDate },
+  { key: "recordNumber", header: "ODS record number", width: 18, get: r => r.recordNumber },
+  { key: "wordCount", header: "Word count", width: 12, get: r => r.wordCount },
   { key: "frequency", header: "Frequency", width: 14, get: r => r.frequency },
   { key: "calculatedFrequency", header: "Calculated frequency", width: 18, get: r => r.calculatedFrequency },
   { key: "confirmedFrequency", header: "Confirmed frequency", width: 18, get: r => r.confirmedFrequency },
-  { key: "primaryEntity", header: "Primary entity", width: 28, get: r => r.entity },
+  { key: "primaryEntity", header: "Primary entity", width: 28, get: r => r.primaryEntity },
   { key: "leadEntities", header: "Lead entities", width: 32, get: r => r.leadEntities.join("; ") },
   { key: "contributingEntities", header: "Contributing entities", width: 36, get: r => r.contributingEntities.join("; ") },
-  { key: "subjects", header: "Subjects", width: 40, get: r => r.subjectTerms.join("; ") },
+  { key: "subjects", header: "Subjects", width: 40, get: r => r.subjects.join("; ") },
   { key: "downloadCount", header: "Downloads", width: 12, get: r => r.downloadCount },
-  { key: "versionCount", header: "Series length", width: 12, get: r => r.count },
-  { key: "allSymbols", header: "All symbols", width: 50, get: r => r.versions.map(v => v.symbol).join("; ") },
-  { key: "allYears", header: "All years", width: 24, get: r => r.versions.map(v => v.year ?? "").join("; ") },
-  { key: "publicationDates", header: "Publication dates", width: 28, get: r => r.versions.map(v => v.publicationDate ?? "").join("; ") },
-  { key: "recordNumbers", header: "ODS record numbers", width: 28, get: r => r.versions.map(v => v.recordNumber ?? "").join("; ") },
-  { key: "wordCounts", header: "Word counts", width: 24, get: r => r.versions.map(v => v.wordCount ?? "").join("; ") },
 ];
 
 function csvEscape(value: string | number | null): string {
@@ -617,13 +731,14 @@ async function buildXlsx(reports: ExportReport[]): Promise<Buffer> {
     to: { row: 1, column: EXPORT_COLUMNS.length },
   };
 
-  // Right-align numeric columns and apply thousands separator to downloads/word counts.
-  const numericKeys = new Set(["year", "downloadCount", "versionCount"]);
+  // Right-align numeric columns; thousands separator on counts but not IDs/years.
+  const numericKeys = new Set(["seriesId", "year", "wordCount", "downloadCount"]);
+  const noThousands = new Set(["seriesId", "year"]);
   EXPORT_COLUMNS.forEach((c, i) => {
     const col = ws.getColumn(i + 1);
     if (numericKeys.has(c.key)) {
       col.alignment = { horizontal: "right" };
-      if (c.key !== "year") col.numFmt = "#,##0";
+      if (!noThousands.has(c.key)) col.numFmt = "#,##0";
     }
   });
 

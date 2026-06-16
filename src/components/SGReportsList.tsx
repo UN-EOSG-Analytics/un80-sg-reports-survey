@@ -725,13 +725,28 @@ function ReportRow({
   isSelected,
   onSelect,
   subjectCounts,
+  searchTerm,
 }: {
   report: ReportGroup;
   isSelected: boolean;
   onSelect: () => void;
   subjectCounts: SubjectCount[];
+  searchTerm: string;
 }) {
   const displayTitle = report.title?.replace(/\s*:\s*$/, "").trim() || null;
+
+  // If the user's search matches a version other than the headline (latest),
+  // surface that — otherwise users see a symbol they didn't ask for and wonder why.
+  // Only consider symbol-shaped searches (contain `/`), not free-text title matches.
+  const trimmedSearch = searchTerm.trim();
+  const isSymbolSearch = trimmedSearch.length > 0 && trimmedSearch.includes("/");
+  const matchedVersion = isSymbolSearch
+    ? report.versions?.find((v) =>
+        v.symbol.toLowerCase().includes(trimmedSearch.toLowerCase())
+      )
+    : undefined;
+  const showMatchedChip =
+    matchedVersion !== undefined && matchedVersion.symbol !== report.symbol;
 
   return (
     <div
@@ -740,13 +755,22 @@ function ReportRow({
       }`}
       onClick={onSelect}
     >
-      <div className="flex items-center">
+      <div className="flex flex-col items-start gap-0.5">
         <DocumentSymbolBadge
           symbol={report.symbol}
           size="xs"
           maxLength={14}
           className="max-w-[120px]"
         />
+        {showMatchedChip && (
+          <span
+            className="text-[10px] text-gray-500 italic truncate max-w-[140px]"
+            title={`Your search matched a previous version: ${matchedVersion!.symbol}${matchedVersion!.year ? " (" + matchedVersion!.year + ")" : ""}`}
+          >
+            ↳ {matchedVersion!.symbol}
+            {matchedVersion!.year ? ` (${matchedVersion!.year})` : ""}
+          </span>
+        )}
       </div>
 
       <div className="truncate text-gray-700" title={displayTitle || undefined}>
@@ -962,7 +986,7 @@ export function ReportsTable() {
 
         <p className="text-sm text-gray-500 ml-auto">
           {data?.total} report series
-          {hasActiveFilters && " (filtered)"}
+          {hasActiveFilters && " (filtered — newest version of each series shown)"}
         </p>
       </div>
 
@@ -989,6 +1013,7 @@ export function ReportsTable() {
               isSelected={selectedReport?.symbol === r.symbol}
               onSelect={() => setSelectedReport(r)}
               subjectCounts={data?.subjectCounts || []}
+              searchTerm={filters.search}
             />
           ))}
         </div>

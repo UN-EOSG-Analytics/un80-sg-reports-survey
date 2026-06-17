@@ -1,3 +1,4 @@
+import { getCurrentUser } from "@/lib/auth";
 import ExcelJS from "exceljs";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -15,6 +16,12 @@ interface ExportRow {
 }
 
 export async function POST(req: NextRequest) {
+  // Only admins may generate this report.
+  const user = await getCurrentUser();
+  if (!user || user.role !== "admin") {
+    return new NextResponse("Forbidden", { status: 403 });
+  }
+
   const rows: ExportRow[] = await req.json();
 
   const workbook = new ExcelJS.Workbook();

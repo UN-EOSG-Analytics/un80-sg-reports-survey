@@ -18,11 +18,19 @@ export async function getBaseUrl(): Promise<string> {
   try {
     const headersList = await headers();
     const host = headersList.get("host");
-    const protocol = headersList.get("x-forwarded-proto") || "https";
+    const forwardedProto = headersList.get("x-forwarded-proto");
 
     if (host) {
-      // Use http for localhost, https for everything else
-      const scheme = host.startsWith("localhost") ? "http" : protocol;
+      // Always use http for localhost regardless of forwarded headers.
+      // For other hosts, clamp x-forwarded-proto to the two known schemes so
+      // that a spoofed header value cannot produce an unexpected URL scheme in
+      // magic-link emails.  Default to https when the header is absent or
+      // unrecognised.
+      const scheme = host.startsWith("localhost")
+        ? "http"
+        : forwardedProto === "http" || forwardedProto === "https"
+          ? forwardedProto
+          : "https";
       return `${scheme}://${host}`;
     }
   } catch {

@@ -1,5 +1,8 @@
-// App namespace/schema for database tables
-export const DB_SCHEMA = process.env.DB_SCHEMA || "app";
+// App namespace/schema for database tables.
+// All API routes and lib files must import DB_SCHEMA from here rather than
+// re-declaring it locally, so there is a single source of truth for the
+// default value.
+export const DB_SCHEMA = process.env.DB_SCHEMA || "sg_reports_survey";
 
 // Table names with schema prefix
 export const tables = {

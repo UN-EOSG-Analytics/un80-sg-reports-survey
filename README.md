@@ -1,27 +1,25 @@
-# UN Website Boilerplate (with Auth)
+# UN80 SG Reports Survey
 
-A Next.js template with UN branding and magic link authentication.
-
-Based on: https://github.com/kleinlennart/un-website-boilerplate
+A web application for the UN-EOSG Analytics team to manage the UN80 review of Secretary-General mandatory reports. UN system staff review reports assigned to their entity, submit survey responses, and confirm entity assignments. Admins view aggregated analysis and export data.
 
 ## Features
 
-- UN branding (logo, colors, Roboto font)
-- Magic link authentication (configurable email domains via DB)
-- Rate limiting on magic link requests (2 min cooldown)
-- 30-day session duration
-- PostgreSQL session/user storage
-- Configurable database schema per app
-- Entity selection on first login (with "Other" option)
-- Entity change dialog (click entity badge in header)
-- Public landing page (`/about`) + protected dashboard (`/`)
+- **Magic-link authentication** — passwordless login; allowed email domains configured in database
+- **Admin whitelist** — admin privileges granted via `admin_emails` DB table (separate from user accounts)
+- **Entity dashboard** — each user sees reports suggested for their entity; they confirm the list and submit survey responses
+- **Survey responses** — per-user, per-report responses: continue / merge / discontinue, with frequency and format preferences
+- **Entity confirmation** — users confirm or adjust AI/DGACM/DRI-suggested entity assignments
+- **Analysis page** (`/analysis`, admin only) — coverage metrics, per-entity progress, frequency-direction breakdown
+- **Excel export** — survey responses and entity confirmations (`/api/export/survey`); entity progress table (`/api/export/entities`, admin only)
+- **AI chat** — OpenAI-powered RAG chat over the reports database
+- **Python data pipeline** — scrapes UN Digital Library, generates embeddings, calculates historical frequencies
 
-## Setup
+## Quick Start
 
 ### 1. Install dependencies
 
 ```bash
-npm install
+pnpm install
 ```
 
 ### 2. Configure environment
@@ -30,124 +28,162 @@ npm install
 cp .env.template .env.local
 ```
 
-Edit `.env.local`:
-- `DATABASE_URL` - PostgreSQL connection string
-- `DB_SCHEMA` - Schema for auth tables (e.g. `sg_reports_survey` → `sg_reports_survey.users`, `sg_reports_survey.magic_tokens`)
-- `AUTH_SECRET` - Generate with `openssl rand -hex 32`
-- `SMTP_*` - Mail server for magic links
-- `BASE_URL` - Your app URL (for magic link emails)
+Required variables in `.env.local`:
 
-### 3. Create database tables
+| Variable | Description |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `DB_SCHEMA` | Schema name (e.g. `sg_reports_survey`) |
+| `AUTH_SECRET` | HMAC secret — generate with `openssl rand -hex 32` |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | Mail server for magic links |
+| `SMTP_FROM` | Sender address (falls back to `SMTP_USER`) |
+| `BASE_URL` | Public app URL (for magic link emails, optional if behind a proxy) |
+| `OPENAI_API_KEY` | OpenAI API key (for AI chat) |
 
-Edit `sql/auth_tables.sql` and replace `sg_reports_survey` with your schema name (must match `DB_SCHEMA`), then:
+### 3. Set up the database
+
+Apply the SQL files **in this order**:
 
 ```bash
+# Auth tables (users, magic_tokens, allowed_domains)
 psql $DATABASE_URL -f sql/auth_tables.sql
+
+# Application tables (documents, survey_responses, etc.)
+psql $DATABASE_URL -f sql/reports_tables.sql
+psql $DATABASE_URL -f sql/survey_responses_table.sql
+psql $DATABASE_URL -f sql/frequency_confirmations_table.sql
+psql $DATABASE_URL -f sql/report_frequencies_table.sql
+
+# Migrations (apply in order)
+psql $DATABASE_URL -f sql/migrations/002_add_normalized_body.sql
+psql $DATABASE_URL -f sql/migrations/003_add_entity_role.sql
+psql $DATABASE_URL -f sql/migrations/004_manual_reports_migration.sql
+psql $DATABASE_URL -f sql/migrations/005_multi_user_responses_and_admin_role.sql
+psql $DATABASE_URL -f sql/migrations/006_drop_response_email_audit_columns.sql
+psql $DATABASE_URL -f sql/migrations/007_admin_emails_whitelist.sql
+psql $DATABASE_URL -f sql/migrations/008_fix_frequency_check_constraint.sql
+
+# Views
+psql $DATABASE_URL -f sql/views.sql
 ```
 
-The schema includes an `allowed_domains` table pre-populated with UN system domains (un.org, undp.org, unicef.org, who.int, etc.). Edit the SQL to remove domains you don't need, or add custom ones:
-
+To grant an admin:
 ```sql
--- Add a custom domain
-INSERT INTO myapp.allowed_domains (entity, domain) VALUES
-  ('*', 'example.org'),        -- global: allow for all entities
-  ('PARTNER', 'partner.org');  -- entity-specific
+INSERT INTO sg_reports_survey.admin_emails (email) VALUES ('name@un.org');
 ```
 
 ### 4. Run
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser.
+Open [http://localhost:3000](http://localhost:3000).
 
-## Auth Flow
+## Python Data Pipeline
 
-1. User visits `/about` (public landing page)
-2. User clicks "Sign In" → `/login`
-3. User enters email, magic link sent (rate limited: 2 min cooldown)
-4. User clicks link → `/verify?token=...`
-5. First login: select entity (combobox with "Other" option); returning users: direct sign-in
-6. Session cookie set (30 days)
-7. Header shows user email, clickable entity badge (to change), and logout
-8. Unauthenticated users accessing protected routes → redirect to `/about`
+The `python/` directory contains numbered scripts that populate the database:
 
-## Customization
+| Script | What it does |
+|---|---|
+| `01_get_reports.py` | Scrapes UN Digital Library, downloads document metadata |
+| `02_populate_reporting_entities.py` | Matches documents to UN entities (DGACM + DRI sources) |
+| `03_generate_embeddings.py` | Generates OpenAI embeddings for semantic search |
+| `04_extract_mandate_info.py` | Extracts mandate details from PDF documents |
+| `05_ai_entity_suggestions.py` | AI-assisted entity matching |
+| `06_calculate_frequencies.py` | Computes historical reporting frequencies |
 
-- **Site title/subtitle**: Edit `SITE_TITLE` and `SITE_SUBTITLE` in `src/components/Header.tsx`
-- **Allowed email domains**: Add to `allowed_domains` table in database
-- **Entity list**: Query in `fetchEntities()` in `src/app/api/entities/route.ts`
-- **Document search**: Query in `src/app/api/documents/search/route.ts`
-- **Protected routes**: Edit `PUBLIC_PATHS` in `src/middleware.ts`
-- **Auth schema**: Set `DB_SCHEMA` env var and update `sql/auth_tables.sql`
+Run scripts in order. Each script loads `.env` via `python-dotenv`. Required env vars: `DATABASE_URL`, `DB_SCHEMA`, `OPENAI_API_KEY`.
+
+```bash
+uv run python python/01_get_reports.py
+# ... etc.
+```
+
+## Commands
+
+```bash
+pnpm dev          # Dev server → http://localhost:3000
+pnpm build        # Production build
+pnpm lint         # ESLint
+pnpm typecheck    # TypeScript check (no emit)
+pnpm format       # Prettier
+```
 
 ## File Structure
 
 ```
 src/
 ├── app/
-│   ├── about/                # Public landing page
+│   ├── about/              # Public landing page
+│   ├── analysis/           # Admin analysis page (coverage, entity progress)
 │   ├── api/
-│   │   ├── auth/             # Auth API routes (backup, actions preferred)
-│   │   ├── documents/search/ # Document search
-│   │   └── entities/         # Entity list + fetchEntities()
-│   ├── login/                # Login page + layout
-│   ├── verify/               # Token verification + entity selection
-│   └── page.tsx              # Protected dashboard
+│   │   ├── auth/            # Auth API routes (request, verify, logout)
+│   │   ├── chat/            # AI chat (OpenAI RAG)
+│   │   ├── documents/       # Document search
+│   │   ├── entities/        # Entity list
+│   │   ├── entity-confirmations/  # Entity assignment confirmations
+│   │   ├── entity-suggestions/    # AI entity suggestions
+│   │   ├── export/          # Excel export (survey + entities)
+│   │   ├── frequency-confirmations/ # One-time report confirmations
+│   │   ├── reports/         # Report data
+│   │   ├── sg-reports/      # SG-specific report queries
+│   │   ├── similar-reports/ # Embedding-based similarity
+│   │   ├── stats/           # Survey statistics
+│   │   └── survey-responses/ # Survey response CRUD
+│   ├── login/              # Login page
+│   ├── reports/            # Browse all reports (public)
+│   ├── stats/              # Stats page
+│   ├── verify/             # Token verification + entity selection
+│   └── page.tsx            # Protected dashboard
 ├── components/
-│   ├── DocumentSearch.tsx    # Document autocomplete
-│   ├── EntityChangeDialog.tsx # Dialog to change entity
-│   ├── EntityCombobox.tsx    # Entity dropdown with "Other" option
-│   ├── EntitySearch.tsx      # Entity autocomplete (for search)
-│   ├── Footer.tsx            # Site footer
-│   ├── Header.tsx            # Site header with maxWidth, hideAbout props
-│   ├── LoginForm.tsx         # Login form (uses server actions)
-│   ├── UserMenu.tsx          # Email + entity badge + logout
-│   └── VerifyForm.tsx        # Verify form with returning user detection
+│   ├── EntityDashboard.tsx  # Main entity view
+│   ├── SGReportsList.tsx    # Report list with survey UI
+│   ├── ReportSidebar.tsx    # Report detail sidebar
+│   ├── SurveyExportButton.tsx
+│   ├── EntityTableExport.tsx
+│   └── ui/                  # shadcn/ui primitives
 ├── lib/
-│   ├── actions.ts            # Server actions for auth
-│   ├── auth.ts               # Auth logic (isAllowedDomain, sessions, etc.)
-│   ├── config.ts             # DB_SCHEMA config + table names
-│   ├── db.ts                 # PostgreSQL pool
-│   ├── mail.ts               # Magic link emails
-│   └── utils.ts              # Tailwind cn() helper
-└── middleware.ts             # Route protection
-sql/
-└── auth_tables.sql           # Database schema (users, tokens, allowed_domains)
+│   ├── actions.ts           # Server actions (login, verify, logout)
+│   ├── auth.ts              # Auth logic (sessions, tokens, getCurrentUser)
+│   ├── config.ts            # DB_SCHEMA config + table names
+│   ├── db.ts                # PostgreSQL pool
+│   ├── get-base-url.ts      # Dynamic host detection
+│   └── mail.ts              # Magic link emails
+└── proxy.ts               # Next.js middleware (route protection)
+python/                    # Data pipeline scripts
+sql/                       # Database schema and migrations
+  ├── auth_tables.sql
+  ├── reports_tables.sql
+  ├── survey_responses_table.sql
+  ├── views.sql
+  └── migrations/          # Incremental migrations (apply in order)
+docs/                      # Analysis docs and notes
 ```
+
+## Auth Flow
+
+1. User visits `/about` (public landing page)
+2. User clicks “Sign In” → `/login`
+3. User enters email; magic link sent (rate-limited: 2-minute cooldown)
+4. User clicks link → `/verify?token=...`
+5. First login: select entity; returning users: sign in directly
+6. Session cookie set (30 days, HMAC-signed)
+7. Unauthenticated users accessing protected routes → redirect to `/about`
+
+Admin access: add email to `admin_emails` table directly in the database.
 
 ## Maintenance
 
-### Check for issues
 ```bash
-npm audit          # Security vulnerabilities
-npm outdated       # Outdated packages
-npm run lint       # ESLint errors
-npx tsc --noEmit   # TypeScript errors
+pnpm audit          # Security vulnerabilities
+pnpm outdated       # Outdated packages
+pnpm lint           # ESLint
+pnpm typecheck      # TypeScript errors
 ```
 
-### Update packages
+## Adding shadcn/ui components
+
 ```bash
-npm update                                              # Safe patch/minor updates
-npm install next@latest eslint-config-next@latest       # Update Next.js
+npx shadcn@latest add <component-name>
 ```
-
-### Clean install (if issues occur)
-```bash
-rm -rf node_modules .next && npm install
-```
-
-## Good to know
-
-- use `npx shadcn@latest add <component-name>` when you need to add components.
-
-- https://nextjs.org/docs/app/api-reference/file-conventions/src-folder
-- https://nextjs.org/docs/app/getting-started/project-structure
-
-- The `/public` directory should remain in the root of your project.
-- Config files like `package.json`, `next.config.js` and `tsconfig.json` should remain in the root of your project.
-- `.env.*` files should remain in the root of your project.
-
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Learn Next.js](https://nextjs.org/learn)

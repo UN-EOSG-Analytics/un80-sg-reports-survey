@@ -215,24 +215,21 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
-    // Users can delete confirmations for their own entity
-    // (either they created it, or they belong to the same entity)
-    const userEntity = user.entity;
-    
+    // Admins can delete any confirmation; users can only delete ones they created.
+    // Matching on entity-membership alone would allow any user at Entity X to
+    // delete a colleague's confirmation for Entity X, which is too broad.
     let result: { id: number }[];
-    
-    if (userEntity && userEntity === entity) {
-      // User belongs to this entity - allow deletion
+
+    if (user.role === "admin") {
       result = await query<{ id: number }>(
-        `DELETE FROM ${DB_SCHEMA}.report_entity_confirmations 
+        `DELETE FROM ${DB_SCHEMA}.report_entity_confirmations
          WHERE proper_title = $1 AND entity = $2
          RETURNING id`,
         [properTitle, entity]
       );
     } else {
-      // User doesn't belong to this entity - only allow deleting their own confirmations
       result = await query<{ id: number }>(
-        `DELETE FROM ${DB_SCHEMA}.report_entity_confirmations 
+        `DELETE FROM ${DB_SCHEMA}.report_entity_confirmations
          WHERE proper_title = $1 AND entity = $2 AND confirmed_by_user_id = $3
          RETURNING id`,
         [properTitle, entity, user.id]
@@ -241,9 +238,9 @@ export async function DELETE(req: NextRequest) {
 
     // Idempotent delete - if nothing was deleted, that's still success
     // (the goal of "remove confirmation" is achieved either way)
-    return NextResponse.json({ 
-      success: true, 
-      deleted: result.length > 0 
+    return NextResponse.json({
+      success: true,
+      deleted: result.length > 0
     });
   } catch (error) {
     console.error("Error deleting confirmation:", error);

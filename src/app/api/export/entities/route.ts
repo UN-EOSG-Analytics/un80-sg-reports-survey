@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import { NextRequest, NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth";
 
 interface ExportRow {
   Entity: string;
@@ -15,6 +16,11 @@ interface ExportRow {
 }
 
 export async function POST(req: NextRequest) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const rows: ExportRow[] = await req.json();
 
   const workbook = new ExcelJS.Workbook();

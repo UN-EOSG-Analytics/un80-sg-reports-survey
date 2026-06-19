@@ -54,10 +54,10 @@ export interface ToolResult {
   error?: string;
 }
 
-// Read document by symbol
+// Read document by symbol using the restricted chat connection
 export async function readDocument(symbol: string): Promise<ToolResult> {
   try {
-    const results = await query<{
+    const results = await chatQuery<{
       symbol: string;
       proper_title: string | null;
       title: string | null;
@@ -127,6 +127,12 @@ function isQuerySafe(sql: string): { safe: boolean; error?: string } {
     return { safe: false, error: "Only SELECT queries are allowed" };
   }
 
+  // Check for pg_ prefix separately: \b doesn't work across the word/non-word
+  // boundary before _ (which is itself a word character in JS regex).
+  if (normalized.includes("pg_")) {
+    return { safe: false, error: "Query contains forbidden keyword: pg_" };
+  }
+
   // Check for dangerous keywords
   const dangerous = [
     "insert",
@@ -142,7 +148,6 @@ function isQuerySafe(sql: string): { safe: boolean; error?: string } {
     "execute",
     "into",
     "copy",
-    "pg_",
   ];
 
   for (const keyword of dangerous) {
@@ -210,23 +215,5 @@ export async function queryDatabase(
       success: false,
       error: `Query failed: ${errorMsg}. You may retry with a corrected query. The original query was: ${sql}`,
     };
-  }
-}
-
-// Execute a tool by name
-export async function executeTool(
-  name: string,
-  args: Record<string, unknown>
-): Promise<ToolResult> {
-  switch (name) {
-    case "read_document":
-      return readDocument(args.symbol as string);
-    case "query_database":
-      return queryDatabase(args.query as string, args.explanation as string);
-    default:
-      return {
-        success: false,
-        error: `Unknown tool: ${name}`,
-      };
   }
 }

@@ -1,153 +1,170 @@
-# UN Website Boilerplate (with Auth)
+# UN SG Reports Survey
 
-A Next.js template with UN branding and magic link authentication.
-
-Based on: https://github.com/kleinlennart/un-website-boilerplate
+An internal web app for the United Nations EOSG to track, confirm, and analyze UN Secretary-General reports across all UN entities. Users from each UN entity sign in, confirm which SG reports their entity is responsible for, and administrators review overall progress.
 
 ## Features
 
-- UN branding (logo, colors, Roboto font)
-- Magic link authentication (configurable email domains via DB)
-- Rate limiting on magic link requests (2 min cooldown)
-- 30-day session duration
-- PostgreSQL session/user storage
-- Configurable database schema per app
-- Entity selection on first login (with "Other" option)
-- Entity change dialog (click entity badge in header)
-- Public landing page (`/about`) + protected dashboard (`/`)
+- **Report Browser** — Browse and search the full list of SG reports with entity assignments
+- **Entity Confirmations** — Each entity confirms their lead/contributing roles for assigned reports
+- **Survey Responses** — Users respond to structured survey questions per report
+- **AI Chat** — Ask natural-language questions about the reports database (powered by Azure OpenAI + pgvector similarity search)
+- **Excel Export** — Admin-only export of entity progress to Excel
+- **Analysis Dashboard** — Overview of response rates and confirmation status across all entities
+- **Magic Link Auth** — Passwordless authentication via email magic links (`@un.org` and other UN system domains)
+- **Entity Selection** — First-login entity selection; entity badge in header for easy switching
 
-## Setup
+## Tech Stack
 
-### 1. Install dependencies
+- **Framework**: Next.js 15 (App Router), React 18, TypeScript
+- **Styling**: Tailwind CSS, shadcn/ui components
+- **Database**: PostgreSQL with pgvector extension (for similarity search)
+- **Authentication**: Custom magic-link auth (HMAC-signed tokens, 30-day sessions)
+- **AI**: Azure OpenAI (GPT-4o) via Vercel AI SDK; pgvector for semantic document retrieval
+- **Export**: ExcelJS for `.xlsx` generation
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- PostgreSQL with pgvector extension
+- Azure OpenAI deployment
+
+### Setup
+
+1. Install dependencies:
 
 ```bash
 npm install
 ```
 
-### 2. Configure environment
+2. Configure environment:
 
 ```bash
 cp .env.template .env.local
 ```
 
-Edit `.env.local`:
-- `DATABASE_URL` - PostgreSQL connection string
-- `DB_SCHEMA` - Schema for auth tables (e.g. `sg_reports_survey` → `sg_reports_survey.users`, `sg_reports_survey.magic_tokens`)
-- `AUTH_SECRET` - Generate with `openssl rand -hex 32`
-- `SMTP_*` - Mail server for magic links
-- `BASE_URL` - Your app URL (for magic link emails)
+Required variables:
 
-### 3. Create database tables
+| Variable | Description |
+|---|---|
+| `DATABASE_URL` | Main PostgreSQL connection string (admin user) |
+| `DATABASE_URL_CHAT` | Read-only PostgreSQL connection for AI chat queries |
+| `DB_SCHEMA` | Schema name (e.g. `sg_reports_survey`) |
+| `AUTH_SECRET` | HMAC signing secret (`openssl rand -hex 32`) |
+| `BASE_URL` | Public URL of the app (for magic link emails) |
+| `SMTP_HOST` | Mail server hostname |
+| `SMTP_PORT` | Mail server port |
+| `SMTP_USER` | Mail username |
+| `SMTP_PASS` | Mail password |
+| `SMTP_FROM` | From address for magic link emails |
+| `AZURE_OPENAI_API_KEY` | Azure OpenAI key (AI chat feature) |
+| `AZURE_OPENAI_ENDPOINT` | Azure OpenAI endpoint |
+| `AZURE_OPENAI_DEPLOYMENT` | GPT-4o deployment name |
 
-Edit `sql/auth_tables.sql` and replace `sg_reports_survey` with your schema name (must match `DB_SCHEMA`), then:
+3. Provision the database (run in this order):
 
 ```bash
-psql $DATABASE_URL -f sql/auth_tables.sql
+# Auth and user tables
+psql "$DATABASE_URL" -f sql/auth_tables.sql
+
+# Application tables
+psql "$DATABASE_URL" -f sql/reports_tables.sql
+psql "$DATABASE_URL" -f sql/survey_responses_table.sql
+psql "$DATABASE_URL" -f sql/report_frequencies_table.sql
+psql "$DATABASE_URL" -f sql/frequency_confirmations_table.sql
+
+# Views
+psql "$DATABASE_URL" -f sql/views.sql
+
+# Apply all migrations in order
+for f in sql/migrations/*.sql; do psql "$DATABASE_URL" -f "$f"; done
+
+# Create read-only chat user (requires superuser)
+psql "$DATABASE_URL" -f sql/create_chat_user.sql
 ```
 
-The schema includes an `allowed_domains` table pre-populated with UN system domains (un.org, undp.org, unicef.org, who.int, etc.). Edit the SQL to remove domains you don't need, or add custom ones:
+> **Note:** `sql/auth_tables.sql` defines users, magic_tokens, sessions, allowed_domains, and admin_emails. The schema reflects the state after all migrations have been applied (notably, migration 007 drops the `role` column from `users` and adds `admin_emails`).
 
-```sql
--- Add a custom domain
-INSERT INTO myapp.allowed_domains (entity, domain) VALUES
-  ('*', 'example.org'),        -- global: allow for all entities
-  ('PARTNER', 'partner.org');  -- entity-specific
-```
-
-### 4. Run
+4. Start the development server:
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser.
+Open [http://localhost:3000](http://localhost:3000).
+
+## Python Data Pipeline
+
+The `python/` directory contains scripts for ingesting SG report metadata from UN Digital Library and other sources. Run them in order:
+
+```
+01_fetch_sg_reports.py      # Download report metadata from UN Digital Library
+02_process_reports.py       # Normalize and deduplicate records
+03_fuse_ceb_revenue.py      # Merge CEB revenue data
+04_...                      # (see individual script headers for details)
+```
+
+Requirements: `pip install -r python/requirements.txt` (or use `uv`/`pyproject.toml` if present).
 
 ## Auth Flow
 
 1. User visits `/about` (public landing page)
-2. User clicks "Sign In" → `/login`
-3. User enters email, magic link sent (rate limited: 2 min cooldown)
-4. User clicks link → `/verify?token=...`
-5. First login: select entity (combobox with "Other" option); returning users: direct sign-in
-6. Session cookie set (30 days)
-7. Header shows user email, clickable entity badge (to change), and logout
-8. Unauthenticated users accessing protected routes → redirect to `/about`
+2. User enters email → magic link sent (2-minute cooldown per email)
+3. User clicks link → token verified → session cookie set (30 days)
+4. First login: select entity from dropdown; returning users: direct sign-in
+5. Header shows email + entity badge (click to change entity)
+6. Unauthenticated access to protected routes → redirect to `/about`
 
-## Customization
+## Admin Access
 
-- **Site title/subtitle**: Edit `SITE_TITLE` and `SITE_SUBTITLE` in `src/components/Header.tsx`
-- **Allowed email domains**: Add to `allowed_domains` table in database
-- **Entity list**: Query in `fetchEntities()` in `src/app/api/entities/route.ts`
-- **Document search**: Query in `src/app/api/documents/search/route.ts`
-- **Protected routes**: Edit `PUBLIC_PATHS` in `src/middleware.ts`
-- **Auth schema**: Set `DB_SCHEMA` env var and update `sql/auth_tables.sql`
+Admin users are identified via the `admin_emails` table (added in migration 007). Admins can:
+- Export entity progress to Excel (`/api/export/survey`)
+- View all users and their entities
+- Access analysis dashboard
 
-## File Structure
+To add an admin:
+```sql
+INSERT INTO sg_reports_survey.admin_emails (email) VALUES ('admin@un.org');
+```
+
+## AI Chat
+
+The AI chat feature (`/chat`) lets users ask questions about SG reports. The assistant:
+- Uses Azure OpenAI (GPT-4o) for language understanding
+- Has access to two tools: `read_document` (fetch full text of a report by symbol) and `query_database` (read-only SQL queries via a restricted `chat_readonly` DB user)
+- The `chat_readonly` DB user (created by `sql/create_chat_user.sql`) has SELECT-only access to non-sensitive tables
+
+## Project Structure
 
 ```
 src/
 ├── app/
-│   ├── about/                # Public landing page
 │   ├── api/
-│   │   ├── auth/             # Auth API routes (backup, actions preferred)
-│   │   ├── documents/search/ # Document search
-│   │   └── entities/         # Entity list + fetchEntities()
-│   ├── login/                # Login page + layout
-│   ├── verify/               # Token verification + entity selection
-│   └── page.tsx              # Protected dashboard
-├── components/
-│   ├── DocumentSearch.tsx    # Document autocomplete
-│   ├── EntityChangeDialog.tsx # Dialog to change entity
-│   ├── EntityCombobox.tsx    # Entity dropdown with "Other" option
-│   ├── EntitySearch.tsx      # Entity autocomplete (for search)
-│   ├── Footer.tsx            # Site footer
-│   ├── Header.tsx            # Site header with maxWidth, hideAbout props
-│   ├── LoginForm.tsx         # Login form (uses server actions)
-│   ├── UserMenu.tsx          # Email + entity badge + logout
-│   └── VerifyForm.tsx        # Verify form with returning user detection
+│   │   ├── auth/             # Magic link request + verify
+│   │   ├── chat/             # AI chat endpoint
+│   │   ├── entity-confirmations/ # Lead/contributing confirmations
+│   │   ├── export/           # Excel export (survey + entities)
+│   │   ├── sg-reports/       # Report list + filter
+│   │   └── survey-responses/ # Survey answer CRUD
+│   ├── analysis/             # Admin analysis dashboard
+│   ├── chat/                 # AI chat UI
+│   └── page.tsx              # Main dashboard
+├── components/               # React components
 ├── lib/
-│   ├── actions.ts            # Server actions for auth
-│   ├── auth.ts               # Auth logic (isAllowedDomain, sessions, etc.)
-│   ├── config.ts             # DB_SCHEMA config + table names
-│   ├── db.ts                 # PostgreSQL pool
-│   ├── mail.ts               # Magic link emails
-│   └── utils.ts              # Tailwind cn() helper
-└── middleware.ts             # Route protection
+│   ├── auth.ts               # Magic link, session, HMAC logic
+│   ├── chat-tools.ts         # AI tool implementations (readDocument, queryDatabase)
+│   ├── db.ts                 # Main DB pool (admin user)
+│   ├── db-chat.ts            # Read-only DB pool (chat_readonly user)
+│   └── ...
 sql/
-└── auth_tables.sql           # Database schema (users, tokens, allowed_domains)
+├── auth_tables.sql           # users, magic_tokens, sessions, allowed_domains, admin_emails
+├── reports_tables.sql        # documents, report_entity_confirmations
+├── survey_responses_table.sql
+├── report_frequencies_table.sql
+├── frequency_confirmations_table.sql
+├── views.sql
+├── create_chat_user.sql      # Creates chat_readonly PostgreSQL role
+└── migrations/               # Incremental schema changes (apply in order)
+python/                       # Data ingestion pipeline scripts
 ```
-
-## Maintenance
-
-### Check for issues
-```bash
-npm audit          # Security vulnerabilities
-npm outdated       # Outdated packages
-npm run lint       # ESLint errors
-npx tsc --noEmit   # TypeScript errors
-```
-
-### Update packages
-```bash
-npm update                                              # Safe patch/minor updates
-npm install next@latest eslint-config-next@latest       # Update Next.js
-```
-
-### Clean install (if issues occur)
-```bash
-rm -rf node_modules .next && npm install
-```
-
-## Good to know
-
-- use `npx shadcn@latest add <component-name>` when you need to add components.
-
-- https://nextjs.org/docs/app/api-reference/file-conventions/src-folder
-- https://nextjs.org/docs/app/getting-started/project-structure
-
-- The `/public` directory should remain in the root of your project.
-- Config files like `package.json`, `next.config.js` and `tsconfig.json` should remain in the root of your project.
-- `.env.*` files should remain in the root of your project.
-
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Learn Next.js](https://nextjs.org/learn)
